@@ -1,0 +1,38 @@
+-------------------------------------------------------------------------------
+Test set: QueryPlanEquivalenceTest
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 2, Skipped: 0, Time elapsed: 2.163 s <<< FAILURE! -- in QueryPlanEquivalenceTest
+QueryPlanEquivalenceTest.testEquivalentPlans -- Time elapsed: 1.659 s <<< ERROR!
+java.lang.NullPointerException: Cannot invoke "org.apache.calcite.plan.RelTrait.getTraitDef()" because "trait" is null
+	at org.apache.calcite.plan.RelTraitSet.replace(RelTraitSet.java:195)
+	at org.apache.calcite.plan.RelOptCluster.traitSetOf(RelOptCluster.java:272)
+	at org.apache.calcite.adapter.jdbc.JdbcTableScan.<init>(JdbcTableScan.java:47)
+	at org.apache.calcite.adapter.jdbc.JdbcTable.toRel(JdbcTable.java:178)
+	at org.apache.calcite.prepare.RelOptTableImpl.toRel(RelOptTableImpl.java:287)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.toRel(SqlToRelConverter.java:4116)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertIdentifier(SqlToRelConverter.java:2881)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertFrom(SqlToRelConverter.java:2457)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertFrom(SqlToRelConverter.java:2397)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertFrom(SqlToRelConverter.java:2359)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertSelectImpl(SqlToRelConverter.java:755)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertSelect(SqlToRelConverter.java:735)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertQueryRecursive(SqlToRelConverter.java:3939)
+	at org.apache.calcite.sql2rel.SqlToRelConverter.convertQuery(SqlToRelConverter.java:628)
+	at org.apache.calcite.prepare.PlannerImpl.rel(PlannerImpl.java:271)
+	at QueryPlanEquivalenceTest.getLogicalPlan(QueryPlanEquivalenceTest.java:66)
+	at QueryPlanEquivalenceTest.testEquivalentPlans(QueryPlanEquivalenceTest.java:76)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+QueryPlanEquivalenceTest.testNonEquivalentPlans -- Time elapsed: 0.005 s <<< ERROR!
+java.lang.IllegalArgumentException: cannot move to STATE_2_READY from STATE_4_VALIDATED
+	at org.apache.calcite.prepare.PlannerImpl.ensure(PlannerImpl.java:150)
+	at org.apache.calcite.prepare.PlannerImpl.parse(PlannerImpl.java:214)
+	at org.apache.calcite.tools.Planner.parse(Planner.java:50)
+	at QueryPlanEquivalenceTest.getLogicalPlan(QueryPlanEquivalenceTest.java:64)
+	at QueryPlanEquivalenceTest.testNonEquivalentPlans(QueryPlanEquivalenceTest.java:92)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
