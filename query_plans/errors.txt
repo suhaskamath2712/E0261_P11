@@ -1,0 +1,573 @@
+Attempting to read queries from 'C:\Users\suhas\Downloads\E0261_P11\query_plans\all_queries.sql'...
+Successfully parsed 72 queries.
+
+Connecting to PostgreSQL database 'tpch'...
+Connection successful.
+
+[1/72] Processing Query ID: U1
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U1.json'
+
+[2/72] Processing Query ID: U2
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U2.json'
+
+[3/72] Processing Query ID: U3
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U3.json'
+
+[4/72] Processing Query ID: U4
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U4.json'
+
+[5/72] Processing Query ID: U5
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U5.json'
+
+[6/72] Processing Query ID: U6
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U6.json'
+
+[7/72] Processing Query ID: U7
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U7.json'
+
+[8/72] Processing Query ID: U8
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: syntax error at end of input
+LINE 4: ...verage quantity. Uses 'lineitem' instead of 'web_lineitem'.;
+                                                                       ^
+
+Problematic Query Fragment:
+-- =================================================================
+-- Query ID: U8 (Corrected)
+-- Description: Combines customers with the fewest recent orders and line items
+-- with the highest ave...
+
+
+[9/72] Processing Query ID: U9
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\U9.json'
+
+[10/72] Processing Query ID: O1
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\O1.json'
+
+[11/72] Processing Query ID: O2
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\O2.json'
+
+[12/72] Processing Query ID: O3
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\O3.json'
+
+[13/72] Processing Query ID: O4
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\O4.json'
+
+[14/72] Processing Query ID: O5
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\O5.json'
+
+[15/72] Processing Query ID: O6
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\O6.json'
+
+[16/72] Processing Query ID: A1
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\A1.json'
+
+[17/72] Processing Query ID: A2
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\A2.json'
+
+[18/72] Processing Query ID: A3
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\A3.json'
+
+[19/72] Processing Query ID: A4
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\A4.json'
+
+[20/72] Processing Query ID: A5
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\A5.json'
+
+[21/72] Processing Query ID: N1
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\N1.json'
+
+[22/72] Processing Query ID: F1
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\F1.json'
+
+[23/72] Processing Query ID: F2
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\F2.json'      
+
+[24/72] Processing Query ID: F3
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\F3.json'      
+
+[25/72] Processing Query ID: F4
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\F4.json'      
+
+[26/72] Processing Query ID: MQ1
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ1.json'     
+
+[27/72] Processing Query ID: MQ2
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ2.json'     
+
+[28/72] Processing Query ID: MQ3
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ3.json'
+
+[29/72] Processing Query ID: MQ4
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ4.json'
+
+[30/72] Processing Query ID: MQ5
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ5.json'
+
+[31/72] Processing Query ID: MQ6
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ6.json'
+
+[32/72] Processing Query ID: MQ10
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ10.json'
+
+[33/72] Processing Query ID: MQ11
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ11.json'
+
+[34/72] Processing Query ID: MQ17
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ17.json'
+
+[35/72] Processing Query ID: MQ18
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ18.json'
+
+[36/72] Processing Query ID: MQ21
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\MQ21.json'
+
+[37/72] Processing Query ID: Alaap
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\Alaap.json'
+
+[38/72] Processing Query ID: TPCH_Q9
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q9.json'
+
+[39/72] Processing Query ID: TPCH_Q11
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q11.json'
+
+[40/72] Processing Query ID: TPCH_Q12
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q12.json'
+
+[41/72] Processing Query ID: TPCH_Q13
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q13.json'
+
+[42/72] Processing Query ID: TPCH_Q14
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q14.json'
+
+[43/72] Processing Query ID: ETPCH_Q15
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\ETPCH_Q15.json'
+
+[44/72] Processing Query ID: TPCH_Q16
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q16.json'
+
+[45/72] Processing Query ID: TPCH_Q17
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\TPCH_Q17.json'
+
+[46/72] Processing Query ID: ETPCH_Q18
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 11:         web_lineitem
+                 ^
+
+Problematic Query Fragment:
+select
+        c_name,
+        c_custkey,
+        o_orderkey,
+        o_orderdate,
+        o_totalprice,
+        sum(wl_quantity)
+from
+        customer,
+        orders,
+        web_lineitem
+where
+    ...
+
+
+[47/72] Processing Query ID: Nested_Test
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\Nested_Test.json'
+
+[48/72] Processing Query ID: paper_sample
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 11: From web_lineitem, nation, orders, region, supplier
+              ^
+
+Problematic Query Fragment:
+(Select c_name as entity_name, n_name as country, o_totalprice as price
+From orders JOIN customer ON c_custkey = o_custkey
+and o_totalprice <= c_acctbal and c_acctbal >= 9000
+JOIN nation ON c_nationke...
+
+
+[49/72] Processing Query ID: ETPCH_Q1
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 20:     FROM web_lineitem
+                  ^
+
+Problematic Query Fragment:
+SELECT
+    returnflag,
+    linestatus,
+    SUM(quantity) AS sum_qty,
+    SUM(extendedprice) AS sum_base_price,
+    SUM(extendedprice * (1 - discount)) AS sum_disc_price,
+    SUM(extendedprice * (1 - d...
+
+
+[50/72] Processing Query ID: ETPCH_Q3
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 16:         web_lineitem
+                 ^
+
+Problematic Query Fragment:
+SELECT
+    orderkey,
+    SUM(extendedprice * (1 - discount)) AS revenue,
+    o_orderdate,
+    o_shippriority
+FROM (
+    SELECT
+        wl_orderkey AS orderkey,
+        wl_extendedprice AS extendedpric...
+
+
+[51/72] Processing Query ID: ETPCH_Q4
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 4:     FROM orders, web_lineitem
+                         ^
+
+Problematic Query Fragment:
+SELECT o_orderpriority, SUM(order_count) AS order_count
+FROM (
+    SELECT o_orderpriority, COUNT(DISTINCT orders.o_orderkey) AS order_count
+    FROM orders, web_lineitem
+    WHERE orders.o_orderkey = ...
+
+
+[52/72] Processing Query ID: ETPCH_Q5
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 4: ... FROM customer, nation, orders, region, supplier, web_lineit...
+                                                             ^
+
+Problematic Query Fragment:
+SELECT n_name, SUM(revenue) AS revenue
+FROM (
+    SELECT n_name, wl_extendedprice * (1 - wl_discount) AS revenue
+    FROM customer, nation, orders, region, supplier, web_lineitem
+    WHERE customer.c_...
+
+
+[53/72] Processing Query ID: ETPCH_Q6
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 4:     FROM web_lineitem
+                 ^
+
+Problematic Query Fragment:
+SELECT SUM(revenue) AS revenue
+FROM (
+    SELECT wl_extendedprice * wl_discount AS revenue
+    FROM web_lineitem
+    WHERE wl_shipdate >= DATE '1993-01-01'
+    AND wl_shipdate < DATE '1995-01-01'
+    ...
+
+
+[54/72] Processing Query ID: ETPCH_Q6_1
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 4:         FROM web_lineitem
+                     ^
+
+Problematic Query Fragment:
+SELECT SUM(revenue) AS revenue
+    FROM (
+        SELECT wl_extendedprice * wl_discount AS revenue
+        FROM web_lineitem
+        WHERE wl_shipdate >= DATE '1993-01-01'
+        AND wl_shipdate < DA...
+
+
+[55/72] Processing Query ID: ETPCH_Q6_2
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 4:         FROM web_lineitem
+                     ^
+
+Problematic Query Fragment:
+SELECT *
+    FROM (
+        SELECT sum(wl_extendedprice ) AS revenue
+        FROM web_lineitem
+        WHERE wl_shipdate >= DATE '1993-01-01'
+        AND wl_shipdate < DATE '1995-01-01'
+        AND wl...
+
+
+[56/72] Processing Query ID: ETPCH_Q7
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "nation1" does not exist
+LINE 4:     FROM customer, nation n1, nation1 n2, orders, supplier, ...
+                                      ^
+
+Problematic Query Fragment:
+SELECT supp_nation, cust_nation, l_year, SUM(revenue) as revenue
+FROM (
+    SELECT n1.n_name as supp_nation, n2.n1_name as cust_nation, EXTRACT(YEAR FROM wl_shipdate) as l_year, wl_extendedprice*(1 - ...
+
+
+[57/72] Processing Query ID: ETPCH_Q9
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 11:         nation, orders, part, partsupp, supplier, web_lineit...
+                                                           ^
+
+Problematic Query Fragment:
+SELECT
+    nation,
+    EXTRACT(YEAR FROM o_orderdate) AS o_year,
+    SUM(profit) AS sum_profit
+FROM (
+    SELECT
+        n_name AS nation,
+        o_orderdate,
+        (-ps_supplycost * wl_quantity + ...
+
+
+[58/72] Processing Query ID: ETPCH_Q10
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "store_lineitem" does not exist
+LINE 4:     FROM customer, nation, orders, store_lineitem
+                                           ^
+
+Problematic Query Fragment:
+SELECT c_custkey, c_name, SUM(revenue) AS revenue, c_acctbal, n_name, c_address, c_phone, c_comment   
+FROM (
+    SELECT c_custkey, c_name, sl_extendedprice * (1 - sl_discount) AS revenue, c_acctbal, n_n...      
+
+
+[59/72] Processing Query ID: ETPCH_Q12
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "store_lineitem" does not exist
+LINE 8:     FROM orders, store_lineitem
+                         ^
+
+Problematic Query Fragment:
+SELECT shipmode,
+       SUM(high_line_count) AS high_line_count,
+       SUM(low_line_count) AS low_line_count
+FROM (
+    SELECT sl_shipmode AS shipmode,
+           SUM(CASE WHEN o_orderpriority IN ('1...
+
+
+[60/72] Processing Query ID: ETPCH_Q14
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "store_lineitem" does not exist
+LINE 7:         part, store_lineitem
+                      ^
+
+Problematic Query Fragment:
+SELECT SUM(promo_revenue) / SUM(total_revenue) * 100 AS promo_revenue_percentage
+FROM (
+    SELECT
+        SUM(CASE WHEN part.p_type LIKE 'PROMO%' THEN store_lineitem.sl_extendedprice * (1 - store_lin...
+
+
+[61/72] Processing Query ID: ETPCH_Q13
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\ETPCH_Q13.json'
+
+[62/72] Processing Query ID: ETPCH_Q2
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\ETPCH_Q2.json'
+
+[63/72] Processing Query ID: ETPCH_Q22
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "customer1" does not exist
+LINE 19:                                         customer1
+                                                 ^
+
+Problematic Query Fragment:
+select
+        cntrycode,
+        count(*) as numcust,
+        sum(c_acctbal) as totacctbal
+from
+        (
+                select
+                        substring(c_phone from 1 for 2) as cntrycode,
+...
+
+
+[64/72] Processing Query ID: ETPCH_Q8
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 16:                         web_lineitem,
+                                 ^
+
+Problematic Query Fragment:
+select
+        o_year,
+        sum(case
+                when nation = 'INDIA' then volume
+                else 0
+        end) / sum(volume) as mkt_share
+from
+        (
+                select
+         ...
+
+
+[65/72] Processing Query ID: ETPCH_Q11
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\ETPCH_Q11.json'
+
+[66/72] Processing Query ID: ETPCH_Q16
+Successfully saved plan to 'C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans\ETPCH_Q16.json'
+
+[67/72] Processing Query ID: ETPCH_Q17
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 3:         web_lineitem,
+                ^
+
+Problematic Query Fragment:
+select sum(wl_extendedprice) / 7.0 as avg_yearly
+from
+        web_lineitem,
+        part
+where
+        p_partkey = wl_partkey
+        and p_brand = 'Brand#53'
+        and p_container = 'MED BAG'
+     ...
+
+
+[68/72] Processing Query ID: ETPCH_Q19
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 4:         web_lineitem,
+                ^
+
+Problematic Query Fragment:
+select
+        sum(wl_extendedprice* (1 - wl_discount)) as revenue
+from
+        web_lineitem,
+        part
+where
+        (
+                p_partkey = wl_partkey
+                and p_brand = 'Brand#1...
+
+
+[69/72] Processing Query ID: ETPCH_Q20
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 26:                                         web_lineitem
+                                                 ^
+
+Problematic Query Fragment:
+select
+        s_name,
+        s_address
+from
+        supplier,
+        nation
+where
+        s_suppkey in (
+                select
+                        ps_suppkey
+                from
+             ...
+
+
+[70/72] Processing Query ID: ETPCH_Q21
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "web_lineitem" does not exist
+LINE 2: FROM supplier, nation, orders, web_lineitem l1
+                                       ^
+
+Problematic Query Fragment:
+SELECT s_name, COUNT(*) AS numwait
+FROM supplier, nation, orders, web_lineitem l1
+WHERE s_suppkey = l1.wl_suppkey
+  AND s_nationkey = n_nationkey
+  AND n_name = 'ARGENTINA'
+  AND l1.wl_orderkey = o_or...
+
+
+[71/72] Processing Query ID: ETPCH_Q23
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "order1" does not exist
+LINE 5:          order1 o2,
+                 ^
+
+Problematic Query Fragment:
+SELECT   RIGHT(c_address, 5) AS city,
+         p_brand             AS part_brand
+FROM     customer,
+         orders o1,
+         order1 o2,
+         store_lineitem,
+         web_lineitem,
+         par...
+
+
+[72/72] Processing Query ID: ETPCH_Q24
+
+--- PostgreSQL Error ---
+Error executing EXPLAIN for a query.
+Details: relation "order1" does not exist
+LINE 4: order1 o2,
+        ^
+
+Problematic Query Fragment:
+select c_address as city
+from customer,
+orders o1,
+order1 o2,
+store_lineitem,
+web_lineitem w,
+part,
+web_lineitem1 w1,
+partsupp ps1,
+partsupp1 ps2
+where c_custkey = o1.o_custkey and c_custkey = o2.o1_c...
+
+
+Database connection closed.

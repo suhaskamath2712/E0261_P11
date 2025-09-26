@@ -16,7 +16,7 @@ DB_SETTINGS = {
 
 # --- CONFIGURATION ---
 # The name of the SQL file containing the queries.
-SQL_FILE_PATH = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\queries.sql"
+SQL_FILE_PATH = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\all_queries.sql"
 
 # The directory where the output JSON plans will be saved.
 OUTPUT_DIR = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans"
@@ -117,6 +117,11 @@ def main():
     if not queries_to_run:
         print("No queries to process. Exiting.")
         return
+        
+    for query_id in queries_to_run:
+        if (query_id[0] + '.json') in os.listdir(OUTPUT_DIR):
+            print(f"Query ID '{query_id}' already processed. Skipping.")
+            queries_to_run.remove(query_id)   
 
     conn = None
     try:

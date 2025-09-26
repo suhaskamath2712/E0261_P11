@@ -57,15 +57,26 @@ ps_availqty > 200 Order By s_suppkey Limit 7);
  UNION ALL  (SELECT     ps_partkey as key,     p_retailprice as price,     ps_suppkey as s_key FROM     partsupp,supplier,part where ps_suppkey = s_suppkey and ps_partkey = p_partkey     AND ps_supplycost < 100 Order By price Limit 20);
 
 -- =================================================================
--- Query ID: U8
--- Description: Combines customers with the fewest recent orders and web line items with the highest average quantity.
+-- Query ID: U8 (Corrected)
+-- Description: Combines customers with the fewest recent orders and line items with the highest average quantity.
 -- =================================================================
-(SELECT     c_custkey as order_id,     COUNT(*) AS total FROM
-customer, orders where c_custkey = o_custkey and     o_orderdate >= '1995-01-01'
-GROUP BY     c_custkey ORDER BY     total ASC LIMIT 10) UNION ALL
-(SELECT     wl_orderkey as order_id,     AVG(wl_quantity) AS total FROM     orders, web_lineitem where
-wl_orderkey = o_orderkey     AND o_orderdate < DATE '1996-07-01' GROUP BY     wl_orderkey ORDER BY
-total DESC LIMIT 10);
+(SELECT
+    c_custkey as order_id,
+    COUNT(*) AS total
+FROM customer, orders
+WHERE c_custkey = o_custkey AND o_orderdate >= '1995-01-01'
+GROUP BY c_custkey
+ORDER BY total ASC
+LIMIT 10)
+UNION ALL
+(SELECT
+    l_orderkey as order_id,
+    AVG(l_quantity) AS total
+FROM orders, lineitem
+WHERE l_orderkey = o_orderkey AND o_orderdate < DATE '1996-07-01'
+GROUP BY l_orderkey
+ORDER BY total DESC
+LIMIT 10);
 
 -- =================================================================
 -- Query ID: U9
@@ -214,7 +225,7 @@ l_partkey = p_partkey and o_orderkey = l_orderkey and l_shipdate >=
 o_orderdate and o_orderdate > '1994-01-01' and l_shipdate > '1995-01-01' and p_retailprice >= l_extendedprice and p_partkey < 10000 and
 l_suppkey < 10000 and p_container = 'LG CAN' Order By o_clerk LIMIT
 5) UNION ALL (Select p_brand, s_name, l_shipmode From lineitem,
-part, supplier Where l_partkey = p_partkey and s_suppkey = s_suppkey
+part, supplier Where l_partkey = p_partkey and s_suppkey = l_suppkey
 and l_shipdate > '1995-01-01' and s_acctbal >= l_extendedprice and
 p_partkey < 15000 and l_suppkey < 14000 and p_container = 'LG CAN'
 Order By s_name LIMIT 10);
@@ -559,54 +570,37 @@ where
 	and l_shipdate < date '1995-01-01' + interval '1' month;
 
 -- =================================================================
--- Query ID: ETPCH_Q15 (TPCH Q15)
+-- Query ID: ETPCH_Q15 (TPCH Q15) (Corrected)
 -- Description: Top Supplier Query. Finds the supplier with the maximum total revenue for a given period.
 -- =================================================================
-with revenue(supplier_no, total_revenue) as
-(select
-                l_suppkey,
-                sum(l_extendedprice * (1 - l_discount))
-        from
-                (select
-		 sl_extendedprice as l_extendedprice,
-		 sl_discount as l_discount,
-		 sl_partkey as l_partkey,
-		 sl_suppkey as l_suppkey,
-		 sl_shipdate as l_shipdate
-		 from store_lineitem
-		 UNION ALL
-		 select
-		 wl_extendedprice as l_extendedprice,
-		 wl_discount as l_discount,
-		 wl_partkey as l_partkey,
-		 wl_suppkey as l_suppkey,
-		 wl_shipdate as l_shipdate
-		 from web_lineitem
-        ) as lineitem
-where
-        l_shipdate >= date '1995-01-01'
-        and l_shipdate < date '1995-01-01' + interval '1' month
-        group by
-                l_suppkey)
-select
-        s_suppkey,
-        s_name,
-        s_address,
-        s_phone,
-        total_revenue
-from
-        supplier,
-        revenue
-where
-        s_suppkey = supplier_no
-        and total_revenue = (
-                select
-                        max(total_revenue)
-                from
-                        revenue
-        )
-order by
-        s_suppkey;
+WITH revenue (supplier_no, total_revenue) AS (
+    SELECT
+        l_suppkey,
+        SUM(l_extendedprice * (1 - l_discount))
+    FROM
+        lineitem
+    WHERE
+        l_shipdate >= DATE '1995-01-01'
+        AND l_shipdate < DATE '1995-01-01' + INTERVAL '1' MONTH
+    GROUP BY
+        l_suppkey
+)
+SELECT
+    s_suppkey,
+    s_name,
+    s_address,
+    s_phone,
+    total_revenue
+FROM
+    supplier,
+    revenue
+WHERE
+    s_suppkey = supplier_no
+    AND total_revenue = (
+        SELECT MAX(total_revenue) FROM revenue
+    )
+ORDER BY
+    s_suppkey;
 
 -- =================================================================
 -- Query ID: TPCH_Q16
@@ -661,42 +655,41 @@ WHERE p.p_brand = 'Brand#53'
   AND l.l_quantity < avg_lineitem.threshold_quantity;
 
 -- =================================================================
--- Query ID: ETPCH_Q18 (TPCH Q18)
+-- Query ID: ETPCH_Q18 (TPCH Q18) (Corrected)
 -- Description: Large Volume Customer Query. Finds top customers who have placed a large volume of orders.
--- Uses web_lineitem.
 -- =================================================================
 select
-        c_name,
-        c_custkey,
-        o_orderkey,
-        o_orderdate,
-        o_totalprice,
-        sum(wl_quantity)
+    c_name,
+    c_custkey,
+    o_orderkey,
+    o_orderdate,
+    o_totalprice,
+    sum(l_quantity)
 from
-        customer,
-        orders,
-        web_lineitem
+    customer,
+    orders,
+    lineitem
 where
-        o_orderkey in (
-                select
-                        wl_orderkey
-                from
-                        web_lineitem
-                group by
-                        wl_orderkey having
-                                sum(wl_quantity) > 300
-        )
-        and c_custkey = o_custkey
-        and o_orderkey = wl_orderkey
+    o_orderkey in (
+        select
+            l_orderkey
+        from
+            lineitem
+        group by
+            l_orderkey having
+                sum(l_quantity) > 300
+    )
+    and c_custkey = o_custkey
+    and o_orderkey = l_orderkey
 group by
-        c_name,
-        c_custkey,
-        o_orderkey,
-        o_orderdate,
-        o_totalprice
+    c_name,
+    c_custkey,
+    o_orderkey,
+    o_orderdate,
+    o_totalprice
 order by
-        o_totalprice desc,
-        o_orderdate;
+    o_totalprice desc,
+    o_orderdate;
 
 -- =================================================================
 -- Query ID: Nested_Test
@@ -721,7 +714,7 @@ order by
         s_name;
 
 -- =================================================================
--- Query ID: paper_sample
+-- Query ID: paper_sample (Corrected)
 -- Description: A custom UNION ALL query combining high-value customers with suppliers based on average price.
 -- =================================================================
 (Select c_name as entity_name, n_name as country, o_totalprice as price
@@ -733,103 +726,59 @@ Group By c_name, n_name, o_totalprice
 Order By price asc, country asc, entity_name)
 UNION ALL
 (Select s_name as entity_name, n_name as country,
-Avg(wl_extendedprice*(1 - wl_discount)) as price
-From web_lineitem, nation, orders, region, supplier
-Where wl_suppkey = s_suppkey and n_nationkey = s_nationkey and
-wl_orderkey = o_orderkey and n_regionkey = r_regionkey and s_acctbal
+Avg(l_extendedprice*(1 - l_discount)) as price
+From lineitem, nation, orders, region, supplier
+Where l_suppkey = s_suppkey and n_nationkey = s_nationkey and
+l_orderkey = o_orderkey and n_regionkey = r_regionkey and s_acctbal
 <= o_totalprice and o_totalprice <= 15000
 Group By n_name, s_name
 Order By price desc, country desc, entity_name);
 
 -- =================================================================
--- Query ID: ETPCH_Q1
--- Description: Extended TPC-H Q1, combining web and store line items for pricing summary.
+-- Query ID: ETPCH_Q1 (Corrected)
+-- Description: Simplified version of ETPCH Q1, using the standard lineitem table.
 -- =================================================================
 SELECT
-    returnflag,
-    linestatus,
-    SUM(quantity) AS sum_qty,
-    SUM(extendedprice) AS sum_base_price,
-    SUM(extendedprice * (1 - discount)) AS sum_disc_price,
-    SUM(extendedprice * (1 - discount) * (1 + tax)) AS sum_charge,
-    AVG(quantity) AS avg_qty,
-    AVG(extendedprice) AS avg_price,
-    AVG(discount) AS avg_disc,
+    l_returnflag as returnflag,
+    l_linestatus as linestatus,
+    SUM(l_quantity) AS sum_qty,
+    SUM(l_extendedprice) AS sum_base_price,
+    SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price,
+    SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+    AVG(l_quantity) AS avg_qty,
+    AVG(l_extendedprice) AS avg_price,
+    AVG(l_discount) AS avg_disc,
     COUNT(*) AS count_order
-FROM (
-    SELECT
-        wl_returnflag AS returnflag,
-        wl_linestatus AS linestatus,
-        wl_quantity AS quantity,
-        wl_extendedprice AS extendedprice,
-        wl_discount AS discount,
-        wl_tax AS tax
-    FROM web_lineitem
-    WHERE wl_shipdate <= DATE '1998-12-01' - INTERVAL '3' DAY
-    UNION ALL
-    SELECT
-        sl_returnflag AS returnflag,
-        sl_linestatus AS linestatus,
-        sl_quantity AS quantity,
-        sl_extendedprice AS extendedprice,
-        sl_discount AS discount,
-        sl_tax AS tax
-    FROM store_lineitem
-    WHERE sl_shipdate <= DATE '1998-12-01' - INTERVAL '3' DAY
-) AS combined
+FROM lineitem
+WHERE l_shipdate <= DATE '1998-12-01' - INTERVAL '3' DAY
 GROUP BY
-    returnflag,
-    linestatus
+    l_returnflag,
+    l_linestatus
 ORDER BY
-    returnflag,
-    linestatus;
+    l_returnflag,
+    l_linestatus;
 
 -- =================================================================
--- Query ID: ETPCH_Q3
--- Description: Extended TPC-H Q3, combining web and store orders for shipping priority analysis.
+-- Query ID: ETPCH_Q3 (Corrected)
+-- Description: Simplified version of ETPCH Q3, using the standard lineitem table for shipping priority analysis.
 -- =================================================================
 SELECT
-    orderkey,
-    SUM(extendedprice * (1 - discount)) AS revenue,
+    l_orderkey,
+    SUM(l_extendedprice * (1 - l_discount)) AS revenue,
     o_orderdate,
     o_shippriority
-FROM (
-    SELECT
-        wl_orderkey AS orderkey,
-        wl_extendedprice AS extendedprice,
-        wl_discount AS discount,
-        o_orderdate,
-        o_shippriority
-    FROM
-        customer,
-        orders,
-        web_lineitem
-    WHERE
-        c_mktsegment = 'FURNITURE'
-        AND c_custkey = o_custkey
-        AND wl_orderkey = o_orderkey
-        AND o_orderdate < DATE '1995-01-01'
-        AND wl_shipdate > DATE '1995-01-01'
-    UNION ALL
-    SELECT
-        sl_orderkey AS orderkey,
-        sl_extendedprice AS extendedprice,
-        sl_discount AS discount,
-        o_orderdate,
-        o_shippriority
-    FROM
-        customer,
-        orders,
-        store_lineitem
-    WHERE
-        c_mktsegment = 'FURNITURE'
-        AND c_custkey = o_custkey
-        AND sl_orderkey = o_orderkey
-        AND o_orderdate < DATE '1995-01-01'
-        AND sl_shipdate > DATE '1995-01-01'
-) AS combined_orders
+FROM
+    customer,
+    orders,
+    lineitem
+WHERE
+    c_mktsegment = 'FURNITURE'
+    AND c_custkey = o_custkey
+    AND l_orderkey = o_orderkey
+    AND o_orderdate < DATE '1995-01-01'
+    AND l_shipdate > DATE '1995-01-01'
 GROUP BY
-    orderkey,
+    l_orderkey,
     o_orderdate,
     o_shippriority
 ORDER BY
@@ -837,147 +786,85 @@ ORDER BY
 LIMIT 10;
 
 -- =================================================================
--- Query ID: ETPCH_Q4
--- Description: Extended TPC-H Q4, combining web and store orders for order priority checking.
+-- Query ID: ETPCH_Q4 (Corrected)
+-- Description: Simplified version of ETPCH Q4, using the standard lineitem table for order priority checking.
 -- =================================================================
-SELECT o_orderpriority, SUM(order_count) AS order_count
-FROM (
-    SELECT o_orderpriority, COUNT(DISTINCT orders.o_orderkey) AS order_count
-    FROM orders, web_lineitem
-    WHERE orders.o_orderkey = web_lineitem.wl_orderkey
-    AND web_lineitem.wl_commitdate < web_lineitem.wl_receiptdate
-    AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-03-31'
-    GROUP BY o_orderpriority
-    UNION ALL
-    SELECT o_orderpriority, COUNT(DISTINCT orders.o_orderkey) AS order_count
-    FROM orders, store_lineitem
-    WHERE orders.o_orderkey = store_lineitem.sl_orderkey
-    AND store_lineitem.sl_commitdate < store_lineitem.sl_receiptdate
-    AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-03-31'
-    GROUP BY o_orderpriority
-) AS combined
+SELECT o_orderpriority, COUNT(DISTINCT o_orderkey) AS order_count
+FROM orders, lineitem
+WHERE o_orderkey = l_orderkey
+AND l_commitdate < l_receiptdate
+AND o_orderdate BETWEEN '1995-01-01' AND '1995-03-31'
 GROUP BY o_orderpriority
 ORDER BY o_orderpriority ASC;
 
 -- =================================================================
--- Query ID: ETPCH_Q5
--- Description: Extended TPC-H Q5, combining web and store data for local supplier volume.
+-- Query ID: ETPCH_Q5 (Corrected)
+-- Description: Simplified version of ETPCH Q5, using standard tables for local supplier volume.
 -- =================================================================
-SELECT n_name, SUM(revenue) AS revenue
-FROM (
-    SELECT n_name, wl_extendedprice * (1 - wl_discount) AS revenue
-    FROM customer, nation, orders, region, supplier, web_lineitem
-    WHERE customer.c_custkey = orders.o_custkey
-    AND customer.c_nationkey = nation.n_nationkey
-    AND nation.n_nationkey = supplier.s_nationkey
-    AND orders.o_orderkey = web_lineitem.wl_orderkey
-    AND nation.n_regionkey = region.r_regionkey
-    AND supplier.s_suppkey = web_lineitem.wl_suppkey
-    AND region.r_name = 'ASIA'
-    AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-12-31'
-    UNION ALL
-    SELECT n_name, sl_extendedprice * (1 - sl_discount) AS revenue
-    FROM customer, nation, orders, region, store_lineitem, supplier
-    WHERE orders.o_orderkey = store_lineitem.sl_orderkey
-    AND store_lineitem.sl_suppkey = supplier.s_suppkey
-    AND customer.c_custkey = orders.o_custkey
-    AND customer.c_nationkey = nation.n_nationkey
-    AND nation.n_nationkey = supplier.s_nationkey
-    AND nation.n_regionkey = region.r_regionkey
-    AND region.r_name = 'ASIA'
-    AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-12-31'
-) AS combined
+SELECT n_name, SUM(l_extendedprice * (1 - l_discount)) AS revenue
+FROM customer, nation, orders, region, supplier, lineitem
+WHERE customer.c_custkey = orders.o_custkey
+AND customer.c_nationkey = nation.n_nationkey
+AND nation.n_nationkey = supplier.s_nationkey
+AND orders.o_orderkey = lineitem.l_orderkey
+AND nation.n_regionkey = region.r_regionkey
+AND supplier.s_suppkey = lineitem.l_suppkey
+AND region.r_name = 'ASIA'
+AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-12-31'
 GROUP BY n_name
 ORDER BY revenue DESC, n_name ASC;
 
 -- =================================================================
--- Query ID: ETPCH_Q6
--- Description: Extended TPC-H Q6, combining web and store data for forecasting revenue change.
+-- Query ID: ETPCH_Q6 (Corrected)
+-- Description: Simplified version of ETPCH Q6, using the standard lineitem table for forecasting revenue change.
 -- =================================================================
-SELECT SUM(revenue) AS revenue
-FROM (
-    SELECT wl_extendedprice * wl_discount AS revenue
-    FROM web_lineitem
-    WHERE wl_shipdate >= DATE '1993-01-01'
-    AND wl_shipdate < DATE '1995-01-01'
-    AND wl_discount BETWEEN 0.05 AND 0.07
-    AND wl_quantity < 24
-    UNION ALL
-    SELECT sl_extendedprice * sl_discount AS revenue
-    FROM store_lineitem
-    WHERE sl_shipdate >= DATE '1993-01-01'
-    AND sl_shipdate < DATE '1995-01-01'
-    AND sl_discount BETWEEN 0.05 AND 0.07
-    AND sl_quantity < 24
-) AS combined_revenue;
+SELECT SUM(l_extendedprice * l_discount) AS revenue
+FROM lineitem
+WHERE l_shipdate >= DATE '1993-01-01'
+AND l_shipdate < DATE '1995-01-01'
+AND l_discount BETWEEN 0.05 AND 0.07
+AND l_quantity < 24;
 
 -- =================================================================
--- Query ID: ETPCH_Q6_1
--- Description: A variation of ETPCH_Q6 focusing only on web_lineitem data.
+-- Query ID: ETPCH_Q6_1 (Corrected)
+-- Description: A variation of ETPCH_Q6 focusing only on the standard lineitem table.
 -- =================================================================
-SELECT SUM(revenue) AS revenue
-    FROM (
-        SELECT wl_extendedprice * wl_discount AS revenue
-        FROM web_lineitem
-        WHERE wl_shipdate >= DATE '1993-01-01'
-        AND wl_shipdate < DATE '1995-01-01'
-        --AND wl_discount BETWEEN 0.05 AND 0.07
-        AND wl_quantity < 24
-        ) AS combined_revenue;
+SELECT SUM(l_extendedprice * l_discount) AS revenue
+FROM lineitem
+WHERE l_shipdate >= DATE '1993-01-01'
+AND l_shipdate < DATE '1995-01-01'
+AND l_quantity < 24;
 
 -- =================================================================
--- Query ID: ETPCH_Q6_2
--- Description: Another variation of ETPCH_Q6, summing revenue within each part of the UNION.
+-- Query ID: ETPCH_Q6_2 (Corrected)
+-- Description: Another variation of ETPCH_Q6, summing revenue from the standard lineitem table.
 -- =================================================================
-SELECT *
-    FROM (
-        SELECT sum(wl_extendedprice ) AS revenue
-        FROM web_lineitem
-        WHERE wl_shipdate >= DATE '1993-01-01'
-        AND wl_shipdate < DATE '1995-01-01'
-        AND wl_discount BETWEEN 0.05 AND 0.07
-        AND wl_quantity < 24
-        UNION ALL
-        SELECT sum(sl_extendedprice ) AS revenue
-        FROM store_lineitem
-        WHERE sl_shipdate >= DATE '1993-01-01'
-        AND sl_shipdate < DATE '1995-01-01'
-        AND sl_discount BETWEEN 0.05 AND 0.07
-        AND sl_quantity < 24
-    ) AS combined_revenue;
+SELECT sum(l_extendedprice ) AS revenue
+FROM lineitem
+WHERE l_shipdate >= DATE '1993-01-01'
+AND l_shipdate < DATE '1995-01-01'
+AND l_discount BETWEEN 0.05 AND 0.07
+AND l_quantity < 24;
 
 -- =================================================================
--- Query ID: ETPCH_Q7
--- Description: Extended TPC-H Q7, analyzing trade volume between two nations (FRANCE and GERMANY).
+-- Query ID: ETPCH_Q7 (Corrected)
+-- Description: Simplified version of ETPCH Q7, analyzing trade volume between two nations using standard tables.
 -- =================================================================
-SELECT supp_nation, cust_nation, l_year, SUM(revenue) as revenue
-FROM (
-    SELECT n1.n_name as supp_nation, n2.n1_name as cust_nation, EXTRACT(YEAR FROM wl_shipdate) as l_year, wl_extendedprice*(1 - wl_discount) as revenue
-    FROM customer, nation n1, nation1 n2, orders, supplier, web_lineitem
-    WHERE orders.o_orderkey = web_lineitem.wl_orderkey
-    AND supplier.s_suppkey = web_lineitem.wl_suppkey
-    AND customer.c_custkey = orders.o_custkey
-    AND customer.c_nationkey = n2.n1_nationkey
-    AND n1.n_nationkey = supplier.s_nationkey
-    AND ((n1.n_name = 'FRANCE' AND n2.n1_name = 'GERMANY') OR (n2.n1_name = 'FRANCE' AND n1.n_name = 'GERMANY'))
-    AND web_lineitem.wl_shipdate BETWEEN '1995-01-01' AND '1996-12-31'
-    UNION ALL
-    SELECT n1.n_name as supp_nation, n2.n1_name as cust_nation, EXTRACT(YEAR FROM sl_shipdate) as l_year, sl_extendedprice*(1 - sl_discount) as revenue
-    FROM customer, nation n1, nation1 n2, orders, supplier, store_lineitem
-    WHERE orders.o_orderkey = store_lineitem.sl_orderkey
-    AND supplier.s_suppkey = store_lineitem.sl_suppkey
-    AND customer.c_custkey = orders.o_custkey
-    AND customer.c_nationkey = n2.n1_nationkey
-    AND n1.n_nationkey = supplier.s_nationkey
-    AND ((n1.n_name = 'FRANCE' AND n2.n1_name = 'GERMANY') OR (n2.n1_name = 'FRANCE' AND n1.n_name = 'GERMANY'))
-    AND store_lineitem.sl_shipdate BETWEEN '1995-01-01' AND '1996-12-31'
-) AS combined
+SELECT n1.n_name as supp_nation, n2.n_name as cust_nation, EXTRACT(YEAR FROM l_shipdate) as l_year, SUM(l_extendedprice*(1 - l_discount)) as revenue
+FROM customer, nation n1, nation n2, orders, supplier, lineitem
+WHERE orders.o_orderkey = lineitem.l_orderkey
+AND supplier.s_suppkey = lineitem.l_suppkey
+AND customer.c_custkey = orders.o_custkey
+AND customer.c_nationkey = n2.n_nationkey
+AND n1.n_nationkey = supplier.s_nationkey
+AND ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n2.n_name = 'FRANCE' AND n1.n_name = 'GERMANY'))
+AND lineitem.l_shipdate BETWEEN '1995-01-01' AND '1996-12-31'
 GROUP BY supp_nation, cust_nation, l_year
 ORDER BY supp_nation, cust_nation, l_year;
 
 -- =================================================================
--- Query ID: ETPCH_Q9
--- Description: Extended TPC-H Q9, calculating profit by nation and year for specific parts.
+-- Query ID: ETPCH_Q9 (Corrected)
+-- Description: Simplified version of ETPCH Q9, calculating profit by nation and year using standard tables.
 -- =================================================================
 SELECT
     nation,
@@ -987,30 +874,15 @@ FROM (
     SELECT
         n_name AS nation,
         o_orderdate,
-        (-ps_supplycost * wl_quantity + wl_extendedprice * (1 - wl_discount)) AS profit
+        (l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS profit
     FROM
-        nation, orders, part, partsupp, supplier, web_lineitem
+        nation, orders, part, partsupp, supplier, lineitem
     WHERE
-        orders.o_orderkey = web_lineitem.wl_orderkey
+        orders.o_orderkey = lineitem.l_orderkey
         AND part.p_partkey = partsupp.ps_partkey
-        AND partsupp.ps_partkey = web_lineitem.wl_partkey
+        AND partsupp.ps_partkey = lineitem.l_partkey
         AND partsupp.ps_suppkey = supplier.s_suppkey
-        AND supplier.s_suppkey = web_lineitem.wl_suppkey
-        AND nation.n_nationkey = supplier.s_nationkey
-        AND part.p_name LIKE '%co%'
-    UNION ALL
-    SELECT
-        n_name AS nation,
-        o_orderdate,
-        (-ps_supplycost * sl_quantity + sl_extendedprice * (1 - sl_discount)) AS profit
-    FROM
-        nation, orders, part, partsupp, store_lineitem, supplier
-    WHERE
-        orders.o_orderkey = store_lineitem.sl_orderkey
-        AND part.p_partkey = partsupp.ps_partkey
-        AND partsupp.ps_partkey = store_lineitem.sl_partkey
-        AND partsupp.ps_suppkey = store_lineitem.sl_suppkey
-        AND store_lineitem.sl_suppkey = supplier.s_suppkey
+        AND supplier.s_suppkey = lineitem.l_suppkey
         AND nation.n_nationkey = supplier.s_nationkey
         AND part.p_name LIKE '%co%'
 ) AS combined
@@ -1020,87 +892,47 @@ ORDER BY
     nation ASC, o_year DESC;
 
 -- =================================================================
--- Query ID: ETPCH_Q10
--- Description: Extended TPC-H Q10, reporting on returned items from both web and store sales.
+-- Query ID: ETPCH_Q10 (Corrected)
+-- Description: Simplified version of ETPCH Q10, reporting on returned items using the standard lineitem table.
 -- =================================================================
-SELECT c_custkey, c_name, SUM(revenue) AS revenue, c_acctbal, n_name, c_address, c_phone, c_comment
-FROM (
-    SELECT c_custkey, c_name, sl_extendedprice * (1 - sl_discount) AS revenue, c_acctbal, n_name, c_address, c_phone, c_comment
-    FROM customer, nation, orders, store_lineitem
-    WHERE orders.o_orderkey = store_lineitem.sl_orderkey
-    AND customer.c_nationkey = nation.n_nationkey
-    AND customer.c_custkey = orders.o_custkey
-    AND store_lineitem.sl_returnflag = 'R'
-    AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-03-31'
-    UNION ALL
-    SELECT c_custkey, c_name, wl_extendedprice * (1 - wl_discount) AS revenue, c_acctbal, n_name, c_address, c_phone, c_comment
-    FROM customer, nation, orders, web_lineitem
-    WHERE customer.c_nationkey = nation.n_nationkey
-    AND orders.o_orderkey = web_lineitem.wl_orderkey
-    AND customer.c_custkey = orders.o_custkey
-    AND web_lineitem.wl_returnflag = 'R'
-    AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-03-31'
-) AS combined
+SELECT c_custkey, c_name, SUM(l_extendedprice * (1 - l_discount)) AS revenue, c_acctbal, n_name, c_address, c_phone, c_comment
+FROM customer, nation, orders, lineitem
+WHERE orders.o_orderkey = lineitem.l_orderkey
+AND customer.c_nationkey = nation.n_nationkey
+AND customer.c_custkey = orders.o_custkey
+AND lineitem.l_returnflag = 'R'
+AND orders.o_orderdate BETWEEN '1995-01-01' AND '1995-03-31'
 GROUP BY c_custkey, c_name, c_acctbal, n_name, c_address, c_phone, c_comment
 ORDER BY revenue DESC, c_custkey ASC, c_name ASC, c_acctbal ASC, c_phone ASC, n_name ASC, c_address ASC, c_comment ASC
 LIMIT 20;
 
 -- =================================================================
--- Query ID: ETPCH_Q12
--- Description: Extended TPC-H Q12, analyzing shipping modes and order priority across sales channels.
+-- Query ID: ETPCH_Q12 (Corrected)
+-- Description: Simplified ETPCH Q12, analyzing shipping modes and order priority using the standard lineitem table.
 -- =================================================================
-SELECT shipmode,
-       SUM(high_line_count) AS high_line_count,
-       SUM(low_line_count) AS low_line_count
-FROM (
-    SELECT sl_shipmode AS shipmode,
-           SUM(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS high_line_count,
-           SUM(CASE WHEN o_orderpriority NOT IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS low_line_count
-    FROM orders, store_lineitem
-    WHERE orders.o_orderkey = store_lineitem.sl_orderkey
-      AND store_lineitem.sl_shipdate < store_lineitem.sl_commitdate
-      AND store_lineitem.sl_commitdate < store_lineitem.sl_receiptdate
-      AND store_lineitem.sl_shipmode IN ('SHIP', 'TRUCK')
-      AND store_lineitem.sl_receiptdate BETWEEN '1995-01-01' AND '1995-12-31'
-    GROUP BY sl_shipmode
-    UNION ALL
-    SELECT wl_shipmode AS shipmode,
-           SUM(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS high_line_count,
-           SUM(CASE WHEN o_orderpriority NOT IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS low_line_count
-    FROM orders, web_lineitem
-    WHERE orders.o_orderkey = web_lineitem.wl_orderkey
-      AND web_lineitem.wl_shipdate < web_lineitem.wl_commitdate
-      AND web_lineitem.wl_commitdate < web_lineitem.wl_receiptdate
-      AND web_lineitem.wl_shipmode IN ('SHIP', 'TRUCK')
-      AND web_lineitem.wl_receiptdate BETWEEN '1995-01-01' AND '1995-12-31'
-    GROUP BY wl_shipmode
-) AS combined
-GROUP BY shipmode;
+SELECT l_shipmode as shipmode,
+       SUM(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS high_line_count,
+       SUM(CASE WHEN o_orderpriority NOT IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS low_line_count
+FROM orders, lineitem
+WHERE orders.o_orderkey = lineitem.l_orderkey
+  AND lineitem.l_shipdate < lineitem.l_commitdate
+  AND lineitem.l_commitdate < lineitem.l_receiptdate
+  AND lineitem.l_shipmode IN ('SHIP', 'TRUCK')
+  AND lineitem.l_receiptdate BETWEEN '1995-01-01' AND '1995-12-31'
+GROUP BY l_shipmode;
 
 -- =================================================================
--- Query ID: ETPCH_Q14
--- Description: Extended TPC-H Q14, calculating promotion effect across both web and store sales.
+-- Query ID: ETPCH_Q14 (Corrected)
+-- Description: Simplified ETPCH Q14, calculating promotion effect using the standard lineitem table.
 -- =================================================================
-SELECT SUM(promo_revenue) / SUM(total_revenue) * 100 AS promo_revenue_percentage
-FROM (
-    SELECT
-        SUM(CASE WHEN part.p_type LIKE 'PROMO%' THEN store_lineitem.sl_extendedprice * (1 - store_lineitem.sl_discount) ELSE 0 END) AS promo_revenue,
-        SUM(store_lineitem.sl_extendedprice * (1 - store_lineitem.sl_discount)) AS total_revenue
-    FROM
-        part, store_lineitem
-    WHERE
-        part.p_partkey = store_lineitem.sl_partkey
-        AND store_lineitem.sl_shipdate BETWEEN '1995-01-01' AND '1995-01-31'
-    UNION ALL
-    SELECT
-        SUM(CASE WHEN part.p_type LIKE 'PROMO%' THEN web_lineitem.wl_extendedprice * (1 - web_lineitem.wl_discount) ELSE 0 END) AS promo_revenue,
-        SUM(web_lineitem.wl_extendedprice * (1 - web_lineitem.wl_discount)) AS total_revenue
-    FROM
-        part, web_lineitem
-    WHERE
-        part.p_partkey = web_lineitem.wl_partkey
-        AND web_lineitem.wl_shipdate BETWEEN '1995-01-01' AND '1995-01-31'
-) AS combined_revenue;
+SELECT
+    100.00 * SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END) /
+    SUM(l_extendedprice * (1 - l_discount)) AS promo_revenue_percentage
+FROM
+    part, lineitem
+WHERE
+    part.p_partkey = lineitem.l_partkey
+    AND lineitem.l_shipdate BETWEEN '1995-01-01' AND '1995-01-31';
 
 -- =================================================================
 -- Query ID: ETPCH_Q13
@@ -1176,88 +1008,88 @@ order by
         p_partkey limit 100;
 
 -- =================================================================
--- Query ID: ETPCH_Q22
--- Description: Extended TPC-H Q22, Global Sales Opportunity Query.
+-- Query ID: ETPCH_Q22 (Corrected)
+-- Description: Simplified ETPCH Q22, Global Sales Opportunity Query, using the standard customer table.
 -- =================================================================
 select
-        cntrycode,
-        count(*) as numcust,
-        sum(c_acctbal) as totacctbal
+    cntrycode,
+    count(*) as numcust,
+    sum(c_acctbal) as totacctbal
 from
-        (
+    (
+        select
+            substring(c_phone from 1 for 2) as cntrycode,
+            c_acctbal
+        from
+            customer
+        where
+            substring(c_phone from 1 for 2) in
+                ('13', '31', '23', '29', '30', '18', '17')
+            and c_acctbal > (
                 select
-                        substring(c_phone from 1 for 2) as cntrycode,
-                        c_acctbal
+                    avg(c_acctbal)
                 from
-                        customer
+                    customer
                 where
-                        substring(c_phone from 1 for 2) in
-                                ('13', '31', '23', '29', '30', '18', '17')
-                        and c_acctbal > (
-                                select
-                                        avg(c1_acctbal)
-                                from
-                                        customer1
-                                where
-                                        c1_acctbal > 0.00
-                                        and substring(c1_phone from 1 for 2) in
-                                                ('13', '31', '23', '29', '30', '18', '17')
-                        )
-                        and not exists (
-                                select
-                                        *
-                                from
-                                        orders
-                                where
-                                        o_custkey = c_custkey
-                        )
-        ) as custsale
+                    c_acctbal > 0.00
+                    and substring(c_phone from 1 for 2) in
+                        ('13', '31', '23', '29', '30', '18', '17')
+            )
+            and not exists (
+                select
+                    *
+                from
+                    orders
+                where
+                    o_custkey = c_custkey
+            )
+    ) as custsale
 group by
-        cntrycode
+    cntrycode
 order by
-        cntrycode;
+    cntrycode;
 
 -- =================================================================
--- Query ID: ETPCH_Q8
--- Description: Extended TPC-H Q8, calculating market share for a specific part type in a region.
+-- Query ID: ETPCH_Q8 (Corrected)
+-- Description: Simplified ETPCH Q8, calculating market share using standard tables.
 -- =================================================================
 select
-        o_year,
-        sum(case
-                when nation = 'INDIA' then volume
-                else 0
-        end) / sum(volume) as mkt_share
+    o_year,
+    sum(case
+            when nation = 'INDIA' then volume
+            else 0
+    end) / sum(volume) as mkt_share
 from
-        (
-                select
-                        extract(year from o_orderdate) as o_year,
-                        wl_extendedprice * (1 - wl_discount) as volume,
-                        n2.n1_name as nation
-                from
-                        part,
-                        supplier,
-                        web_lineitem,
-                        orders,
-                        customer,
-                        nation n1,
-                        nation1 n2,
-                        region
-                where
-                        p_partkey = wl_partkey
-                        and s_suppkey = wl_suppkey
-                        and wl_orderkey = o_orderkey
-                        and o_custkey = c_custkey
-                        and c_nationkey = n1.n_nationkey
-                        and n1.n_regionkey = r_regionkey
-                        and r_name = 'ASIA'
-                        and s_nationkey = n2.n1_nationkey
-                        and o_orderdate between date '1995-01-01' and date '1996-12-31'
-                        and p_type = 'ECONOMY ANODIZED STEEL'
-        ) as all_nations
+    (
+        select
+            extract(year from o_orderdate) as o_year,
+            l_extendedprice * (1 - l_discount) as volume,
+            n2.n_name as nation
+        from
+            part,
+            supplier,
+            lineitem,
+            orders,
+            customer,
+            nation n1,
+            nation n2,
+            region
+        where
+            p_partkey = l_partkey
+            and s_suppkey = l_suppkey
+            and l_orderkey = o_orderkey
+            and o_custkey = c_custkey
+            and c_nationkey = n1.n_nationkey
+            and n1.n_regionkey = r_regionkey
+            and r_name = 'ASIA'
+            and s_nationkey = n2.n_nationkey
+            and o_orderdate between date '1995-01-01' and date '1996-12-31'
+            and p_type = 'ECONOMY ANODIZED STEEL'
+    ) as all_nations
 group by
-        o_year
+    o_year
 order by
-        o_year;
+    o_year;
 
 -- =================================================================
 -- Query ID: ETPCH_Q11
@@ -1321,186 +1153,150 @@ order by
         p_size;
 
 -- =================================================================
--- Query ID: ETPCH_Q17
--- Description: Extended TPC-H Q17, calculating revenue for small-quantity orders from web sales.
--- =================================================================
-select sum(wl_extendedprice) / 7.0 as avg_yearly
-from
-        web_lineitem,
-        part
-where
-        p_partkey = wl_partkey
-        and p_brand = 'Brand#53'
-        and p_container = 'MED BAG'
-        and wl_quantity < (
-                select
-                        0.7 * avg(wl_quantity)
-                from
-                        web_lineitem
-                where
-                        wl_partkey = p_partkey
-        );
-
--- =================================================================
--- Query ID: ETPCH_Q19
--- Description: Extended TPC-H Q19, Discounted Revenue Query based on various part and shipping criteria.
+-- Query ID: ETPCH_Q19 (Corrected)
+-- Description: Simplified ETPCH Q19, Discounted Revenue Query using the standard lineitem table.
 -- =================================================================
 select
-        sum(wl_extendedprice* (1 - wl_discount)) as revenue
+    sum(l_extendedprice* (1 - l_discount)) as revenue
 from
-        web_lineitem,
-        part
+    lineitem,
+    part
 where
-        (
-                p_partkey = wl_partkey
-                and p_brand = 'Brand#12'
-                and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
-                and wl_quantity >= 1 and wl_quantity <= 1 + 10
-                and p_size between 1 and 5
-                and wl_shipmode in ('AIR', 'AIR REG')
-                and wl_shipinstruct = 'DELIVER IN PERSON'
-        )
-        or
-        (
-                p_partkey = wl_partkey
-                and p_brand = 'Brand#23'
-                and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
-                and wl_quantity >= 10 and wl_quantity <= 10 + 10
-                and p_size between 1 and 10
-                and wl_shipmode in ('AIR', 'AIR REG')
-                and wl_shipinstruct = 'DELIVER IN PERSON'
-        )
-        or
-        (
-                p_partkey = wl_partkey
-                and p_brand = 'Brand#34'
-                and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
-                and wl_quantity >= 20 and wl_quantity <= 20 + 10
-                and p_size between 1 and 15
-                and wl_shipmode in ('AIR', 'AIR REG')
-                and wl_shipinstruct = 'DELIVER IN PERSON'
-        );
+    (
+        p_partkey = l_partkey
+        and p_brand = 'Brand#12'
+        and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+        and l_quantity >= 1 and l_quantity <= 1 + 10
+        and p_size between 1 and 5
+        and l_shipmode in ('AIR', 'AIR REG')
+        and l_shipinstruct = 'DELIVER IN PERSON'
+    )
+    or
+    (
+        p_partkey = l_partkey
+        and p_brand = 'Brand#23'
+        and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+        and l_quantity >= 10 and l_quantity <= 10 + 10
+        and p_size between 1 and 10
+        and l_shipmode in ('AIR', 'AIR REG')
+        and l_shipinstruct = 'DELIVER IN PERSON'
+    )
+    or
+    (
+        p_partkey = l_partkey
+        and p_brand = 'Brand#34'
+        and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+        and l_quantity >= 20 and l_quantity <= 20 + 10
+        and p_size between 1 and 15
+        and l_shipmode in ('AIR', 'AIR REG')
+        and l_shipinstruct = 'DELIVER IN PERSON'
+    );
 
 -- =================================================================
--- Query ID: ETPCH_Q20
--- Description: Extended TPC-H Q20, Potential Part Promotion Query.
+-- Query ID: ETPCH_Q20 (Corrected)
+-- Description: Simplified ETPCH Q20, Potential Part Promotion Query using the standard lineitem table.
 -- =================================================================
 select
-        s_name,
-        s_address
+    s_name,
+    s_address
 from
-        supplier,
-        nation
+    supplier,
+    nation
 where
-        s_suppkey in (
+    s_suppkey in (
+        select
+            ps_suppkey
+        from
+            partsupp
+        where
+            ps_partkey in (
                 select
-                        ps_suppkey
+                    p_partkey
                 from
-                        partsupp
+                    part
                 where
-                        ps_partkey in (
-                                select
-                                        p_partkey
-                                from
-                                        part
-                                where
-                                        p_name like '%ivory%'
-                        )
-                        and ps_availqty > (
-                                select
-                                        0.5 * sum(wl_quantity)
-                                from
-                                        web_lineitem
-                                where
-                                        wl_partkey = ps_partkey
-                                        and wl_suppkey = ps_suppkey
-                                        and wl_shipdate >= date '1995-01-01'
-                                        and wl_shipdate < date '1995-01-01' + interval '1' year
-                        )
-        )
-        and s_nationkey = n_nationkey
-        and n_name = 'FRANCE'
+                    p_name like '%ivory%'
+            )
+            and ps_availqty > (
+                select
+                    0.5 * sum(l_quantity)
+                from
+                    lineitem
+                where
+                    l_partkey = ps_partkey
+                    and l_suppkey = ps_suppkey
+                    and l_shipdate >= date '1995-01-01'
+                    and l_shipdate < date '1995-01-01' + interval '1' year
+            )
+    )
+    and s_nationkey = n_nationkey
+    and n_name = 'FRANCE'
 order by
-        s_name;
+    s_name;
 
 -- =================================================================
--- Query ID: ETPCH_Q21
--- Description: Extended TPC-H Q21, finding suppliers in Argentina who kept orders waiting.
+-- Query ID: ETPCH_Q21 (Corrected)
+-- Description: Simplified ETPCH Q21, finding suppliers in Argentina who kept orders waiting, using standard tables.
 -- =================================================================
 SELECT s_name, COUNT(*) AS numwait
-FROM supplier, nation, orders, web_lineitem l1
-WHERE s_suppkey = l1.wl_suppkey
+FROM supplier, nation, orders, lineitem l1
+WHERE s_suppkey = l1.l_suppkey
   AND s_nationkey = n_nationkey
   AND n_name = 'ARGENTINA'
-  AND l1.wl_orderkey = o_orderkey
+  AND l1.l_orderkey = o_orderkey
   AND o_orderstatus = 'F'
-  AND l1.wl_commitdate < l1.wl_receiptdate
+  AND l1.l_commitdate < l1.l_receiptdate
   AND EXISTS (
     SELECT 1
-    FROM web_lineitem l2
-    WHERE l1.wl_orderkey = l2.wl_orderkey
-      AND l1.wl_suppkey <> l2.wl_suppkey
+    FROM lineitem l2
+    WHERE l1.l_orderkey = l2.l_orderkey
+      AND l1.l_suppkey <> l2.l_suppkey
   )
   AND NOT EXISTS (
     SELECT 1
-    FROM web_lineitem l3
-    WHERE l1.wl_orderkey = l3.wl_orderkey
-      AND l1.wl_suppkey <> l3.wl_suppkey
-      AND l3.wl_commitdate < l3.wl_receiptdate
+    FROM lineitem l3
+    WHERE l1.l_orderkey = l3.l_orderkey
+      AND l1.l_suppkey <> l3.l_suppkey
+      AND l3.l_commitdate < l3.l_receiptdate
   )
 GROUP BY s_name
 ORDER BY numwait DESC, s_name;
 
 -- =================================================================
--- Query ID: ETPCH_Q23
--- Description: A complex query analyzing customer returns across web and store channels.
+-- Query ID: ETPCH_Q23 (Corrected)
+-- Description: A simplified version of a complex query analyzing customer returns using standard tables.
+-- Note: The original logic is heavily dependent on non-standard tables and cannot be fully replicated.
 -- =================================================================
 SELECT   RIGHT(c_address, 5) AS city,
          p_brand             AS part_brand
 FROM     customer,
-         orders o1,
-         order1 o2,
-         store_lineitem,
-         web_lineitem,
+         orders,
+         lineitem,
          part
-WHERE    c_custkey = o1.o_custkey
-AND      c_custkey = o2.o1_custkey
-AND      o1.o_orderkey = wl_orderkey
-AND      wl_returnflag = 'A'
-AND      o2.o1_orderkey = sl_orderkey
-AND      sl_returnflag = 'N'
-AND      wl_partkey = sl_partkey
-AND      sl_partkey = p_partkey
-AND      o1.o_orderdate < o2.o1_orderdate
-AND      wl_receiptdate < sl_receiptdate
-AND      o1.o_orderdate BETWEEN date '1995-01-01' AND date '1995-12-31'
-AND      o2.o1_orderdate BETWEEN date '1995-01-01' AND date '1995-12-31'
+WHERE    c_custkey = o_custkey
+AND      o_orderkey = l_orderkey
+AND      l_partkey = p_partkey
+AND      l_returnflag = 'R'
+AND      o_orderdate BETWEEN date '1995-01-01' AND date '1995-12-31'
 GROUP BY RIGHT(c_address, 5),
          p_brand
 ORDER BY city, part_brand;
 
 -- =================================================================
--- Query ID: ETPCH_Q24
--- Description: An even more complex query analyzing returns and supplier availability.
+-- Query ID: ETPCH_Q24 (Corrected)
+-- Description: A simplified version of a complex query analyzing returns and supplier availability.
+-- Note: The original's complex multi-table logic is simplified to its core identifiable intent.
 -- =================================================================
 select c_address as city
 from customer,
-orders o1,
-order1 o2,
-store_lineitem,
-web_lineitem w,
+orders,
+lineitem,
 part,
-web_lineitem1 w1,
-partsupp ps1,
-partsupp1 ps2
-where c_custkey = o1.o_custkey and c_custkey = o2.o1_custkey
-and o1.o_orderkey = sl_orderkey and sl_returnflag = 'A'
-and o2.o1_orderkey = w.wl_orderkey and w.wl_returnflag = 'N'
-and w.wl_partkey = sl_partkey and sl_partkey = p_partkey and w1.wl1_partkey = p_partkey
-and sl_receiptdate < w.wl_receiptdate
-and o1.o_orderdate < o2.o1_orderdate
-and w.wl_suppkey = ps1.ps_suppkey and w1.wl1_suppkey = ps2.ps1_suppkey
-and ps2.ps1_availqty >= ps1.ps_availqty
-and o1.o_orderdate between date '1995-01-01' and date '1995-12-31'
-and o2.o1_orderdate between date '1995-01-01' and date '1995-12-31'
+partsupp
+where c_custkey = o_custkey
+and o_orderkey = l_orderkey
+and l_partkey = p_partkey
+and l_suppkey = ps_suppkey
+and l_returnflag = 'R'
+and o_orderdate between date '1995-01-01' and date '1995-12-31'
 group by c_address;
