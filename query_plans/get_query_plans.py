@@ -7,19 +7,19 @@ import json
 # --- DATABASE CONNECTION DETAILS ---
 # Please update these with your actual PostgreSQL connection details.
 DB_SETTINGS = {
-    "dbname": "your_db_name",
-    "user": "your_username",
-    "password": "your_password",
+    "dbname": "tpch",
+    "user": "postgres",
+    "password": "123",
     "host": "localhost",
     "port": "5432"
 }
 
 # --- CONFIGURATION ---
 # The name of the SQL file containing the queries.
-SQL_FILE_PATH = 'all_queries.sql'
+SQL_FILE_PATH = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\queries.sql"
 
 # The directory where the output JSON plans will be saved.
-OUTPUT_DIR = 'query_plans'
+OUTPUT_DIR = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans"
 
 
 def parse_sql_file(filepath):
