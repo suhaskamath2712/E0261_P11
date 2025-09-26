@@ -16,10 +16,10 @@ DB_SETTINGS = {
 
 # --- CONFIGURATION ---
 # The name of the SQL file containing the queries.
-SQL_FILE_PATH = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\all_queries.sql"
+SQL_FILE_PATH = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\rewritten_queries.sql"
 
 # The directory where the output JSON plans will be saved.
-OUTPUT_DIR = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\output_plans"
+OUTPUT_DIR = r"C:\Users\suhas\Downloads\E0261_P11\query_plans\rewritten_query_plans"
 
 
 def parse_sql_file(filepath):
