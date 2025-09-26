@@ -117,11 +117,14 @@ def main():
     if not queries_to_run:
         print("No queries to process. Exiting.")
         return
-        
-    for query_id in queries_to_run:
-        if (query_id[0] + '.json') in os.listdir(OUTPUT_DIR):
-            print(f"Query ID '{query_id}' already processed. Skipping.")
-            queries_to_run.remove(query_id)   
+
+    # Remove queries that have already been processed
+    # This prevents re-running queries and overwriting existing plans.
+    # We check for existing JSON files in the output directory.
+    # This is useful if the script is interrupted and needs to be resumed.
+    # Ignore last 5 characters (.json)
+    existing_files = {f[:-5] for f in os.listdir(OUTPUT_DIR) if f.endswith('.json')}
+    queries_to_run = [(qid, qtext) for qid, qtext in queries_to_run if qid not in existing_files]  
 
     conn = None
     try:

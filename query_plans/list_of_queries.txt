@@ -5,7 +5,7 @@ N Series (Nested): 1 query
 F Series (Fragmented): 4 queries
 MQ Series (TPC-H Modified): 11 queries
 TPCH_Q Series: 7 queries
-ETPCH_Q Series (Extended TPC-H): 26 queries
+ETPCH_Q Series (Extended TPC-H): 24 queries
 Custom/Misc: 3 queries (Alaap, Nested_Test, paper_sample)
 
 Total: 72 queries
