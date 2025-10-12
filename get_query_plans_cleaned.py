@@ -222,9 +222,18 @@ def main():
                 print(f"No queries parsed from '{sql_path}'. Skipping.")
                 continue
 
-            # Skip already processed ones in this output folder
-            existing_files = {f[:-5] for f in os.listdir(out_dir) if f.endswith('.json')}
-            pending = [(qid, qtext) for qid, qtext in queries_to_run if qid not in existing_files]
+            # Skip already processed ones in this output folder.
+            # Consider both legacy <QueryID>.json and new <QueryID>_<label>.json names as processed
+            json_files = [f for f in os.listdir(out_dir) if f.endswith('.json')]
+            processed_ids = set()
+            for fname in json_files:
+                base = fname[:-5]  # strip .json
+                if base.endswith(f"_{label}"):
+                    processed_ids.add(base[: -(len(label) + 1)])
+                else:
+                    processed_ids.add(base)
+
+            pending = [(qid, qtext) for qid, qtext in queries_to_run if qid not in processed_ids]
 
             if not pending:
                 print("All queries in this source already processed. Nothing to do.")
@@ -242,7 +251,8 @@ def main():
                         payload = raw_plan
                     else:
                         payload = cleaned_plan
-                    output_filename = os.path.join(out_dir, f"{query_id}.json")
+                    # Save as <QueryID>_<label>.json to disambiguate sources
+                    output_filename = os.path.join(out_dir, f"{query_id}_{label}.json")
                     try:
                         with open(output_filename, 'w') as f:
                             json.dump(payload, f, indent=2)
