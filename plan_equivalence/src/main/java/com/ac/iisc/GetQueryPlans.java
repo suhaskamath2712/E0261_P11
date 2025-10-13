@@ -39,6 +39,8 @@ public class GetQueryPlans {
     private static final String DB_HOST = "localhost";
     private static final String DB_PORT = "5432";
 
+    // DB settings - keep consistent with Python script defaults.
+    // If you need to change these, adjust here or refactor to read from env/system properties.
     // Sources: (label, sql file path, output dir)
     private static final String[][] SOURCES = new String[][]{
             {"original",
@@ -64,6 +66,13 @@ public class GetQueryPlans {
             "Plan"
     );
 
+    // Parse a SQL file containing multiple queries delimited by a header with a Query ID.
+    // Expected header format:
+    // -- =+ ...
+    // -- Query ID: <alphanumeric-or-hyphen>
+    // -- =+ ...
+    // <SQL text>
+    // We normalize CRLF to LF so the regex using \n works consistently on Windows.
     private static Map<String, String> parseQueries(String sqlFilePath) throws Exception {
         String content = FileIO.readTextFile(sqlFilePath);
         // Normalize line endings to ensure regex with \n works on Windows files
@@ -80,6 +89,8 @@ public class GetQueryPlans {
         return map;
     }
 
+    // Run EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for a given SQL query.
+    // Returns the raw JSONArray text produced by PostgreSQL as org.json types.
     private static JSONArray explainPlan(Connection conn, String sql) throws SQLException {
         // Use a PreparedStatement to avoid issues with semicolons; EXPLAIN is server-side
         String explain = "EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) " + sql;
@@ -95,15 +106,19 @@ public class GetQueryPlans {
         return null;
     }
 
+    // Recursively remove execution-only keys from a plan tree while preserving structure.
+    // Accepts either JSONObject, JSONArray, or primitives and returns a cleaned copy.
     private static Object cleanPlanTree(Object node) {
-        if (node instanceof JSONObject obj) {
+        if (node instanceof JSONObject) {
+            JSONObject obj = (JSONObject) node;
             JSONObject cleaned = new JSONObject();
             for (String key : obj.keySet()) {
                 if (KEYS_TO_REMOVE.contains(key)) continue;
                 cleaned.put(key, cleanPlanTree(obj.get(key)));
             }
             return cleaned;
-        } else if (node instanceof JSONArray arr) {
+        } else if (node instanceof JSONArray) {
+            JSONArray arr = (JSONArray) node;
             JSONArray out = new JSONArray();
             for (int i = 0; i < arr.length(); i++) {
                 out.put(cleanPlanTree(arr.get(i)));
@@ -114,6 +129,8 @@ public class GetQueryPlans {
         }
     }
 
+    // Given EXPLAIN (FORMAT JSON) output (a one-element array with a root object),
+    // lift the nested "Plan" object to be the root and then clean execution-only keys.
     private static JSONObject extractAndClean(JSONArray raw) {
         if (raw == null || raw.length() == 0) return null;
         Object first = raw.get(0);
@@ -126,6 +143,8 @@ public class GetQueryPlans {
         return (cleaned instanceof JSONObject) ? (JSONObject) cleaned : null;
     }
 
+    // Discover already processed Query IDs in an output directory.
+    // Considers both legacy (<QueryID>.json) and new (<QueryID>_<label>.json) names as processed.
     private static Set<String> detectProcessedIds(String outDir, String label) throws Exception {
         // Reads files in outDir and interprets processed IDs from both <ID>.json and <ID>_<label>.json
         Path dir = Paths.get(outDir);
@@ -189,10 +208,10 @@ public class GetQueryPlans {
                         Object payload = (cleaned != null) ? cleaned : raw;
                         String outPath = outDir + java.io.File.separator + id + "_" + label + ".json";
                         String pretty;
-                        if (payload instanceof JSONObject jo) {
-                            pretty = jo.toString(2);
-                        } else if (payload instanceof JSONArray ja) {
-                            pretty = ja.toString(2);
+                        if (payload instanceof JSONObject) {
+                            pretty = ((JSONObject) payload).toString(2);
+                        } else if (payload instanceof JSONArray) {
+                            pretty = ((JSONArray) payload).toString(2);
                         } else {
                             pretty = String.valueOf(payload);
                         }
