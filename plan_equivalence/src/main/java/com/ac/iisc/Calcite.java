@@ -73,9 +73,15 @@ import java.util.regex.Pattern;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.config.Lex;
+import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.util.SqlShuttle;
 
 /**
  * Calcite parsing helper: reads query text from files (by ID) and parses SQL strings
@@ -210,6 +216,243 @@ public class Calcite {
         // Create a parser instance bound to our SQL string and parse to a statement/Query SqlNode.
         SqlParser parser = SqlParser.create(sql, config);
         return parser.parseQuery();
+    }
+
+    // =====================================================================================
+    //  Lightweight AST Transformations (SqlNode-level)
+    //
+    //  Purpose
+    //  -------
+    //  Provide a simple mechanism to apply a sequence of named transformations to a Calcite
+    //  SqlNode (the parsed SQL AST) without requiring schemas or converting to RelNode.
+    //
+    //  Scope & Limitations
+    //  -------------------
+    //  - These are syntactic/AST-level rewrites using SqlShuttle visitors. They do NOT require
+    //    catalog resolution or type information and thus work without a schema.
+    //  - For semantic/logical "rule" transformations (RelOptRules) you would normally use a
+    //    Planner (HepPlanner/Volcano) over RelNodes, which requires a schema. This utility is
+    //    intentionally schema-free and keeps to safe, local rewrites.
+    //
+    //  Available transformation names (case-sensitive):
+    //  - "simplifyDoubleNegation":    NOT(NOT(x))  => x
+    //  - "normalizeConjunctionOrder": Sort operands of AND deterministically (by toString)
+    //  - "pushNotDown":               Apply De Morgan on NOT(AND/OR(...)) to push NOT inward
+    //  - "foldBooleanConstants":      Simplify AND/OR with TRUE/FALSE (e.g., a AND TRUE => a)
+    //
+    //  Usage:
+    //     SqlNode transformed = Calcite.applyTransformations(node,
+    //         new String[]{"simplifyDoubleNegation", "pushNotDown", "foldBooleanConstants"});
+    // =====================================================================================
+
+    /** Functional interface for AST transformations. */
+    private interface SqlTransformation {
+        SqlNode apply(SqlNode in);
+    }
+
+    /**
+     * Apply a list of AST-level transformations, in order, to the given plan.
+     *
+     * Contract
+     * --------
+     * Inputs:
+     *  - plan: Parsed SQL AST (SqlNode). Must be non-null to have any effect.
+     *  - list: Array of transformation names (see list above). Unknown names are ignored.
+     * Output:
+     *  - A transformed SqlNode (same instance when no changes are made).
+     * Error Handling:
+     *  - Null/empty list results in a no-op; the original plan is returned.
+     */
+    public static SqlNode applyTransformations(SqlNode plan, String[] list) {
+        if (plan == null || list == null || list.length == 0) return plan;
+        SqlNode out = plan;
+        for (String name : list) {
+            SqlTransformation t = null;
+            if ("simplifyDoubleNegation".equals(name)) {
+                t = new SimplifyDoubleNegation();
+            } else if ("normalizeConjunctionOrder".equals(name)) {
+                t = new NormalizeConjunctionOrder();
+            } else if ("pushNotDown".equals(name)) {
+                t = new PushNotDown();
+            } else if ("foldBooleanConstants".equals(name)) {
+                t = new FoldBooleanConstants();
+            } else {
+                t = null;
+            }
+            if (t != null) {
+                out = t.apply(out);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * NOT(NOT(x)) => x
+     */
+    private static class SimplifyDoubleNegation extends SqlShuttle implements SqlTransformation {
+        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
+
+        @Override public SqlNode visit(SqlCall call) {
+            // First rewrite children
+            call = (SqlCall) super.visit(call);
+            if (call.getKind() == SqlKind.NOT) {
+                SqlNode inner = call.operand(0);
+                if (inner instanceof SqlCall) {
+                    SqlCall innerCall = (SqlCall) inner;
+                    if (innerCall.getKind() == SqlKind.NOT) {
+                        // NOT(NOT(x)) -> x
+                        return innerCall.operand(0);
+                    }
+                }
+            }
+            return call;
+        }
+    }
+
+    /**
+     * Sort AND operands deterministically (by toString). This is a normalization step only.
+     */
+    private static class NormalizeConjunctionOrder extends SqlShuttle implements SqlTransformation {
+        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
+
+        @Override public SqlNode visit(SqlCall call) {
+            call = (SqlCall) super.visit(call);
+            if (call.getKind() == SqlKind.AND) {
+                java.util.List<SqlNode> list = new java.util.ArrayList<>();
+                flatten(call, SqlKind.AND, list);
+                list.sort(java.util.Comparator.comparing(Object::toString));
+                return buildNary(SqlStdOperatorTable.AND, list);
+            }
+            return call;
+        }
+    }
+
+    /**
+     * Push NOT inward using De Morgan over AND/OR.
+     * NOT(AND(a,b,...)) => OR(NOT a, NOT b, ...)
+     * NOT(OR(a,b,...))  => AND(NOT a, NOT b, ...)
+     */
+    private static class PushNotDown extends SqlShuttle implements SqlTransformation {
+        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
+
+        @Override public SqlNode visit(SqlCall call) {
+            call = (SqlCall) super.visit(call);
+            if (call.getKind() == SqlKind.NOT) {
+                SqlNode inner = call.operand(0);
+                if (inner instanceof SqlCall) {
+                    SqlCall innerCall = (SqlCall) inner;
+                    if (innerCall.getKind() == SqlKind.AND || innerCall.getKind() == SqlKind.OR) {
+                        java.util.List<SqlNode> ops = new java.util.ArrayList<>();
+                        flatten(innerCall, innerCall.getKind(), ops);
+                        java.util.List<SqlNode> nots = new java.util.ArrayList<>(ops.size());
+                        for (SqlNode n : ops) {
+                            nots.add(SqlStdOperatorTable.NOT.createCall(SqlParserPos.ZERO, n));
+                        }
+                        if (innerCall.getKind() == SqlKind.AND) {
+                            return buildNary(SqlStdOperatorTable.OR, nots);
+                        } else {
+                            return buildNary(SqlStdOperatorTable.AND, nots);
+                        }
+                    }
+                }
+            }
+            return call;
+        }
+    }
+
+    /**
+     * Simplify boolean constants in AND/OR expressions:
+     * - a AND TRUE => a; a AND FALSE => FALSE
+     * - a OR TRUE => TRUE; a OR FALSE => a
+     */
+    private static class FoldBooleanConstants extends SqlShuttle implements SqlTransformation {
+        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
+
+        @Override public SqlNode visit(SqlCall call) {
+            call = (SqlCall) super.visit(call);
+            if (call.getKind() == SqlKind.AND || call.getKind() == SqlKind.OR) {
+                java.util.List<SqlNode> ops = new java.util.ArrayList<>();
+                flatten(call, call.getKind(), ops);
+
+                boolean isAnd = call.getKind() == SqlKind.AND;
+                java.util.List<SqlNode> kept = new java.util.ArrayList<>();
+                for (SqlNode n : ops) {
+                    Boolean b = asBoolean(n);
+                    if (b == null) {
+                        kept.add(n);
+                        continue;
+                    }
+                    if (isAnd) {
+                        if (!b) {
+                            // AND FALSE => FALSE
+                            return booleanLiteral(false);
+                        }
+                        // drop TRUE
+                    } else { // OR
+                        if (b) {
+                            // OR TRUE => TRUE
+                            return booleanLiteral(true);
+                        }
+                        // drop FALSE
+                    }
+                }
+                if (kept.isEmpty()) {
+                    // AND of all TRUE => TRUE; OR of all FALSE => FALSE
+                    return booleanLiteral(isAnd);
+                }
+                if (kept.size() == 1) {
+                    return kept.get(0);
+                }
+                return buildNary(isAnd ? SqlStdOperatorTable.AND : SqlStdOperatorTable.OR, kept);
+            }
+            return call;
+        }
+    }
+
+    // ----------------------------- helpers ---------------------------------
+    /** Flatten nested n-ary calls of the same kind (e.g., AND(AND(a,b), c) => [a,b,c]). */
+    private static void flatten(SqlCall call, SqlKind kind, java.util.List<SqlNode> out) {
+        for (int i = 0; i < call.getOperandList().size(); i++) {
+            SqlNode n = call.getOperandList().get(i);
+            if (n instanceof SqlCall) {
+                SqlCall c = (SqlCall) n;
+                if (c.getKind() == kind) {
+                    flatten(c, kind, out);
+                } else {
+                    out.add(n);
+                }
+            } else {
+                out.add(n);
+            }
+        }
+    }
+
+    /** Build an n-ary call (left-associative) from a list of operands. */
+    private static SqlNode buildNary(org.apache.calcite.sql.SqlOperator op, java.util.List<SqlNode> ops) {
+        if (ops.size() == 2) {
+            return op.createCall(SqlParserPos.ZERO, ops.get(0), ops.get(1));
+        }
+        // Build left-associative tree: (((a op b) op c) op d) ...
+        SqlNode acc = op.createCall(SqlParserPos.ZERO, ops.get(0), ops.get(1));
+        for (int i = 2; i < ops.size(); i++) {
+            acc = op.createCall(SqlParserPos.ZERO, acc, ops.get(i));
+        }
+        return acc;
+    }
+
+    /** Convert a SqlNode to Boolean if it is a boolean literal, else null. */
+    private static Boolean asBoolean(SqlNode n) {
+        if (n.getKind() == SqlKind.LITERAL && n instanceof SqlLiteral) {
+            SqlLiteral lit = (SqlLiteral) n;
+            Object v = lit.getValue();
+            if (v instanceof Boolean) return (Boolean) v;
+        }
+        return null;
+    }
+
+    /** Construct a boolean literal SqlNode. */
+    private static SqlNode booleanLiteral(boolean v) {
+        return SqlLiteral.createBoolean(v, SqlParserPos.ZERO);
     }
 
     /**
