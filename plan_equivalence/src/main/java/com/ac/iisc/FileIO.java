@@ -153,4 +153,28 @@ public class FileIO {
 		}
 		return Files.readString(p, StandardCharsets.UTF_8);
 	}
+
+	/** Ensure that a directory exists; if not, create it (including parents). */
+	public static void ensureDirectory(String absoluteDirPath) throws IOException {
+		if (absoluteDirPath == null || absoluteDirPath.isBlank()) {
+			throw new IllegalArgumentException("absoluteDirPath must not be null or blank");
+		}
+		Path dir = Paths.get(absoluteDirPath);
+		if (!Files.exists(dir)) {
+			Files.createDirectories(dir);
+		}
+	}
+
+	/** Write UTF-8 text content to a file, creating parent directories if needed. */
+	public static void writeTextFile(String absolutePath, String content) throws IOException {
+		if (absolutePath == null || absolutePath.isBlank()) {
+			throw new IllegalArgumentException("absolutePath must not be null or blank");
+		}
+		Path p = Paths.get(absolutePath);
+		Path parent = p.getParent();
+		if (parent != null && !Files.exists(parent)) {
+			Files.createDirectories(parent);
+		}
+		Files.writeString(p, content == null ? "" : content, StandardCharsets.UTF_8);
+	}
 }
