@@ -70,9 +70,20 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.sql.DataSource;
+
+import org.apache.calcite.adapter.jdbc.JdbcSchema;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.config.Lex;
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.rules.CoreRules;
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -82,6 +93,11 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlShuttle;
+import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.RelConversionException;
+import org.apache.calcite.tools.ValidationException;
 
 /**
  * Calcite parsing helper: reads query text from files (by ID) and parses SQL strings
@@ -453,6 +469,292 @@ public class Calcite {
     /** Construct a boolean literal SqlNode. */
     private static SqlNode booleanLiteral(boolean v) {
         return SqlLiteral.createBoolean(v, SqlParserPos.ZERO);
+    }
+
+    // =====================================================================================
+    //  RelNode Transformation Support (Planner rules)
+    //
+    //  Many of Apache Calcite's powerful transformations are defined as RelOptRules and
+    //  operate on RelNode trees (logical plans) rather than SqlNode ASTs. The methods
+    //  below provide a lightweight way to:
+    //    1) Convert a SqlNode into a RelNode using a FrameworkConfig (requires a schema), and
+    //    2) Apply a sequence of named CoreRules via a HepPlanner.
+    //
+    //  IMPORTANT
+    //  ---------
+    //  - You MUST provide a FrameworkConfig with a valid default schema (tables, fields) for
+    //    conversion to RelNode to succeed. Without a schema, Calcite cannot validate or convert.
+    //  - Some rules are adapter-specific (e.g., JDBC/Enumerable rules that push down to a source)
+    //    and require appropriate conventions and adapters available on the classpath.
+    //
+    //  Example usage:
+    //    FrameworkConfig config = ... // build with your schema
+    //    RelNode rel = Calcite.toRelNode(sqlNode, config);
+    //    RelNode transformed = Calcite.applyRelTransformations(rel, new String[] {
+    //        "ProjectMergeRule", "FilterMergeRule", "JoinCommuteRule"
+    //    });
+    // =====================================================================================
+
+    /**
+     * Convert a SqlNode to a RelNode using a provided FrameworkConfig (must include schema).
+     *
+     * @param sqlNode Parsed SQL AST
+     * @param config  Framework configuration including default schema and parser settings
+     * @return RelNode logical plan
+     * @throws ValidationException    if validation fails
+     * @throws RelConversionException if conversion fails
+     */
+    public static RelNode toRelNode(SqlNode sqlNode, FrameworkConfig config)
+            throws ValidationException, RelConversionException {
+        Planner planner = Frameworks.getPlanner(config);
+        // The Planner API supports passing an existing SqlNode to validate/rel.
+        SqlNode validated = planner.validate(sqlNode);
+        RelRoot root = planner.rel(validated);
+        return root.rel;
+    }
+
+    /**
+     * Build a FrameworkConfig backed by a JDBC schema.
+     *
+     * Why: Calcite must know your tables/columns to validate and convert SqlNode -> RelNode.
+     * This helper creates a simple root schema with a sub-schema named "db" that wraps a JDBC
+     * DataSource. Your SQL should reference objects available in that database.
+     *
+     * Notes:
+     * - The parser config mirrors loadQuerySQL (double quotes, lower-case unquoted, case-insensitive).
+     * - No explicit programs/rules are installed here; use applyRelTransformations to add rules.
+     */
+    public static FrameworkConfig buildJdbcFrameworkConfig(String jdbcUrl,
+                               String jdbcDriver,
+                               String user,
+                               String pass) {
+    // Create a root schema and add a JDBC sub-schema named "db".
+    SchemaPlus root = Frameworks.createRootSchema(true);
+    DataSource ds = JdbcSchema.dataSource(jdbcUrl, jdbcDriver, user, pass);
+    JdbcSchema jdbc = JdbcSchema.create(root, "db", ds, null, null);
+    root.add("db", jdbc);
+
+    // Reuse our parser settings so parsing behavior is consistent across APIs.
+    SqlParser.Config parserCfg = SqlParser.config()
+        .withLex(Lex.ORACLE)
+        .withQuoting(Quoting.DOUBLE_QUOTE)
+        .withUnquotedCasing(Casing.TO_LOWER)
+        .withCaseSensitive(false)
+        .withIdentifierMaxLength(128);
+
+    return Frameworks.newConfigBuilder()
+        .defaultSchema(root.getSubSchema("db"))
+        .parserConfig(parserCfg)
+        .build();
+    }
+
+    /**
+     * Convenience builder for PostgreSQL-backed FrameworkConfig. This composes the JDBC URL
+     * and driver for you, e.g.,
+     *   buildPostgresFrameworkConfig("localhost", 5432, "tpch", "postgres", "123")
+     */
+    public static FrameworkConfig buildPostgresFrameworkConfig(String host, int port, String database,
+                                                               String user, String pass) {
+        String url = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
+        return buildJdbcFrameworkConfig(url, "org.postgresql.Driver", user, pass);
+    }
+
+    /**
+     * Compare two SQL strings for logical equivalence by converting them to RelNodes using
+     * a provided schema (FrameworkConfig) and then normalizing with a small set of common
+    * rules. The comparison uses RelNode.toString() on the final RelNodes.
+     *
+     * Caveats:
+     * - Equivalence via stringified plans is a heuristic; for rigorous proofs you may need
+     *   canonicalization strategies tailored to your workload.
+     */
+    public static boolean equivalent(String sqlA, String sqlB, FrameworkConfig config) throws Exception {
+    // Parse
+    SqlNode a = loadQuerySQL(sqlA);
+    SqlNode b = loadQuerySQL(sqlB);
+
+    // Convert to RelNodes
+    RelNode relA = toRelNode(a, config);
+    RelNode relB = toRelNode(b, config);
+
+    // Optionally normalize both plans with a small deterministic rule set
+    String[] norm = new String[] {
+        "ProjectMergeRule",
+        "FilterMergeRule",
+        "JoinCommuteRule",
+        "AggregateRemoveRule",
+        "SortRemoveRule",
+        "UnionMergeRule"
+    };
+    relA = applyRelTransformations(relA, norm);
+    relB = applyRelTransformations(relB, norm);
+
+    // Compare plan strings (stringified logical plans)
+    String sA = String.valueOf(relA);
+    String sB = String.valueOf(relB);
+    return sA.equals(sB);
+    }
+
+    /**
+     * Apply a sequence of named CoreRules (RelOptRules) to a RelNode using a HepPlanner.
+     * Unknown or unavailable rule names are logged (via System.err) and skipped.
+     *
+     * @param root      input logical plan
+     * @param ruleNames names like "ProjectMergeRule", "FilterMergeRule", etc.
+     * @return the best expression found by the HepPlanner (possibly the same instance)
+     */
+    public static RelNode applyRelTransformations(RelNode root, String[] ruleNames) {
+        if (root == null || ruleNames == null || ruleNames.length == 0) return root;
+
+        HepProgramBuilder pb = new HepProgramBuilder();
+        for (String n : ruleNames) {
+            java.util.List<RelOptRule> rules = resolveCoreRules(n);
+            if (rules.isEmpty()) {
+                // Try adapter rule sets via reflection if requested
+                if ("EnumerableRules".equalsIgnoreCase(n)) {
+                    rules = resolveAdapterRules("org.apache.calcite.adapter.enumerable.EnumerableRules",
+                            name -> name.contains("PROJECT") || name.contains("FILTER") || name.contains("SORT"));
+                } else if ("JdbcRules".equalsIgnoreCase(n) || "JDBCRules".equalsIgnoreCase(n)) {
+                    rules = resolveAdapterRules("org.apache.calcite.adapter.jdbc.JdbcRules",
+                            name -> name.contains("PROJECT") || name.contains("FILTER") || name.contains("SORT"));
+                }
+            }
+            if (rules.isEmpty()) {
+                System.err.println("[Calcite] Unknown/unsupported rule name: " + n);
+            } else {
+                for (RelOptRule r : rules) pb.addRuleInstance(r);
+            }
+        }
+
+        HepProgram program = pb.build();
+        HepPlanner hep = new HepPlanner(program);
+        hep.setRoot(root);
+        return hep.findBestExp();
+    }
+
+    /**
+     * Map friendly rule names to Calcite CoreRules. If a name is not recognized in the
+     * current Calcite version, this returns null and the caller should skip it.
+     */
+    private static java.util.List<RelOptRule> resolveCoreRules(String name) {
+        java.util.List<RelOptRule> out = new java.util.ArrayList<>();
+
+        // Projection Transformations
+        if ("ProjectMergeRule".equals(name)) out.add(CoreRules.PROJECT_MERGE);
+        else if ("ProjectRemoveRule".equals(name)) out.add(CoreRules.PROJECT_REMOVE);
+        else if ("ProjectJoinTransposeRule".equals(name)) out.add(CoreRules.PROJECT_JOIN_TRANSPOSE);
+        else if ("ProjectFilterTransposeRule".equals(name)) out.add(CoreRules.PROJECT_FILTER_TRANSPOSE);
+        else if ("ProjectSetOpTransposeRule".equals(name)) out.add(CoreRules.PROJECT_SET_OP_TRANSPOSE);
+        else if ("ProjectTableScanRule".equals(name)) {
+            // Version-dependent: look for any CoreRules constant containing PROJECT + TABLE + SCAN
+            out.addAll(findCoreRulesMatching(s -> s.contains("PROJECT") && s.contains("TABLE") && s.contains("SCAN")));
+        }
+
+        // Filter Transformations
+        else if ("FilterMergeRule".equals(name)) out.add(CoreRules.FILTER_MERGE);
+        else if ("FilterProjectTransposeRule".equals(name)) out.add(CoreRules.FILTER_PROJECT_TRANSPOSE);
+        else if ("FilterJoinRule".equals(name)) out.add(CoreRules.FILTER_INTO_JOIN);
+        else if ("FilterAggregateTransposeRule".equals(name)) out.add(CoreRules.FILTER_AGGREGATE_TRANSPOSE);
+        else if ("FilterWindowTransposeRule".equals(name)) out.add(CoreRules.FILTER_WINDOW_TRANSPOSE);
+        else if ("FilterTableScanRule".equals(name)) {
+            // Version/adapter-dependent
+            out.addAll(findCoreRulesMatching(s -> s.contains("FILTER") && s.contains("TABLE") && s.contains("SCAN")));
+        }
+
+        // Join Transformations
+        else if ("JoinCommuteRule".equals(name)) out.add(CoreRules.JOIN_COMMUTE);
+        else if ("JoinAssociateRule".equals(name)) out.add(CoreRules.JOIN_ASSOCIATE);
+        else if ("JoinPushExpressionsRule".equals(name)) out.add(CoreRules.JOIN_PUSH_EXPRESSIONS);
+        else if ("JoinConditionPushRule".equals(name)) out.add(CoreRules.JOIN_CONDITION_PUSH);
+        else if ("SemiJoinRule".equals(name)) {
+            // Version-dependent; attempt to find any SEMI_JOIN related rule
+            out.addAll(findCoreRulesMatching(s -> s.contains("SEMI") && s.contains("JOIN")));
+        }
+
+        // Aggregate Transformations
+        else if ("AggregateProjectPullUpConstantsRule".equals(name)) out.add(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS);
+        else if ("AggregateRemoveRule".equals(name)) out.add(CoreRules.AGGREGATE_REMOVE);
+        else if ("AggregateJoinTransposeRule".equals(name)) out.add(CoreRules.AGGREGATE_JOIN_TRANSPOSE);
+        else if ("AggregateUnionTransposeRule".equals(name)) out.add(CoreRules.AGGREGATE_UNION_TRANSPOSE);
+        else if ("AggregateProjectMergeRule".equals(name)) out.add(CoreRules.AGGREGATE_PROJECT_MERGE);
+        else if ("AggregateCaseToFilterRule".equals(name)) out.add(CoreRules.AGGREGATE_CASE_TO_FILTER);
+
+        // Sort & Limit Transformations
+        else if ("SortRemoveRule".equals(name)) out.add(CoreRules.SORT_REMOVE);
+        else if ("SortUnionTransposeRule".equals(name)) out.add(CoreRules.SORT_UNION_TRANSPOSE);
+        else if ("SortProjectTransposeRule".equals(name)) out.add(CoreRules.SORT_PROJECT_TRANSPOSE);
+        else if ("SortJoinTransposeRule".equals(name)) out.add(CoreRules.SORT_JOIN_TRANSPOSE);
+
+        // Set Operations
+        else if ("UnionMergeRule".equals(name)) out.add(CoreRules.UNION_MERGE);
+        else if ("UnionPullUpConstantsRule".equals(name)) out.add(CoreRules.UNION_PULL_UP_CONSTANTS);
+        else if ("IntersectToDistinctRule".equals(name)) out.add(CoreRules.INTERSECT_TO_DISTINCT);
+        else if ("MinusToDistinctRule".equals(name)) out.add(CoreRules.MINUS_TO_DISTINCT);
+
+        // Window Transformations
+        else if ("ProjectWindowTransposeRule".equals(name)) out.add(CoreRules.PROJECT_WINDOW_TRANSPOSE);
+        else if ("FilterWindowTransposeRule".equals(name)) out.add(CoreRules.FILTER_WINDOW_TRANSPOSE);
+
+        // Other Rules
+        else if ("ValuesReduceRule".equals(name)) {
+            // Version-dependent; include any VALUES + REDUCE rule(s)
+            out.addAll(findCoreRulesMatching(s -> s.contains("VALUES") && s.contains("REDUCE")));
+        }
+        else if ("ReduceExpressionsRule".equals(name)) {
+            // Add common reduce-expressions rules present across Calcite versions
+            out.addAll(findCoreRulesMatching(s -> s.contains("REDUCE") && s.contains("EXPR")));
+        }
+        else if ("PruneEmptyRules".equals(name)) {
+            // Collect all PRUNE_EMPTY* rules available in this version
+            out.addAll(findCoreRulesMatching(s -> s.startsWith("PRUNE_EMPTY")));
+        }
+
+        return out;
+    }
+
+    /** Find all CoreRules public static RelOptRule fields whose names match a predicate. */
+    private static java.util.List<RelOptRule> findCoreRulesMatching(java.util.function.Predicate<String> namePredicate) {
+        java.util.List<RelOptRule> out = new java.util.ArrayList<>();
+        try {
+            for (java.lang.reflect.Field f : CoreRules.class.getFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                if (!RelOptRule.class.isAssignableFrom(f.getType())) continue;
+                String fname = f.getName();
+                if (namePredicate.test(fname)) {
+                    Object val = f.get(null);
+                    if (val instanceof RelOptRule) out.add((RelOptRule) val);
+                }
+            }
+        } catch (Throwable ignore) {
+            // Reflection failures: ignore and return what we collected
+        }
+        return out;
+    }
+
+    /**
+     * Resolve adapter rule sets via reflection (EnumerableRules / JdbcRules) without hard
+     * compile-time dependencies. Only adds rules whose field names satisfy the provided filter.
+     */
+    private static java.util.List<RelOptRule> resolveAdapterRules(String adapterClassName,
+                                                                  java.util.function.Predicate<String> nameFilter) {
+        java.util.List<RelOptRule> out = new java.util.ArrayList<>();
+        try {
+            Class<?> cls = Class.forName(adapterClassName);
+            for (java.lang.reflect.Field f : cls.getFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                if (!RelOptRule.class.isAssignableFrom(f.getType())) continue;
+                String fname = f.getName();
+                if (nameFilter.test(fname)) {
+                    Object val = f.get(null);
+                    if (val instanceof RelOptRule) out.add((RelOptRule) val);
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            System.err.println("[Calcite] Adapter rules not available: " + adapterClassName);
+        } catch (Throwable t) {
+            System.err.println("[Calcite] Failed loading adapter rules from: " + adapterClassName + ": " + t.getMessage());
+        }
+        return out;
     }
 
     /**
