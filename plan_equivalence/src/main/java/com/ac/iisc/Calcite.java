@@ -124,8 +124,7 @@ public class Calcite {
      * -- Query ID: <ID>
      * -- =====
      * <SQL...>;
-     */
-    /**
+     * 
      * Extracts queries from a single .sql file into a map of (QueryID -> SQL text).
      *
      * Expected block format:
@@ -173,8 +172,7 @@ public class Calcite {
      * Public helper to load a single SQL query from a file by Query ID.
      * If queryId is null/blank, returns the first query in the file (by order).
      * Returns null if no queries are found or the ID does not exist.
-     */
-    /**
+     * 
      * Load a single SQL statement from a file by its Query ID.
      *
      * Contract
@@ -207,8 +205,7 @@ public class Calcite {
     /**
      * Parse a SQL string using Apache Calcite and return the parsed SqlNode.
      * Uses a Postgres-friendly parser config (double quotes, lower-cased unquoted identifiers, case-insensitive).
-     */
-    /**
+     * 
      * Parse a SQL string into a Calcite SqlNode.
      *
      * Why these parser settings?
