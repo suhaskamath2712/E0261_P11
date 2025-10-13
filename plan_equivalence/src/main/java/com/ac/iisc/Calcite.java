@@ -65,8 +65,12 @@ package com.ac.iisc;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -98,6 +102,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
+import org.apache.calcite.util.Litmus;
 
 /**
  * Calcite parsing helper: reads query text from files (by ID) and parses SQL strings
@@ -234,6 +239,20 @@ public class Calcite {
         return parser.parseQuery();
     }
 
+    /**
+     * Compare two SqlNodes for structural equality using Calcite's equalsDeep API.
+     * This checks that the parsed SQL abstract syntax trees are the same shape and values
+     * (ignoring parser source positions). Returns false if either node is null or the
+     * structures differ.
+     */
+    public static boolean sqlNodesEqual(SqlNode left, SqlNode right) {
+        if (left == right) return true;
+        if (left == null || right == null) return false;
+        // equalsDeep performs a deep, structural comparison. Litmus.IGNORE avoids throwing
+        // and simply returns a boolean indicating success/failure.
+        return left.equalsDeep(right, Litmus.IGNORE);
+    }
+
     // =====================================================================================
     //  Lightweight AST Transformations (SqlNode-level)
     //
@@ -334,9 +353,9 @@ public class Calcite {
         @Override public SqlNode visit(SqlCall call) {
             call = (SqlCall) super.visit(call);
             if (call.getKind() == SqlKind.AND) {
-                java.util.List<SqlNode> list = new java.util.ArrayList<>();
+                List<SqlNode> list = new ArrayList<>();
                 flatten(call, SqlKind.AND, list);
-                list.sort(java.util.Comparator.comparing(Object::toString));
+                list.sort(Comparator.comparing(Object::toString));
                 return buildNary(SqlStdOperatorTable.AND, list);
             }
             return call;
@@ -358,9 +377,9 @@ public class Calcite {
                 if (inner instanceof SqlCall) {
                     SqlCall innerCall = (SqlCall) inner;
                     if (innerCall.getKind() == SqlKind.AND || innerCall.getKind() == SqlKind.OR) {
-                        java.util.List<SqlNode> ops = new java.util.ArrayList<>();
+                        List<SqlNode> ops = new ArrayList<>();
                         flatten(innerCall, innerCall.getKind(), ops);
-                        java.util.List<SqlNode> nots = new java.util.ArrayList<>(ops.size());
+                        List<SqlNode> nots = new ArrayList<>(ops.size());
                         for (SqlNode n : ops) {
                             nots.add(SqlStdOperatorTable.NOT.createCall(SqlParserPos.ZERO, n));
                         }
@@ -387,11 +406,11 @@ public class Calcite {
         @Override public SqlNode visit(SqlCall call) {
             call = (SqlCall) super.visit(call);
             if (call.getKind() == SqlKind.AND || call.getKind() == SqlKind.OR) {
-                java.util.List<SqlNode> ops = new java.util.ArrayList<>();
+                List<SqlNode> ops = new ArrayList<>();
                 flatten(call, call.getKind(), ops);
 
                 boolean isAnd = call.getKind() == SqlKind.AND;
-                java.util.List<SqlNode> kept = new java.util.ArrayList<>();
+                List<SqlNode> kept = new ArrayList<>();
                 for (SqlNode n : ops) {
                     Boolean b = asBoolean(n);
                     if (b == null) {
@@ -427,7 +446,7 @@ public class Calcite {
 
     // ----------------------------- helpers ---------------------------------
     /** Flatten nested n-ary calls of the same kind (e.g., AND(AND(a,b), c) => [a,b,c]). */
-    private static void flatten(SqlCall call, SqlKind kind, java.util.List<SqlNode> out) {
+    private static void flatten(SqlCall call, SqlKind kind, List<SqlNode> out) {
         for (int i = 0; i < call.getOperandList().size(); i++) {
             SqlNode n = call.getOperandList().get(i);
             if (n instanceof SqlCall) {
@@ -444,7 +463,7 @@ public class Calcite {
     }
 
     /** Build an n-ary call (left-associative) from a list of operands. */
-    private static SqlNode buildNary(org.apache.calcite.sql.SqlOperator op, java.util.List<SqlNode> ops) {
+    private static SqlNode buildNary(org.apache.calcite.sql.SqlOperator op, List<SqlNode> ops) {
         if (ops.size() == 2) {
             return op.createCall(SqlParserPos.ZERO, ops.get(0), ops.get(1));
         }
@@ -608,7 +627,7 @@ public class Calcite {
 
         HepProgramBuilder pb = new HepProgramBuilder();
         for (String n : ruleNames) {
-            java.util.List<RelOptRule> rules = resolveCoreRules(n);
+            List<RelOptRule> rules = resolveCoreRules(n);
             if (rules.isEmpty()) {
                 // Try adapter rule sets via reflection if requested
                 if ("EnumerableRules".equalsIgnoreCase(n)) {
@@ -636,8 +655,8 @@ public class Calcite {
      * Map friendly rule names to Calcite CoreRules. If a name is not recognized in the
      * current Calcite version, this returns null and the caller should skip it.
      */
-    private static java.util.List<RelOptRule> resolveCoreRules(String name) {
-        java.util.List<RelOptRule> out = new java.util.ArrayList<>();
+    private static List<RelOptRule> resolveCoreRules(String name) {
+        List<RelOptRule> out = new ArrayList<>();
 
         // Projection Transformations
         if ("ProjectMergeRule".equals(name)) out.add(CoreRules.PROJECT_MERGE);
@@ -713,8 +732,8 @@ public class Calcite {
     }
 
     /** Find all CoreRules public static RelOptRule fields whose names match a predicate. */
-    private static java.util.List<RelOptRule> findCoreRulesMatching(java.util.function.Predicate<String> namePredicate) {
-        java.util.List<RelOptRule> out = new java.util.ArrayList<>();
+    private static List<RelOptRule> findCoreRulesMatching(Predicate<String> namePredicate) {
+        List<RelOptRule> out = new ArrayList<>();
         try {
             for (java.lang.reflect.Field f : CoreRules.class.getFields()) {
                 if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
@@ -735,9 +754,9 @@ public class Calcite {
      * Resolve adapter rule sets via reflection (EnumerableRules / JdbcRules) without hard
      * compile-time dependencies. Only adds rules whose field names satisfy the provided filter.
      */
-    private static java.util.List<RelOptRule> resolveAdapterRules(String adapterClassName,
-                                                                  java.util.function.Predicate<String> nameFilter) {
-        java.util.List<RelOptRule> out = new java.util.ArrayList<>();
+    private static List<RelOptRule> resolveAdapterRules(String adapterClassName,
+                                                                  Predicate<String> nameFilter) {
+        List<RelOptRule> out = new ArrayList<>();
         try {
             Class<?> cls = Class.forName(adapterClassName);
             for (java.lang.reflect.Field f : cls.getFields()) {
