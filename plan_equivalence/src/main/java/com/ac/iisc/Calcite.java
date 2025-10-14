@@ -530,6 +530,45 @@ public class Calcite {
     }
 
     /**
+     * Convert a SQL string to a RelNode using the Planner's parse→validate→rel flow.
+     * This ensures the Planner's internal state machine (RESET → PARSED → VALIDATED) is followed
+     * consistently across Calcite versions.
+     */
+    public static RelNode toRelNode(String sql, FrameworkConfig config)
+            throws SqlParseException, ValidationException, RelConversionException {
+        Planner planner = Frameworks.getPlanner(config);
+        SqlNode parsed = planner.parse(sql);
+        SqlNode validated = planner.validate(parsed);
+        RelRoot root = planner.rel(validated);
+        return root.rel;
+    }
+
+    /**
+     * Convenience: Load a query by ID from a .sql file and convert to RelNode using the safe
+     * parse→validate→rel flow. Reduces boilerplate in callers.
+     *
+     * @param sqlFilePath Absolute path to the .sql file with Query ID blocks
+     * @param queryId     The Query ID header to load (if null/blank, first query is used)
+     * @param config      FrameworkConfig with default schema and parser settings
+     */
+    public static RelNode loadRelFromFile(String sqlFilePath, String queryId, FrameworkConfig config)
+            throws IOException, SqlParseException, ValidationException, RelConversionException {
+        String sql = loadQueryFromFile(sqlFilePath, queryId);
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("No SQL found for Query ID: " + String.valueOf(queryId));
+        }
+        return toRelNode(sql, config);
+    }
+
+    /**
+     * Convenience: Load a query by ID from the default ORIGINAL_SQL_FILE and convert to RelNode.
+     */
+    public static RelNode loadRelFromDefault(String queryId, FrameworkConfig config)
+            throws IOException, SqlParseException, ValidationException, RelConversionException {
+        return loadRelFromFile(ORIGINAL_SQL_FILE.toString(), queryId, config);
+    }
+
+    /**
      * Build a FrameworkConfig backed by a JDBC schema.
      *
      * Why: Calcite must know your tables/columns to validate and convert SqlNode -> RelNode.
@@ -636,7 +675,8 @@ public class Calcite {
                 }
             }
             if (rules.isEmpty()) {
-                System.err.println("[Calcite] Unknown/unsupported rule name: " + n);
+                System.err.println("[Calcite][WARN] Unknown/unsupported transformation name: " + n +
+                        ". No rules added for this entry. Ensure you are using CoreRules-friendly names or available adapter sets.");
             } else {
                 for (RelOptRule r : rules) pb.addRuleInstance(r);
             }

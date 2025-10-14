@@ -17,8 +17,6 @@ import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Java migration of get_query_plans_cleaned.py
@@ -29,8 +27,6 @@ import org.slf4j.LoggerFactory;
  * - Writes cleaned JSON to matching output folders, skipping IDs already exported (both legacy and new names)
  */
 public class GetQueryPlans {
-
-    private static final Logger LOG = LoggerFactory.getLogger(GetQueryPlans.class);
 
     // DB settings - keep consistent with Python script defaults
     private static final String DB_NAME = "tpch";
@@ -166,22 +162,22 @@ public class GetQueryPlans {
     public static void main(String[] args) {
         String jdbcUrl = String.format("jdbc:postgresql://%s:%s/%s", DB_HOST, DB_PORT, DB_NAME);
         try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS)) {
-            LOG.info("Connected to PostgreSQL: {}", jdbcUrl);
+            System.out.println("Connected to PostgreSQL: " + jdbcUrl);
 
             for (String[] src : SOURCES) {
                 String label = src[0];
                 String sqlPath = src[1];
                 String outDir = src[2];
 
-                LOG.info("\n{}", "-".repeat(80));
-                LOG.info("Processing source: {}", label);
-                LOG.info("SQL file: {}", sqlPath);
-                LOG.info("Output: {}", outDir);
+                System.out.println("\n" + "-".repeat(80));
+                System.out.println("Processing source: " + label);
+                System.out.println("SQL file: " + sqlPath);
+                System.out.println("Output: " + outDir);
 
                 FileIO.ensureDirectory(outDir);
                 Map<String, String> queries = parseQueries(sqlPath);
                 if (queries.isEmpty()) {
-                    LOG.warn("No queries parsed; skipping: {}", label);
+                    System.err.println("No queries parsed; skipping: " + label);
                     continue;
                 }
 
@@ -194,14 +190,14 @@ public class GetQueryPlans {
                     String sql = e.getValue();
                     if (processed.contains(id)) {
                         skipped++;
-                        LOG.info("[{}] Skip existing: {}", label, id);
+                        System.out.println("[" + label + "] Skip existing: " + id);
                         continue;
                     }
 
                     try {
                         JSONArray raw = explainPlan(conn, sql);
                         if (raw == null) {
-                            LOG.warn("[{}] No plan returned; query skipped: {}", label, id);
+                            System.err.println("[" + label + "] No plan returned; query skipped: " + id);
                             continue;
                         }
                         JSONObject cleaned = extractAndClean(raw);
@@ -217,18 +213,18 @@ public class GetQueryPlans {
                         }
                         FileIO.writeTextFile(outPath, pretty);
                         saved++;
-                        LOG.info("[{}] Saved: {}", label, outPath);
+                        System.out.println("[" + label + "] Saved: " + outPath);
                     } catch (SQLException ex) {
-                        LOG.error("[{}] ERROR for {}: {}", label, id, ex.getMessage());
+                        System.err.println("[" + label + "] ERROR for " + id + ": " + ex.getMessage());
                         try { conn.rollback(); } catch (SQLException ignored) { }
                     }
                 }
 
-                LOG.info("{} summary: total={}, saved={}, skipped={}", label, total, saved, skipped);
+                System.out.println(label + " summary: total=" + total + ", saved=" + saved + ", skipped=" + skipped);
             }
 
         } catch (Exception e) {
-            LOG.error("Fatal error running GetQueryPlans", e);
+            System.err.println("Fatal error running GetQueryPlans: " + e.getMessage());
         }
     }
 }

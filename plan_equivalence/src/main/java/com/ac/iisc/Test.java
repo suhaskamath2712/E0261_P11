@@ -31,8 +31,8 @@ public class Test
 
         try
         {
-            RelNode originalSqlNode = Calcite.toRelNode(Calcite.SQLtoSqlNode(Calcite.loadQueryFromFile(originalPath, queryId)), cfg);
-            RelNode rewrittenSqlNode = Calcite.toRelNode(Calcite.SQLtoSqlNode(Calcite.loadQueryFromFile(rewrittenPath, queryId)), cfg);
+            RelNode originalSqlNode = Calcite.toRelNode(Calcite.loadQueryFromFile(originalPath, queryId), cfg);
+            RelNode rewrittenSqlNode = Calcite.toRelNode(Calcite.loadQueryFromFile(rewrittenPath, queryId), cfg);
             //RelNode mutatedSqlNode = Calcite.toRelNode(Calcite.SQLtoSqlNode(Calcite.loadQueryFromFile(mutatedPath, queryId)), cfg);
 
             System.out.println("Original:");

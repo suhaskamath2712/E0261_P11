@@ -35,18 +35,20 @@
             <version>1.36.0</version>
         </dependency>
 
-        <!-- Add other dependencies you might need, like for logging -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.7</version>
-        </dependency>
+        <!-- Logging removed per request to avoid SLF4J binder warnings -->
 
         <!-- NEW: PostgreSQL JDBC Driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>42.6.0</version> <!-- Use a recent, stable version -->
+        </dependency>
+
+        <!-- Provide a no-op SLF4J binder to suppress runtime warnings when slf4j-api is present via transitive deps -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>1.7.36</version>
         </dependency>
     </dependencies>
 
