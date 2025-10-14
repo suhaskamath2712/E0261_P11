@@ -67,10 +67,10 @@ Notes on equivalence and correctness:
   String sql = Calcite.loadQueryFromFile("C:\\...\\original_queries.sql", "TPCH_Q11");
 
 
-### `loadQuerySQL(String sql)` (public static)
+### `SQLtoSqlNode(String sql)` (public static)
 
 - Purpose: Parse a SQL string into a Calcite `SqlNode` using a parser configuration with settings friendly to Postgres-style identifiers.
-- Signature: `public static SqlNode loadQuerySQL(String sql) throws SqlParseException`
+- Signature: `public static SqlNode SQLtoSqlNode(String sql) throws SqlParseException`
 - Inputs:
   - `sql`: non-null, non-blank SQL statement
 - Output: `SqlNode` representing the parsed statement (AST)
@@ -84,7 +84,7 @@ Notes on equivalence and correctness:
   - If you need a different dialect, modify the `SqlParser.Config` accordingly.
 - Example usage:
 
-  SqlNode node = Calcite.loadQuerySQL("SELECT * FROM orders WHERE order_id = 10");
+  SqlNode node = Calcite.SQLtoSqlNode("SELECT * FROM orders WHERE order_id = 10");
 
 
 ### `sqlNodesEqual(SqlNode left, SqlNode right)` (public static)
@@ -311,15 +311,15 @@ Notes on equivalence and correctness:
 
 ```java
 String sql = Calcite.loadQueryFromFile("C:/.../original_queries.sql", "TPCH_Q11");
-SqlNode node = Calcite.loadQuerySQL(sql);
+SqlNode node = Calcite.SQLtoSqlNode(sql);
 SqlNode normalized = Calcite.applyTransformations(node, new String[]{"pushNotDown","foldBooleanConstants"});
 ```
 
 2. Compare two SQL statements syntactically (AST-level):
 
 ```java
-SqlNode a = Calcite.loadQuerySQL(sql1);
-SqlNode b = Calcite.loadQuerySQL(sql2);
+SqlNode a = Calcite.SQLtoSqlNode(sql1);
+SqlNode b = Calcite.SQLtoSqlNode(sql2);
 bool eq = Calcite.sqlNodesEqual(a, b);
 ```
 
@@ -327,8 +327,8 @@ bool eq = Calcite.sqlNodesEqual(a, b);
 
 ```java
 FrameworkConfig cfg = Calcite.buildPostgresFrameworkConfig("localhost",5432,"tpch","postgres","pwd");
-RelNode relA = Calcite.toRelNode(Calcite.loadQuerySQL(sqlA), cfg);
-RelNode relB = Calcite.toRelNode(Calcite.loadQuerySQL(sqlB), cfg);
+RelNode relA = Calcite.toRelNode(Calcite.SQLtoSqlNode(sqlA), cfg);
+RelNode relB = Calcite.toRelNode(Calcite.SQLtoSqlNode(sqlB), cfg);
 RelNode normA = Calcite.applyRelTransformations(relA, new String[]{"ProjectMergeRule","FilterMergeRule"});
 RelNode normB = Calcite.applyRelTransformations(relB, new String[]{"ProjectMergeRule","FilterMergeRule"});
 boolean same = String.valueOf(normA).equals(String.valueOf(normB));
@@ -360,3 +360,68 @@ Note: Replace the Postgres convenience with `buildJdbcFrameworkConfig` if you us
 
 
 ---
+
+## Apache Calcite planner transformations supported by `applyRelTransformations`
+
+`Calcite.applyRelTransformations(RelNode root, String[] ruleNames)` accepts friendly rule names that are mapped to Calcite `CoreRules` (and some adapter rules discovered reflectively). The following names are recognized by the implementation in `Calcite.java`:
+
+- Projection rules
+  - `ProjectMergeRule`
+  - `ProjectRemoveRule`
+  - `ProjectJoinTransposeRule`
+  - `ProjectFilterTransposeRule`
+  - `ProjectSetOpTransposeRule`
+  - `ProjectTableScanRule` (resolved reflectively; version-dependent)
+
+- Filter rules
+  - `FilterMergeRule`
+  - `FilterProjectTransposeRule`
+  - `FilterJoinRule` (maps to `FILTER_INTO_JOIN`)
+  - `FilterAggregateTransposeRule`
+  - `FilterWindowTransposeRule`
+  - `FilterTableScanRule` (resolved reflectively; version-/adapter-dependent)
+
+- Join rules
+  - `JoinCommuteRule`
+  - `JoinAssociateRule`
+  - `JoinPushExpressionsRule`
+  - `JoinConditionPushRule`
+  - `SemiJoinRule` (resolved reflectively; version-dependent)
+
+- Aggregate rules
+  - `AggregateProjectPullUpConstantsRule`
+  - `AggregateRemoveRule`
+  - `AggregateJoinTransposeRule`
+  - `AggregateUnionTransposeRule`
+  - `AggregateProjectMergeRule`
+  - `AggregateCaseToFilterRule`
+
+- Sort & limit rules
+  - `SortRemoveRule`
+  - `SortUnionTransposeRule`
+  - `SortProjectTransposeRule`
+  - `SortJoinTransposeRule`
+
+- Set operation rules
+  - `UnionMergeRule`
+  - `UnionPullUpConstantsRule`
+  - `IntersectToDistinctRule`
+  - `MinusToDistinctRule`
+
+- Window rules
+  - `ProjectWindowTransposeRule`
+  - `FilterWindowTransposeRule`
+
+- Other/general rules
+  - `ValuesReduceRule` (resolved reflectively; version-dependent)
+  - `ReduceExpressionsRule` (resolved reflectively; adds common reduce-expr rules)
+  - `PruneEmptyRules` (collects available `PRUNE_EMPTY*` rules reflectively)
+
+- Adapter rule sets (optional; discovered reflectively if on classpath)
+  - `EnumerableRules` — selects a subset (e.g., PROJECT/FILTER/SORT related rules)
+  - `JdbcRules` (or `JDBCRules`) — selects a subset (e.g., PROJECT/FILTER/SORT related rules)
+
+Notes
+- Some names are resolved reflectively to accommodate Calcite version differences. If a specific constant is unavailable, similar rule constants are searched by name.
+- Adapter rules require the corresponding adapter classes on the classpath; otherwise they’re skipped with a log message.
+
