@@ -219,7 +219,7 @@ public class Calcite {
      * @throws SqlParseException If the SQL is syntactically invalid.
      * @throws IllegalArgumentException If the SQL is null/blank.
      */
-    public static SqlNode loadQuerySQL(String sql) throws SqlParseException {
+    public static SqlNode SQLtoSqlNode(String sql) throws SqlParseException {
         if (sql == null || sql.isBlank()) {
             throw new IllegalArgumentException("sql must not be null or blank");
         }
@@ -586,8 +586,8 @@ public class Calcite {
      */
     public static boolean equivalent(String sqlA, String sqlB, FrameworkConfig config) throws Exception {
     // Parse
-    SqlNode a = loadQuerySQL(sqlA);
-    SqlNode b = loadQuerySQL(sqlB);
+    SqlNode a = SQLtoSqlNode(sqlA);
+    SqlNode b = SQLtoSqlNode(sqlB);
 
     // Convert to RelNodes
     RelNode relA = toRelNode(a, config);
@@ -796,7 +796,7 @@ public class Calcite {
                 return;
             }
 
-            SqlNode node = loadQuerySQL(sql); // Parse to Calcite AST (SqlNode)
+            SqlNode node = SQLtoSqlNode(sql); // Parse to Calcite AST (SqlNode)
 
             System.out.println("SQL:\n" + sql);
             System.out.println("\nParsed SqlNode (toString):\n" + node.toString());

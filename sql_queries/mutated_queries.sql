@@ -147,7 +147,7 @@ SELECT p_name, s_phone, ps_supplycost, n_name FROM part RIGHT OUTER JOIN partsup
 -- Description: An aggregate query counting line items by ship mode based on date and price conditions.
 -- Change: Changed date range to 1996.
 -- =================================================================
-Select l_shipmode, count(*) as count From orders, lineitem Where
+Select l_shipmode, count(*) as cnt From orders, lineitem Where
 o_orderkey = l_orderkey and l_commitdate < l_receiptdate and
 l_shipdate < l_commitdate and l_receiptdate >= '1996-01-01' and
 l_receiptdate < '1997-01-01' and l_extendedprice <= o_totalprice
