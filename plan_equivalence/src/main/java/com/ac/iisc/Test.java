@@ -11,21 +11,15 @@ import org.apache.calcite.tools.ValidationException;
 public class Test
 {
     private static final String originalPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
-    private static final String rewrittenPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\rewritten_queries.sql";
+    private static final String rewrittenPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
     //private static final String mutatedPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql";
 
     public static void main(String[] args)
     {
         //Enter queryID and transformations here:
         //No other change required
-        String queryId = "A1";
-        String[] originalToRewrittenTransformations = {"AliasNormalization",
-                                                            "ProjectRenameTranspose",
-                                                            "FilterConditionNormalization",
-                                                            "FilterPredicatePushDown",
-                                                            "DateRangeSimplification",
-                                                            "JoinConditionNormalization",
-                                                            "AggregateGroupSetNormalization"};
+        String queryId = "U1";
+        String[] originalToRewrittenTransformations = {"UnionMergeRule"};
 
         FrameworkConfig cfg = Calcite.buildPostgresFrameworkConfig("localhost",5432,"tpch","postgres","123");
 
