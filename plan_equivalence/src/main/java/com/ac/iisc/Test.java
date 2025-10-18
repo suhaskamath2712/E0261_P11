@@ -10,8 +10,8 @@ import org.apache.calcite.tools.ValidationException;
 
 public class Test
 {
-    private static final String originalPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
-    private static final String rewrittenPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
+    private static final String ORIGINAL_PATH = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
+    private static final String REWRITTEN_PATH = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
     //private static final String mutatedPath = "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql";
 
     public static void main(String[] args)
@@ -19,14 +19,14 @@ public class Test
         //Enter queryID and transformations here:
         //No other change required
         String queryId = "U1";
-        String[] originalToRewrittenTransformations = {"UnionMergeRule"};
+        String[] originalToRewrittenTransformations = {""};
 
         FrameworkConfig cfg = Calcite.buildPostgresFrameworkConfig("localhost",5432,"tpch","postgres","123");
 
         try
         {
-            RelNode originalSqlNode = Calcite.toRelNode(Calcite.loadQueryFromFile(originalPath, queryId), cfg);
-            RelNode rewrittenSqlNode = Calcite.toRelNode(Calcite.loadQueryFromFile(rewrittenPath, queryId), cfg);
+            RelNode originalSqlNode = Calcite.toRelNode(Calcite.loadQueryFromFile(ORIGINAL_PATH, queryId), cfg);
+            RelNode rewrittenSqlNode = Calcite.toRelNode(Calcite.loadQueryFromFile(REWRITTEN_PATH, queryId), cfg);
             //RelNode mutatedSqlNode = Calcite.toRelNode(Calcite.SQLtoSqlNode(Calcite.loadQueryFromFile(mutatedPath, queryId)), cfg);
 
             System.out.println("Original:");
