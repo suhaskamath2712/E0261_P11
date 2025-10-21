@@ -173,14 +173,19 @@ public class QueryPlanComparator {
             // Fast path: structural digests
             String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
             String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
+
             if (d1.equals(d2)) return true;
             // Fallback 1: neutralize input indexes
             String nd1 = normalizeDigest(d1);
             String nd2 = normalizeDigest(d2);
+
             if (nd1.equals(nd2)) return true;
             // Fallback 2: canonical digest that treats inner-join children as unordered
             String c1 = canonicalDigest(rel1);
             String c2 = canonicalDigest(rel2);
+
+            //System.out.println("c1: " + c1);
+            //System.out.println("c2: " + c2);
             return c1.equals(c2);
 
         } catch (Exception e) {
