@@ -41,17 +41,22 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.rel2sql.RelToSqlConverter;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.dialect.AnsiSqlDialect;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -306,7 +311,40 @@ public class Calcite {
             .build();
     }
 
-    /** Equivalence check using normalized stringified plans. */
+    // =====================================================================================
+    //  RelNode -> SqlNode / SQL conversion (RelToSqlConverter)
+    // =====================================================================================
+
+    /** Convert a RelNode back into a SqlNode statement using the ANSI SQL dialect. */
+    public static SqlNode relToSqlNode(RelNode rel) {
+        return relToSqlNode(rel, AnsiSqlDialect.DEFAULT);
+    }
+
+    /**
+     * Convert a RelNode back into a SqlNode statement using the provided SQL dialect.
+     * Note: Not every RelNode is representable as a single SQL statement; in those cases,
+     * Calcite may emit best-effort SQL or require a different dialect.
+     */
+    public static SqlNode relToSqlNode(RelNode rel, SqlDialect dialect) {
+        if (rel == null) throw new IllegalArgumentException("rel must not be null");
+        if (dialect == null) dialect = AnsiSqlDialect.DEFAULT;
+        RelToSqlConverter converter = new RelToSqlConverter(dialect);
+        RelToSqlConverter.Result result = converter.visitRoot(rel);
+        return result.asStatement();
+    }
+
+    /** Convenience: Convert RelNode directly into a pretty SQL string (ANSI dialect). */
+    public static String relToSqlString(RelNode rel) {
+        return relToSqlString(rel, AnsiSqlDialect.DEFAULT);
+    }
+
+    /** Convert RelNode into a SQL string using the provided dialect. */
+    public static String relToSqlString(RelNode rel, SqlDialect dialect) {
+        SqlNode stmt = relToSqlNode(rel, dialect);
+        return stmt.toSqlString(dialect).getSql();
+    }
+
+    /** Equivalence check using a deterministic structural digest of plans. */
     public static boolean equivalent(String sqlA, String sqlB, FrameworkConfig config) throws Exception {
         RelNode relA = toRelNode(sqlA, config);
         RelNode relB = toRelNode(sqlB, config);
@@ -315,9 +353,10 @@ public class Calcite {
         };
         relA = applyRelTransformations(relA, norm);
         relB = applyRelTransformations(relB, norm);
-        String sA = String.valueOf(relA);
-        String sB = String.valueOf(relB);
-        return sA.equals(sB);
+        // Compute a digest that ignores node ids and focuses on structure and key attributes.
+        String dA = RelOptUtil.toString(relA, SqlExplainLevel.DIGEST_ATTRIBUTES);
+        String dB = RelOptUtil.toString(relB, SqlExplainLevel.DIGEST_ATTRIBUTES);
+        return dA.equals(dB);
     }
 
     public static RelNode applyRelTransformations(RelNode root, String[] ruleNames) {
