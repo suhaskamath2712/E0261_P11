@@ -90,14 +90,12 @@ SUPPORTED_CALCITE_TRANSFORMATIONS = """
   - `FilterJoinRule` (maps to `FILTER_INTO_JOIN`)
   - `FilterAggregateTransposeRule`
   - `FilterWindowTransposeRule`
-  - `FilterTableScanRule` (resolved reflectively; version-/adapter-dependent)
 
 - Join rules
   - `JoinCommuteRule`
   - `JoinAssociateRule`
   - `JoinPushExpressionsRule`
   - `JoinConditionPushRule`
-  - `SemiJoinRule` (resolved reflectively; version-dependent)
 
 - Aggregate rules
   - `AggregateProjectPullUpConstantsRule`
@@ -122,11 +120,6 @@ SUPPORTED_CALCITE_TRANSFORMATIONS = """
 - Window rules
   - `ProjectWindowTransposeRule`
   - `FilterWindowTransposeRule`
-
-- Other/general rules
-  - `ValuesReduceRule`
-  - `ReduceExpressionsRule`
-  - `PruneEmptyRules`
 """
 
 

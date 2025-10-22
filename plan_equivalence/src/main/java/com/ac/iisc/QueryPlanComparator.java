@@ -3,6 +3,7 @@ package com.ac.iisc;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
@@ -103,16 +104,25 @@ public class QueryPlanComparator {
     private static RelNode getOptimizedRelNode(Planner planner, String sql) throws Exception {
         System.out.println("Processing SQL: " + sql);
 
-        // 1. Parse the SQL string into an AST
-        SqlNode sqlNode = planner.parse(sql);
+        // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
+        String sqlForParse = sql == null ? null : sql.trim();
+        if (sqlForParse != null) {
+            // Remove a single trailing semicolon if present
+            while (sqlForParse.endsWith(";")) {
+                sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
+            }
+        }
 
-        // 2. Validate the AST
+        // 2. Parse the SQL string into an AST
+        SqlNode sqlNode = planner.parse(sqlForParse);
+
+    // 3. Validate the AST
         SqlNode validatedSqlNode = planner.validate(sqlNode);
 
-        // 3. Convert the validated AST to RelNode (Logical Plan)
+    // 4. Convert the validated AST to RelNode (Logical Plan)
         RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
 
-        // 4. Optimize in phases to avoid oscillations and collapse redundant projections
+    // 5. Optimize in phases to avoid oscillations and collapse redundant projections
         // Phase 1: basic simplification
         HepProgramBuilder p1 = new HepProgramBuilder();
         p1.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
@@ -162,7 +172,6 @@ public class QueryPlanComparator {
         try {
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
-
             // Reset the planner for the second query (Calcite's Planner is stateful)
             planner.close();
             planner = Frameworks.getPlanner(config);
@@ -188,7 +197,61 @@ public class QueryPlanComparator {
             //System.out.println("c2: " + c2);
             return c1.equals(c2);
 
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
+            e.printStackTrace();
+            // Swallow detailed error output to satisfy lint rules; return non-equivalence on error
+            return false;
+        } finally {
+            planner.close();
+        }
+    }
+
+    /**
+     * Compares two SQL queries for semantic equivalence.
+     * @param sql1 First query.
+     * @param sql2 Second query.
+     * @param transformations Array of transformation names to apply before comparison.
+     * @return true if the optimized RelNode trees are equal, false otherwise.
+     */
+    public static boolean compareQueries(String sql1, String sql2, List<String> transformations) {
+        FrameworkConfig config = getFrameworkConfig();
+        Planner planner = Frameworks.getPlanner(config);
+
+        try {
+            // Get the optimized RelNode for the first query
+            RelNode rel1 = getOptimizedRelNode(planner, sql1);
+            RelNode transformedRel1 = applyTransformations(rel1, transformations);
+            System.out.println("After applying transformations, RelNode 1:");
+            System.out.println(RelOptUtil.toString(transformedRel1));
+            // Reset the planner for the second query (Calcite's Planner is stateful)
+            planner.close();
+            planner = Frameworks.getPlanner(config);
+
+            // Get the optimized RelNode for the second query
+            RelNode rel2 = getOptimizedRelNode(planner, sql2);
+
+            // Fast path: structural digests
+            String d1 = RelOptUtil.toString(transformedRel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
+            String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
+
+            if (d1.equals(d2)) return true;
+            // Fallback 1: neutralize input indexes
+            String nd1 = normalizeDigest(d1);
+            String nd2 = normalizeDigest(d2);
+
+            if (nd1.equals(nd2)) return true;
+            // Fallback 2: canonical digest that treats inner-join children as unordered
+            String c1 = canonicalDigest(rel1);
+            String c2 = canonicalDigest(rel2);
+
+            //System.out.println("c1: " + c1);
+            //System.out.println("c2: " + c2);
+            return c1.equals(c2);
+
+        } catch (Exception e)
+        {
+            e.printStackTrace();
             // Swallow detailed error output to satisfy lint rules; return non-equivalence on error
             return false;
         } finally {
@@ -207,8 +270,7 @@ public class QueryPlanComparator {
 
     // Build a canonical digest for a plan where inner-join children are treated as an unordered set
     private static String canonicalDigest(RelNode rel) {
-        if (rel instanceof LogicalProject) {
-            LogicalProject p = (LogicalProject) rel;
+        if (rel instanceof LogicalProject p) {
             StringBuilder sb = new StringBuilder();
             sb.append("Project[");
             for (int i = 0; i < p.getProjects().size(); i++) {
@@ -220,12 +282,10 @@ public class QueryPlanComparator {
             sb.append(canonicalDigest(p.getInput()));
             return sb.toString();
         }
-        if (rel instanceof LogicalFilter) {
-            LogicalFilter f = (LogicalFilter) rel;
+        if (rel instanceof LogicalFilter f) {
             return "Filter(" + normalizeDigest(f.getCondition().toString()) + ")->" + canonicalDigest(f.getInput());
         }
-        if (rel instanceof LogicalJoin) {
-            LogicalJoin j = (LogicalJoin) rel;
+        if (rel instanceof LogicalJoin j) {
             String cond = normalizeDigest(j.getCondition().toString());
             String left = canonicalDigest(j.getLeft());
             String right = canonicalDigest(j.getRight());
@@ -257,16 +317,88 @@ public class QueryPlanComparator {
         return sb.toString();
     }
 
+    private static RelNode applyTransformations(RelNode rel, List<String> transformations)
+    {
+        HepProgramBuilder pb = new HepProgramBuilder();
+        for (String transform : transformations)
+        {
+            switch (transform.toLowerCase())
+            {
+                //Projection Rules
+                case "projectmergerule" -> pb.addRuleInstance(CoreRules.PROJECT_MERGE);
+                case "projectremoverule" -> pb.addRuleInstance(CoreRules.PROJECT_REMOVE);
+                case "projectjointransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);
+                case "projectfiltertransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE);
+                case "projectsetoptransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_SET_OP_TRANSPOSE);
+                case "projecttablescanrule" -> pb.addRuleInstance(CoreRules.PROJECT_TABLE_SCAN);
+                
+                //Filter Rules
+                case "filtermergerule" -> pb.addRuleInstance(CoreRules.FILTER_MERGE);
+                case "filterprojecttransposerule" -> pb.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
+                case "filterjoinrule" -> pb.addRuleInstance(CoreRules.FILTER_INTO_JOIN);
+                case "filteraggregatetransposerule" -> pb.addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE);
+                case "filterwindowtransposerule" -> pb.addRuleInstance(CoreRules.FILTER_WINDOW_TRANSPOSE);
+                
+                //Join Rules
+                case "joincommuterule" -> pb.addRuleInstance(CoreRules.JOIN_COMMUTE);
+                case "joinassociaterule" -> pb.addRuleInstance(CoreRules.JOIN_ASSOCIATE);
+                case "joinpushexpressionsrule" -> pb.addRuleInstance(CoreRules.JOIN_PUSH_EXPRESSIONS);
+                case "joinconditionpushrule" -> pb.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH);
+                
+                //Aggregate Rules
+                case "aggregateprojectpullupconstantsrule" -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS);
+                case "aggregateremoverule" -> pb.addRuleInstance(CoreRules.AGGREGATE_REMOVE);
+                case "aggregatejointransposerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE);
+                case "aggregateuniontransposerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_UNION_TRANSPOSE);
+                case "aggregateprojectmergerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_MERGE);
+                case "aggregatecasetofilterrule" -> pb.addRuleInstance(CoreRules.AGGREGATE_CASE_TO_FILTER);
+
+                //Sort & limit rules
+                case "sortremoverule" -> pb.addRuleInstance(CoreRules.SORT_REMOVE);
+                case "sortuniontransposerule" -> pb.addRuleInstance(CoreRules.SORT_UNION_TRANSPOSE);
+                case "sortprojecttransposerule" -> pb.addRuleInstance(CoreRules.SORT_PROJECT_TRANSPOSE);
+                case "sortjointransposerule" -> pb.addRuleInstance(CoreRules.SORT_JOIN_TRANSPOSE);
+
+                //Set operation rules
+                case "unionmergerule" -> pb.addRuleInstance(CoreRules.UNION_MERGE);
+                case "unionpullupconstantsrule" -> pb.addRuleInstance(CoreRules.UNION_PULL_UP_CONSTANTS);
+                case "intersecttodistinctrule" -> pb.addRuleInstance(CoreRules.INTERSECT_TO_DISTINCT);
+                case "minustodistinctrule" -> pb.addRuleInstance(CoreRules.MINUS_TO_DISTINCT);
+
+                //Window rules
+                case "projectwindowtransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE);
+
+                default -> System.out.println("Unknown transformation: " + transform);
+            }
+        }
+        HepPlanner planner = new HepPlanner(pb.build());
+        planner.setRoot(rel);
+        RelNode newRel = planner.findBestExp();
+        return newRel;
+    }
+
     public static void main(String[] args) {
         // --- Examples using TPC-H tables (assuming 'nation' and 'region' exist) ---
 
         System.out.println("--- Scenario 1: Semantically Equivalent Queries (Different Syntax) ---");
         // Query A: Standard join order (NATION JOIN REGION) and standard filter
-        String sqlA = "SELECT n.N_NAME, r.R_NAME FROM NATION n JOIN REGION r ON n.N_REGIONKEY = r.R_REGIONKEY WHERE n.N_NATIONKEY > 10";
+        String sqlA = "(SELECT s_suppkey, s_name FROM supplier, nation where s_nationkey = n_nationkey and  n_name = 'GERMANY' order by s_suppkey desc, s_name limit 12)UNION ALL (SELECT c_custkey, c_name FROM customer,  orders where c_custkey = o_custkey and o_orderpriority = '1-URGENT' order by c_custkey, c_name desc limit 10);";
         // Query B: Same semantics with reversed join inputs; normalization should make them equivalent
-        String sqlB = "SELECT n.N_NAME, r.R_NAME FROM REGION r JOIN NATION n ON n.N_REGIONKEY = r.R_REGIONKEY WHERE n.N_NATIONKEY > 10";
+        String sqlB = """
+                      (SELECT C.c_name, C.c_custkey
+                        FROM customer AS C, orders AS O
+                        WHERE O.o_custkey = C.c_custkey AND O.o_orderpriority = '1-URGENT'
+                        ORDER BY C.c_custkey, C.c_name DESC
+                        LIMIT 10)
+                        UNION ALL
+                        (SELECT S.s_name, S.s_suppkey
+                        FROM supplier AS S, nation AS N
+                        WHERE S.s_nationkey = N.n_nationkey AND N.n_name = 'GERMANY'
+                        ORDER BY S.s_suppkey DESC, S.s_name
+                        LIMIT 12);""";
 
-        boolean result1 = compareQueries(sqlA, sqlB);
+        List<String> transformations = List.of("unionmergerule");
+        boolean result1 = compareQueries(sqlA, sqlB, transformations);
         System.out.println("\nComparison Result (A vs B): " + result1);
         System.out.println("------------------------------------------------------------------\n");
     }
