@@ -32,11 +32,33 @@ import org.apache.calcite.tools.Planner;
 import org.postgresql.ds.PGSimpleDataSource;
 
 /**
- * Demonstrates how to use Apache Calcite to compare two SQL queries for semantic equivalence
- * by normalizing and comparing their internal RelNode (Relational Expression) representations.
+ * QueryPlanComparator
+ * --------------------
+ * A utility for checking whether two SQL statements are semantically equivalent
+ * using Apache Calcite. It works by wiring Calcite to a real PostgreSQL catalog
+ * (via JDBC), planning both queries to logical plans (RelNode), normalizing the
+ * plans with rule-based optimization (HepPlanner), and then comparing the
+ * resulting structures using multiple robust strategies.
  *
- * This version connects to an external PostgreSQL database using the JDBC adapter.
- * The connection details must be configured below.
+ * What this class does:
+ * - Connects to PostgreSQL and exposes a schema to Calcite (tables/columns must exist).
+ * - Parses and validates SQL; converts to a logical plan (RelNode).
+ * - Normalizes plans in phases to avoid rule oscillations and reduce noise.
+ * - Compares plans using:
+ *   1) Calcite structural digest (fast path)
+ *   2) A normalized digest (input-ref indices like $0 are neutralized)
+ *   3) A canonical digest that treats inner-join children and projection lists
+ *      as unordered sets (so child/column order differences do not matter for
+ *      inner joins)
+ *
+ * Limitations and notes:
+ * - Only inner joins are treated as order-insensitive; outer/semi/anti joins
+ *   remain order-sensitive.
+ * - ORDER BY/LIMIT are part of semantics; different orders/limits will not be
+ *   normalized away.
+ * - Normalization uses match limits to prevent infinite rewrite loops; extremely
+ *   complex queries may still require tuning (more phases or higher limits).
+ * - SQL must be valid against the configured PostgreSQL schema.
  */
 public class QueryPlanComparator {
 
@@ -52,7 +74,13 @@ public class QueryPlanComparator {
     // --- 2. Setup Framework and Planner ---
 
     /**
-     * Configures the Calcite Framework to use the PostgreSQL database as a schema source.
+     * Build a Calcite {@link FrameworkConfig} that exposes a PostgreSQL schema via JDBC.
+     *
+     * Implementation details:
+     * - Creates an in-memory Calcite connection to obtain the root schema container.
+     * - Wraps a {@link PGSimpleDataSource} in a Calcite {@link JdbcSchema} named {@code PG_SCHEMA}.
+     * - Configures the parser with {@link Lex#MYSQL} so unquoted identifiers fold to
+     *   lower-case, matching PostgreSQL default behavior and easing name resolution.
      */
     private static FrameworkConfig getFrameworkConfig() {
         try {
@@ -77,8 +105,8 @@ public class QueryPlanComparator {
             JdbcSchema pgJdbcSchema = JdbcSchema.create(rootSchema, PG_SCHEMA, dataSource, PG_SCHEMA, null);
             rootSchema.add(PG_SCHEMA, pgJdbcSchema);
 
-        // Parser config: fold unquoted identifiers to lower-case, case-insensitive
-        // Use Lex.MYSQL for broad compatibility (works well with PostgreSQL catalogs)
+        // Parser config: fold unquoted identifiers to lower-case, case-insensitive.
+        // Using Lex.MYSQL provides behavior broadly compatible with PostgreSQL catalogs.
         SqlParser.Config parserConfig = SqlParser.config()
             .withLex(Lex.MYSQL);
 
@@ -95,14 +123,19 @@ public class QueryPlanComparator {
     }
 
     /**
-     * Parses, validates, and optimizes a SQL query to produce a canonical RelNode.
-     * @param planner The Calcite Planner instance.
-     * @param sql The SQL query string.
-     * @return The optimized RelNode.
-     * @throws Exception if parsing or planning fails.
+     * Parse, validate, and normalize a SQL query into an optimized {@link RelNode}.
+     *
+     * Steps:
+     * 1) Sanitize input by removing trailing semicolons (Calcite's parser rejects them).
+     * 2) Parse SQL string into a {@link SqlNode} (AST).
+     * 3) Validate the AST against the JDBC-backed schema.
+     * 4) Convert the validated AST to a logical plan (RelNode).
+     * 5) Apply phased HepPlanner programs to normalize and stabilize the plan.
+     *
+     * The returned RelNode is suitable for structural comparison.
      */
     private static RelNode getOptimizedRelNode(Planner planner, String sql) throws Exception {
-        System.out.println("Processing SQL: " + sql);
+        //System.out.println("Processing SQL: " + sql);
 
         // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
         String sqlForParse = sql == null ? null : sql.trim();
@@ -116,13 +149,13 @@ public class QueryPlanComparator {
         // 2. Parse the SQL string into an AST
         SqlNode sqlNode = planner.parse(sqlForParse);
 
-    // 3. Validate the AST
+        // 3. Validate the AST
         SqlNode validatedSqlNode = planner.validate(sqlNode);
 
-    // 4. Convert the validated AST to RelNode (Logical Plan)
+        // 4. Convert the validated AST to RelNode (Logical Plan)
         RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
 
-    // 5. Optimize in phases to avoid oscillations and collapse redundant projections
+        // 5. Optimize in phases to avoid oscillations and collapse redundant projections
         // Phase 1: basic simplification
         HepProgramBuilder p1 = new HepProgramBuilder();
         p1.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
@@ -154,17 +187,25 @@ public class QueryPlanComparator {
         hepPlanner.setRoot(logicalPlan);
         RelNode optimizedPlan = hepPlanner.findBestExp();
 
-        System.out.println("  -> Optimized RelNode (Logical Plan):");
-        System.out.println(RelOptUtil.toString(optimizedPlan));
+        //System.out.println("  -> Optimized RelNode (Logical Plan):");
+        //System.out.println(RelOptUtil.toString(optimizedPlan));
         return optimizedPlan;
     }
 
     /**
-     * Compares two SQL queries for semantic equivalence.
-     * @param sql1 First query.
-     * @param sql2 Second query.
-     * @return true if the optimized RelNode trees are equal, false otherwise.
+     * Compare two SQL queries for semantic equivalence.
+     *
+     * Strategy (in order):
+     * 1) Compare Calcite structural digests (cheap and deterministic).
+     * 2) If different, compare normalized digests that ignore input-ref indices (e.g. $0 -> $x),
+     *    which neutralizes differences due to field index shifts (common when join inputs swap).
+     * 3) If still different, compare a canonical digest where inner-join children and projection
+     *    expression lists are treated as unordered sets, making join child order and column order
+     *    irrelevant for inner-join-only differences.
+     *
+     * Returns true if any of the above comparisons match; false otherwise or on planning error.
      */
+    /*
     public static boolean compareQueries(String sql1, String sql2) {
         FrameworkConfig config = getFrameworkConfig();
         Planner planner = Frameworks.getPlanner(config);
@@ -193,26 +234,26 @@ public class QueryPlanComparator {
             String c1 = canonicalDigest(rel1);
             String c2 = canonicalDigest(rel2);
 
-            //System.out.println("c1: " + c1);
-            //System.out.println("c2: " + c2);
-            return c1.equals(c2);
+            if (c1.equals(c2)) return true;
+
+            return rel1.equals(rel2);
 
         } catch (Exception e)
         {
-            e.printStackTrace();
-            // Swallow detailed error output to satisfy lint rules; return non-equivalence on error
+            // Planning/parsing/validation error: treat as non-equivalent.
+            // Consider logging via a logging framework if needed.
             return false;
         } finally {
             planner.close();
         }
-    }
+    }*/
 
     /**
-     * Compares two SQL queries for semantic equivalence.
-     * @param sql1 First query.
-     * @param sql2 Second query.
-     * @param transformations Array of transformation names to apply before comparison.
-     * @return true if the optimized RelNode trees are equal, false otherwise.
+     * Compare two SQL queries for semantic equivalence after applying an explicit set of
+     * transformations to the first query's plan.
+     *
+     * This overload allows users to experiment with specific CoreRules (by name) on the
+     * first plan before comparison. The same digest-based strategy is used for equality.
      */
     public static boolean compareQueries(String sql1, String sql2, List<String> transformations) {
         FrameworkConfig config = getFrameworkConfig();
@@ -221,18 +262,23 @@ public class QueryPlanComparator {
         try {
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
-            RelNode transformedRel1 = applyTransformations(rel1, transformations);
-            System.out.println("After applying transformations, RelNode 1:");
-            System.out.println(RelOptUtil.toString(transformedRel1));
-            // Reset the planner for the second query (Calcite's Planner is stateful)
+
+            System.out.println("RelNode rel1: " + rel1.explain());
+
+            if (transformations != null && !transformations.isEmpty()) 
+                rel1 = applyTransformations(rel1, transformations);
+
             planner.close();
             planner = Frameworks.getPlanner(config);
 
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
+            
+            System.out.println("Transformed RelNode rel1: " + rel1.explain());
+            System.out.println("RelNode rel2: " + rel2.explain());
 
             // Fast path: structural digests
-            String d1 = RelOptUtil.toString(transformedRel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
+            String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
             String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
 
             if (d1.equals(d2)) return true;
@@ -241,24 +287,29 @@ public class QueryPlanComparator {
             String nd2 = normalizeDigest(d2);
 
             if (nd1.equals(nd2)) return true;
+            
             // Fallback 2: canonical digest that treats inner-join children as unordered
             String c1 = canonicalDigest(rel1);
             String c2 = canonicalDigest(rel2);
 
-            //System.out.println("c1: " + c1);
-            //System.out.println("c2: " + c2);
-            return c1.equals(c2);
+            if (c1.equals(c2)) return true;
+
+            return rel1.equals(rel2);
 
         } catch (Exception e)
         {
-            e.printStackTrace();
-            // Swallow detailed error output to satisfy lint rules; return non-equivalence on error
+            // Planning/parsing/validation error: treat as non-equivalent.
             return false;
         } finally {
             planner.close();
         }
     }
 
+    /**
+     * Normalize a digest string by replacing input references like $0, $12 with a
+     * placeholder ($x) and collapsing repeated spaces. This reduces sensitivity to
+     * field index positions that shift when join inputs are swapped.
+     */
     private static String normalizeDigest(String digest) {
         if (digest == null) return null;
         // Replace input refs like $0, $12 with a placeholder to make join-child order less significant
@@ -268,7 +319,14 @@ public class QueryPlanComparator {
         return s.trim();
     }
 
-    // Build a canonical digest for a plan where inner-join children are treated as an unordered set
+    /**
+     * Build a canonical digest for a plan where:
+     * - Inner-join children are treated as an unordered set (child digests sorted)
+     * - Projection expression lists are treated as an unordered set (expressions sorted)
+     * - Filter conditions and expression strings are normalized via {@link #normalizeDigest(String)}
+     *
+     * This makes the digest insensitive to child order and column order for inner-join queries.
+     */
     private static String canonicalDigest(RelNode rel) {
         if (rel instanceof LogicalProject p) {
             StringBuilder sb = new StringBuilder();
@@ -299,8 +357,7 @@ public class QueryPlanComparator {
             }
             return "Join(" + j.getJoinType() + "," + cond + "){" + a + "|" + b + "}";
         }
-        if (rel instanceof TableScan) {
-            TableScan ts = (TableScan) rel;
+        if (rel instanceof TableScan ts) {
             return "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
         }
         // Default: normalized string of this node with placeholders, plus canonical children
@@ -317,6 +374,14 @@ public class QueryPlanComparator {
         return sb.toString();
     }
 
+    /**
+     * Apply an explicit list of HepPlanner CoreRules (by name) to a plan, producing a
+     * new {@link RelNode}. This is useful for experimenting with how particular rules
+     * affect normalization and equivalence.
+     *
+     * Supported rule name keys map to Calcite's {@link CoreRules}. Unknown names are
+     * reported to stdout and ignored.
+     */
     private static RelNode applyTransformations(RelNode rel, List<String> transformations)
     {
         HepProgramBuilder pb = new HepProgramBuilder();
@@ -377,24 +442,26 @@ public class QueryPlanComparator {
         return newRel;
     }
 
+    /**
+     * Small demo entrypoint: builds two example SQL statements and prints the
+     * comparison result. Adjust the SQL and the transformation list as needed
+     * for local experiments. Ensure the referenced tables exist in PostgreSQL.
+     */
     public static void main(String[] args) {
-        // --- Examples using TPC-H tables (assuming 'nation' and 'region' exist) ---
-
-        System.out.println("--- Scenario 1: Semantically Equivalent Queries (Different Syntax) ---");
-        // Query A: Standard join order (NATION JOIN REGION) and standard filter
-        String sqlA = "(SELECT s_suppkey, s_name FROM supplier, nation where s_nationkey = n_nationkey and  n_name = 'GERMANY' order by s_suppkey desc, s_name limit 12)UNION ALL (SELECT c_custkey, c_name FROM customer,  orders where c_custkey = o_custkey and o_orderpriority = '1-URGENT' order by c_custkey, c_name desc limit 10);";
-        // Query B: Same semantics with reversed join inputs; normalization should make them equivalent
+        String sqlA = """
+                        (SELECT s_suppkey as key, s_name as name FROM supplier, nation where s_nationkey = n_nationkey and  n_name = 'GERMANY' order by s_suppkey desc, s_name limit 12);""";
         String sqlB = """
-                      (SELECT C.c_name, C.c_custkey
-                        FROM customer AS C, orders AS O
-                        WHERE O.o_custkey = C.c_custkey AND O.o_orderpriority = '1-URGENT'
-                        ORDER BY C.c_custkey, C.c_name DESC
-                        LIMIT 10)
-                        UNION ALL
-                        (SELECT S.s_name, S.s_suppkey
-                        FROM supplier AS S, nation AS N
-                        WHERE S.s_nationkey = N.n_nationkey AND N.n_name = 'GERMANY'
-                        ORDER BY S.s_suppkey DESC, S.s_name
+                        (SELECT
+                            S.s_name as name,
+                            S.s_suppkey as key
+                        FROM
+                            supplier AS S,
+                            nation AS N
+                        WHERE
+                            S.s_nationkey = N.n_nationkey
+                            AND N.n_name = 'GERMANY'
+                        ORDER BY
+                            S.s_suppkey DESC, S.s_name
                         LIMIT 12);""";
 
         List<String> transformations = List.of("unionmergerule");
