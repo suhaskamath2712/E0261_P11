@@ -73,7 +73,9 @@ PROMPT = """Compare these two query plans and if they are equivalent, output tru
             A list of Apache calcite transformations that can map from the first plan to the second plan.\n
             DO NOT OUTPUT ANYTHING ELSE. DO NOT GIVE ANY EXPLANATIONS.\n
             Output transformations from the following supported list only:\n
-            If no transformations can map the first plan to the second plan, output "No transformations found".\n"""
+            If no transformations can map the first plan to the second plan, output "No transformations found".\n
+            If no transformations are needed (plans are identical), output "No transformations needed".\n
+            """
 
 SUPPORTED_CALCITE_TRANSFORMATIONS = """
 - Projection rules

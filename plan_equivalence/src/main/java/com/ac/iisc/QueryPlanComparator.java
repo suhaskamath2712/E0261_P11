@@ -205,63 +205,16 @@ public class QueryPlanComparator {
      *
      * Returns true if any of the above comparisons match; false otherwise or on planning error.
      */
-    /*
-    public static boolean compareQueries(String sql1, String sql2) {
-        FrameworkConfig config = getFrameworkConfig();
-        Planner planner = Frameworks.getPlanner(config);
-
-        try {
-            // Get the optimized RelNode for the first query
-            RelNode rel1 = getOptimizedRelNode(planner, sql1);
-            // Reset the planner for the second query (Calcite's Planner is stateful)
-            planner.close();
-            planner = Frameworks.getPlanner(config);
-
-            // Get the optimized RelNode for the second query
-            RelNode rel2 = getOptimizedRelNode(planner, sql2);
-
-            // Fast path: structural digests
-            String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
-            String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
-
-            if (d1.equals(d2)) return true;
-            // Fallback 1: neutralize input indexes
-            String nd1 = normalizeDigest(d1);
-            String nd2 = normalizeDigest(d2);
-
-            if (nd1.equals(nd2)) return true;
-            // Fallback 2: canonical digest that treats inner-join children as unordered
-            String c1 = canonicalDigest(rel1);
-            String c2 = canonicalDigest(rel2);
-
-            if (c1.equals(c2)) return true;
-
-            return rel1.equals(rel2);
-
-        } catch (Exception e)
-        {
-            // Planning/parsing/validation error: treat as non-equivalent.
-            // Consider logging via a logging framework if needed.
-            return false;
-        } finally {
-            planner.close();
-        }
-    }*/
-
-    /**
-     * Compare two SQL queries for semantic equivalence after applying an explicit set of
-     * transformations to the first query's plan.
-     *
-     * This overload allows users to experiment with specific CoreRules (by name) on the
-     * first plan before comparison. The same digest-based strategy is used for equality.
-     */
     public static boolean compareQueries(String sql1, String sql2, List<String> transformations) {
         FrameworkConfig config = getFrameworkConfig();
         Planner planner = Frameworks.getPlanner(config);
 
         try {
+            System.out.println("Here");
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
+
+            
 
             System.out.println("RelNode rel1: " + rel1.explain());
 
@@ -298,6 +251,7 @@ public class QueryPlanComparator {
 
         } catch (Exception e)
         {
+            e.printStackTrace();
             // Planning/parsing/validation error: treat as non-equivalent.
             return false;
         } finally {
@@ -384,9 +338,11 @@ public class QueryPlanComparator {
      */
     private static RelNode applyTransformations(RelNode rel, List<String> transformations)
     {
-        HepProgramBuilder pb = new HepProgramBuilder();
+        RelNode newRel = rel;
+
         for (String transform : transformations)
         {
+            HepProgramBuilder pb = new HepProgramBuilder();
             switch (transform.toLowerCase())
             {
                 //Projection Rules
@@ -435,10 +391,12 @@ public class QueryPlanComparator {
 
                 default -> System.out.println("Unknown transformation: " + transform);
             }
+
+            HepPlanner planner = new HepPlanner(pb.build());
+            planner.setRoot(rel);
+            newRel = planner.findBestExp();
         }
-        HepPlanner planner = new HepPlanner(pb.build());
-        planner.setRoot(rel);
-        RelNode newRel = planner.findBestExp();
+        
         return newRel;
     }
 
@@ -449,22 +407,24 @@ public class QueryPlanComparator {
      */
     public static void main(String[] args) {
         String sqlA = """
-                        (SELECT s_suppkey as key, s_name as name FROM supplier, nation where s_nationkey = n_nationkey and  n_name = 'GERMANY' order by s_suppkey desc, s_name limit 12);""";
+                        select n_name, c_acctbal from nation LEFT OUTER JOIN customer
+                     ON n_nationkey = c_nationkey and c_nationkey > 3 and n_nationkey < 20 and
+                     c_nationkey <> 10 LIMIT 200;""";
         String sqlB = """
-                        (SELECT
-                            S.s_name as name,
-                            S.s_suppkey as key
+                        SELECT
+                            N.n_name,
+                            C.c_acctbal
                         FROM
-                            supplier AS S,
                             nation AS N
+                        LEFT JOIN
+                            customer AS C ON N.n_nationkey = C.c_nationkey
                         WHERE
-                            S.s_nationkey = N.n_nationkey
-                            AND N.n_name = 'GERMANY'
-                        ORDER BY
-                            S.s_suppkey DESC, S.s_name
-                        LIMIT 12);""";
+                            C.c_nationkey > 3
+                            AND N.n_nationkey < 20
+                            AND C.c_nationkey <> 10
+                        LIMIT 200;""";
 
-        List<String> transformations = List.of("unionmergerule");
+        List<String> transformations = List.of("filterjoinrule");
         boolean result1 = compareQueries(sqlA, sqlB, transformations);
         System.out.println("\nComparison Result (A vs B): " + result1);
         System.out.println("------------------------------------------------------------------\n");
