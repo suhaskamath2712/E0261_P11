@@ -1,424 +1,441 @@
-/*
- * =====================================================================================
- * Calcite.java (Corrected)
- *
- * Purpose
- * -------
- * This utility demonstrates how to:
- * 1) Load SQL text from a file that contains multiple queries delimited by
- * documented blocks (with "-- Query ID: <ID>" headers),
- * 2) Select a specific query by its ID (or default to the first), and
- * 3) Parse that SQL into an Apache Calcite SqlNode (the SQL AST).
- * 4) Apply transformations at both the SqlNode (AST) and RelNode (logical plan) level.
- *
- * Key Corrections
- * ---------------
- * - Replaced non-existent FileIO with standard java.nio.file.Files.
- * - Corrected buildNary to properly construct n-ary SqlCalls.
- * - Corrected equivalent() to use RelOptUtil.areEqual for reliable plan comparison.
- * - Replaced complex/fragile reflection-based rule lookup with a direct, robust switch-based approach.
- *
- * =====================================================================================
- */
 package com.ac.iisc;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.sql.DataSource;
+import java.util.Properties;
 
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
-import org.apache.calcite.avatica.util.Casing;
-import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.config.Lex;
-import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.rel2sql.RelToSqlConverter;
+import org.apache.calcite.rel.RelVisitor;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.rules.CoreRules;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlExplainLevel;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.dialect.AnsiSqlDialect;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
-import org.apache.calcite.tools.RelConversionException;
-import org.apache.calcite.tools.ValidationException;
-import org.apache.calcite.util.Litmus;
+import org.postgresql.ds.PGSimpleDataSource;
 
 /**
  * Calcite parsing and transformation helper.
+ *
+ * Responsibilities:
+ * - Build a Calcite FrameworkConfig backed by a PostgreSQL schema (via JDBC).
+ * - Parse/validate SQL to RelNode and optionally optimize it using HepPlanner phases.
+ * - Provide utilities to compare two queries for structural equivalence using digests
+ *   and a canonical formatter that is insensitive to inner-join child order.
+ * - Apply specific CoreRules by name to a RelNode.
+ *
+ * Notes:
+ * - Unquoted identifiers are folded to lower-case to align with PostgreSQL catalogs.
+ * - Trailing semicolons are stripped before parsing.
+ * - Canonical digest normalizes inner-join child ordering; projection order is preserved.
  */
 public class Calcite {
 
-    private static final Path ORIGINAL_SQL_FILE = Paths.get(
-        "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql");
+    // --- 1. PostgreSQL Connection Configuration (UPDATE THESE) ---
+    private static final String PG_DRIVER = "org.postgresql.Driver";
+    private static final String PG_URL = "jdbc:postgresql://localhost:5432/tpch"; 
+    private static final String PG_USER = "postgres";
+    private static final String PG_PASSWORD = "123";
+    // Schema in PostgreSQL containing the TPC-H tables (e.g., 'public')
+    private static final String PG_SCHEMA = "public";
+
+
+    // --- 2. Setup Framework and Planner ---
 
     /**
-     * Extracts queries from a single .sql file into a map of (QueryID -> SQL text).
+     * Build a Calcite {@link FrameworkConfig} that exposes a PostgreSQL schema via JDBC.
+     *
+     * Implementation details:
+     * - Creates an in-memory Calcite connection to obtain the root schema container.
+     * - Wraps a {@link PGSimpleDataSource} in a Calcite {@link JdbcSchema} named {@code PG_SCHEMA}.
+     * - Configures the parser with {@link Lex#MYSQL} so unquoted identifiers fold to
+     *   lower-case, matching PostgreSQL default behavior and easing name resolution.
      */
-    private static Map<String, String> parseQueries(java.nio.file.Path sqlFile) throws IOException {
-        String content = Files.readString(sqlFile); // CORRECTED: Use standard Java NIO
-        Pattern p = Pattern.compile(
-                "-- =+.*?\n-- Query ID: ([\\w-]+).*?\n-- =+.*?\n(.*?)(?=\n-- =+|$)",
-                Pattern.DOTALL);
-        Matcher m = p.matcher(content);
-        Map<String, String> map = new LinkedHashMap<>();
-        while (m.find()) {
-            String id = m.group(1).trim();
-            String sql = m.group(2).trim();
-            if (sql.endsWith(";")) {
-                sql = sql.substring(0, sql.length() - 1);
-            }
-            if (!id.isEmpty() && !sql.isEmpty()) {
-                map.put(id, sql);
-            }
-        }
-        return map;
-    }
-
-    /**
-     * Public helper to load a single SQL query from a file by Query ID.
-     */
-    public static String loadQueryFromFile(String path, String queryId) throws IOException {
-        Path p = Paths.get(path);
-        Map<String, String> queries = parseQueries(p);
-        if (queries.isEmpty()) {
-            return null;
-        }
-        if (queryId == null || queryId.isBlank()) {
-            return queries.values().iterator().next();
-        }
-        return queries.get(queryId);
-    }
-
-    /**
-     * Parse a SQL string using Apache Calcite and return the parsed SqlNode.
-     */
-    public static SqlNode SQLtoSqlNode(String sql) throws SqlParseException {
-        if (sql == null || sql.isBlank()) {
-            throw new IllegalArgumentException("sql must not be null or blank");
-        }
-        SqlParser.Config config = SqlParser.config()
-                .withLex(Lex.ORACLE) // ORACLE is a reasonable default for generic SQL with some extensions
-                .withQuoting(Quoting.DOUBLE_QUOTE)
-                .withUnquotedCasing(Casing.TO_LOWER)
-                .withCaseSensitive(false)
-                .withIdentifierMaxLength(128);
-        SqlParser parser = SqlParser.create(sql, config);
-        return parser.parseQuery();
-    }
-
-    /**
-     * Compare two SqlNodes for structural equality using Calcite's equalsDeep API.
-     */
-    public static boolean sqlNodesEqual(SqlNode left, SqlNode right) {
-        if (left == right) return true;
-        if (left == null || right == null) return false;
-        return left.equalsDeep(right, Litmus.IGNORE);
-    }
-
-    // =====================================================================================
-    //  Lightweight AST Transformations (SqlNode-level)
-    // =====================================================================================
-
-    private interface SqlTransformation {
-        SqlNode apply(SqlNode in);
-    }
-
-    public static SqlNode applyTransformations(SqlNode plan, String[] list) {
-        if (plan == null || list == null || list.length == 0) return plan;
-        SqlNode out = plan;
-        for (String name : list) {
-            SqlTransformation t = null;
-            if ("simplifyDoubleNegation".equals(name)) {
-                t = new SimplifyDoubleNegation();
-            } else if ("normalizeConjunctionOrder".equals(name)) {
-                t = new NormalizeConjunctionOrder();
-            } else if ("pushNotDown".equals(name)) {
-                t = new PushNotDown();
-            } else if ("foldBooleanConstants".equals(name)) {
-                t = new FoldBooleanConstants();
-            }
-            if (t != null) {
-                out = t.apply(out);
-            }
-        }
-        return out;
-    }
-
-    private static class SimplifyDoubleNegation extends SqlShuttle implements SqlTransformation {
-        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
-        @Override public SqlNode visit(SqlCall call) {
-            call = (SqlCall) super.visit(call);
-            if (call.getKind() == SqlKind.NOT) {
-                if (call.operand(0).getKind() == SqlKind.NOT) {
-                    return ((SqlCall) call.operand(0)).operand(0);
-                }
-            }
-            return call;
-        }
-    }
-
-    private static class NormalizeConjunctionOrder extends SqlShuttle implements SqlTransformation {
-        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
-        @Override public SqlNode visit(SqlCall call) {
-            call = (SqlCall) super.visit(call);
-            if (call.getKind() == SqlKind.AND) {
-                List<SqlNode> list = new ArrayList<>();
-                flatten(call, SqlKind.AND, list);
-                list.sort(Comparator.comparing(Object::toString));
-                return buildNary(SqlStdOperatorTable.AND, list);
-            }
-            return call;
-        }
-    }
-
-    private static class PushNotDown extends SqlShuttle implements SqlTransformation {
-        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
-        @Override public SqlNode visit(SqlCall call) {
-            call = (SqlCall) super.visit(call);
-            if (call.getKind() == SqlKind.NOT && call.operand(0) instanceof SqlCall) {
-                SqlCall innerCall = call.operand(0);
-                if (innerCall.getKind() == SqlKind.AND || innerCall.getKind() == SqlKind.OR) {
-                    List<SqlNode> ops = new ArrayList<>(innerCall.getOperandList());
-                    List<SqlNode> nots = new ArrayList<>(ops.size());
-                    for (SqlNode n : ops) {
-                        nots.add(SqlStdOperatorTable.NOT.createCall(SqlParserPos.ZERO, n));
-                    }
-                    return buildNary(
-                        innerCall.getKind() == SqlKind.AND ? SqlStdOperatorTable.OR : SqlStdOperatorTable.AND,
-                        nots);
-                }
-            }
-            return call;
-        }
-    }
-
-    private static class FoldBooleanConstants extends SqlShuttle implements SqlTransformation {
-        @Override public SqlNode apply(SqlNode in) { return in.accept(this); }
-        @Override public SqlNode visit(SqlCall call) {
-            call = (SqlCall) super.visit(call);
-            if (call.getKind() == SqlKind.AND || call.getKind() == SqlKind.OR) {
-                List<SqlNode> ops = new ArrayList<>();
-                flatten(call, call.getKind(), ops);
-                boolean isAnd = call.getKind() == SqlKind.AND;
-                List<SqlNode> kept = new ArrayList<>();
-                for (SqlNode n : ops) {
-                    Boolean b = asBoolean(n);
-                    if (b == null) {
-                        kept.add(n);
-                        continue;
-                    }
-                    if (isAnd) {
-                        if (!b) return booleanLiteral(false); // AND FALSE => FALSE
-                    } else { // OR
-                        if (b) return booleanLiteral(true);   // OR TRUE => TRUE
-                    }
-                }
-                if (kept.isEmpty()) return booleanLiteral(isAnd);
-                if (kept.size() == 1) return kept.get(0);
-                return buildNary(isAnd ? SqlStdOperatorTable.AND : SqlStdOperatorTable.OR, kept);
-            }
-            return call;
-        }
-    }
-
-    // ----------------------------- helpers ---------------------------------
-    private static void flatten(SqlCall call, SqlKind kind, List<SqlNode> out) {
-        for (SqlNode n : call.getOperandList()) {
-            if (n.getKind() == kind) {
-                flatten((SqlCall) n, kind, out);
-            } else {
-                out.add(n);
-            }
-        }
-    }
-
-    /** CORRECTED: Build an n-ary call from a list of operands. */
-    private static SqlNode buildNary(org.apache.calcite.sql.SqlOperator op, List<SqlNode> ops) {
-        return op.createCall(SqlParserPos.ZERO, ops);
-    }
-
-    private static Boolean asBoolean(SqlNode n) {
-        if (n instanceof SqlLiteral && n.getKind() == SqlKind.LITERAL) {
-            return ((SqlLiteral) n).booleanValue();
-        }
-        return null;
-    }
-
-    private static SqlNode booleanLiteral(boolean v) {
-        return SqlLiteral.createBoolean(v, SqlParserPos.ZERO);
-    }
-
-    // =====================================================================================
-    //  RelNode Transformation Support (Planner rules)
-    // =====================================================================================
-
-    public static RelNode toRelNode(String sql, FrameworkConfig config)
-            throws SqlParseException, ValidationException, RelConversionException {
-        Planner planner = Frameworks.getPlanner(config);
-        SqlNode parsed = planner.parse(sql);
-        SqlNode validated = planner.validate(parsed);
-        RelRoot root = planner.rel(validated);
-        return root.rel;
-    }
-
-    public static RelNode loadRelFromFile(String sqlFilePath, String queryId, FrameworkConfig config)
-            throws IOException, SqlParseException, ValidationException, RelConversionException {
-        String sql = loadQueryFromFile(sqlFilePath, queryId);
-        if (sql == null || sql.isBlank()) {
-            throw new IllegalArgumentException("No SQL found for Query ID: " + String.valueOf(queryId));
-        }
-        return toRelNode(sql, config);
-    }
-
-    public static FrameworkConfig buildPostgresFrameworkConfig(String host, int port, String database,
-                                                               String user, String pass) {
-        String url = String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
-        SchemaPlus root = Frameworks.createRootSchema(true);
-        DataSource ds = JdbcSchema.dataSource(url, "org.postgresql.Driver", user, pass);
-        root.add("db", JdbcSchema.create(root, "db", ds, null, null));
-        SqlParser.Config parserCfg = SqlParser.config()
-            .withUnquotedCasing(Casing.TO_LOWER)
-            .withCaseSensitive(false);
-        return Frameworks.newConfigBuilder()
-            .defaultSchema(root.getSubSchema("db"))
-            .parserConfig(parserCfg)
-            .build();
-    }
-
-    // =====================================================================================
-    //  RelNode -> SqlNode / SQL conversion (RelToSqlConverter)
-    // =====================================================================================
-
-    /** Convert a RelNode back into a SqlNode statement using the ANSI SQL dialect. */
-    public static SqlNode relToSqlNode(RelNode rel) {
-        return relToSqlNode(rel, AnsiSqlDialect.DEFAULT);
-    }
-
-    /**
-     * Convert a RelNode back into a SqlNode statement using the provided SQL dialect.
-     * Note: Not every RelNode is representable as a single SQL statement; in those cases,
-     * Calcite may emit best-effort SQL or require a different dialect.
-     */
-    public static SqlNode relToSqlNode(RelNode rel, SqlDialect dialect) {
-        if (rel == null) throw new IllegalArgumentException("rel must not be null");
-        if (dialect == null) dialect = AnsiSqlDialect.DEFAULT;
-        RelToSqlConverter converter = new RelToSqlConverter(dialect);
-        RelToSqlConverter.Result result = converter.visitRoot(rel);
-        return result.asStatement();
-    }
-
-    /** Convenience: Convert RelNode directly into a pretty SQL string (ANSI dialect). */
-    public static String relToSqlString(RelNode rel) {
-        return relToSqlString(rel, AnsiSqlDialect.DEFAULT);
-    }
-
-    /** Convert RelNode into a SQL string using the provided dialect. */
-    public static String relToSqlString(RelNode rel, SqlDialect dialect) {
-        SqlNode stmt = relToSqlNode(rel, dialect);
-        return stmt.toSqlString(dialect).getSql();
-    }
-
-    /** Equivalence check using a deterministic structural digest of plans. */
-    public static boolean equivalent(String sqlA, String sqlB, FrameworkConfig config) throws Exception {
-        RelNode relA = toRelNode(sqlA, config);
-        RelNode relB = toRelNode(sqlB, config);
-        String[] norm = {
-            "ProjectMergeRule", "FilterMergeRule", "JoinCommuteRule"
-        };
-        relA = applyRelTransformations(relA, norm);
-        relB = applyRelTransformations(relB, norm);
-        // Compute a digest that ignores node ids and focuses on structure and key attributes.
-        String dA = RelOptUtil.toString(relA, SqlExplainLevel.DIGEST_ATTRIBUTES);
-        String dB = RelOptUtil.toString(relB, SqlExplainLevel.DIGEST_ATTRIBUTES);
-        return dA.equals(dB);
-    }
-
-    public static RelNode applyRelTransformations(RelNode root, String[] ruleNames) {
-        if (root == null || ruleNames == null || ruleNames.length == 0) return root;
-        HepProgramBuilder pb = new HepProgramBuilder();
-        for (String name : ruleNames) {
-            RelOptRule rule = resolveCoreRule(name); // Use the simplified resolver
-            if (rule != null) {
-                pb.addRuleInstance(rule);
-            } else {
-                System.err.println("[Calcite][WARN] Unknown transformation name: " + name);
-            }
-        }
-        HepProgram program = pb.build();
-        HepPlanner hep = new HepPlanner(program);
-        hep.setRoot(root);
-        return hep.findBestExp();
-    }
-
-    /**
-     * CORRECTED: Simple, direct, and robust rule resolution without reflection.
-     */
-    private static RelOptRule resolveCoreRule(String name) {
-        switch (name) {
-            // Projection Rules
-            case "ProjectMergeRule": return CoreRules.PROJECT_MERGE;
-            case "ProjectRemoveRule": return CoreRules.PROJECT_REMOVE;
-            case "ProjectJoinTransposeRule": return CoreRules.PROJECT_JOIN_TRANSPOSE;
-            case "ProjectFilterTransposeRule": return CoreRules.PROJECT_FILTER_TRANSPOSE;
-            // Filter Rules
-            case "FilterMergeRule": return CoreRules.FILTER_MERGE;
-            case "FilterProjectTransposeRule": return CoreRules.FILTER_PROJECT_TRANSPOSE;
-            case "FilterJoinRule": return CoreRules.FILTER_INTO_JOIN;
-            // Join Rules
-            case "JoinCommuteRule": return CoreRules.JOIN_COMMUTE;
-            case "JoinAssociateRule": return CoreRules.JOIN_ASSOCIATE;
-            // Aggregate Rules
-            case "AggregateRemoveRule": return CoreRules.AGGREGATE_REMOVE;
-            case "AggregateJoinTransposeRule": return CoreRules.AGGREGATE_JOIN_TRANSPOSE;
-            // SetOp Rules
-            case "UnionMergeRule": return CoreRules.UNION_MERGE;
-            // Sort Rules
-            case "SortRemoveRule": return CoreRules.SORT_REMOVE;
-            default: return null;
-        }
-    }
-
-    public static void main(String[] args) {
+    public static FrameworkConfig getFrameworkConfig() {
         try {
-            String id = (args != null && args.length > 0) ? args[0] : null;
-            String sql = loadQueryFromFile(ORIGINAL_SQL_FILE.toString(), id);
-            if (sql == null) {
-                System.err.println("No query found" + (id != null ? (" for ID: " + id) : " in file"));
-                return;
-            }
-            SqlNode node = SQLtoSqlNode(sql);
-            System.out.println("SQL:\n" + sql);
-            System.out.println("\nParsed SqlNode (toString):\n" + node.toString());
-        } catch (IOException e) {
-            System.err.println("Failed to read SQL file: " + e.getMessage());
-        } catch (org.apache.calcite.sql.parser.SqlParseException e) {
-            System.err.println("Parse error: " + e.getMessage());
+            // 1. Ensure the PostgreSQL Driver is loaded
+            Class.forName(PG_DRIVER);
+
+            // 2. Establish a Calcite-managed connection (needed to access the root schema)
+            Properties info = new Properties();
+            info.setProperty("lex", "JAVA");
+            Connection calciteConnection = DriverManager.getConnection("jdbc:calcite:", info);
+            CalciteConnection unwrapCalciteConnection = calciteConnection.unwrap(CalciteConnection.class);
+
+            // 3. Create a DataSource for PostgreSQL
+            PGSimpleDataSource dataSource = new PGSimpleDataSource();
+            dataSource.setUrl(PG_URL);
+            dataSource.setUser(PG_USER);
+            dataSource.setPassword(PG_PASSWORD);
+
+            // 4. Wrap the PostgreSQL connection details into a Calcite schema (JdbcSchema)
+            SchemaPlus rootSchema = unwrapCalciteConnection.getRootSchema();
+            // Use the standard factory method with the DataSource
+            JdbcSchema pgJdbcSchema = JdbcSchema.create(rootSchema, PG_SCHEMA, dataSource, PG_SCHEMA, null);
+            rootSchema.add(PG_SCHEMA, pgJdbcSchema);
+
+        // Parser config: fold unquoted identifiers to lower-case, case-insensitive.
+        // Using Lex.MYSQL provides behavior broadly compatible with PostgreSQL catalogs.
+        SqlParser.Config parserConfig = SqlParser.config()
+            .withLex(Lex.MYSQL);
+
+
+            // 5. Build the Calcite Framework configuration
+            return Frameworks.newConfigBuilder()
+                    .defaultSchema(rootSchema.getSubSchema(PG_SCHEMA)) // Use the Postgres schema as default
+                    .parserConfig(parserConfig) // Use the PostgreSQL-aware parser config
+                    .build();
+
+        } catch (SQLException | ClassNotFoundException e) {
+            throw new RuntimeException("Failed to initialize Calcite framework with PostgreSQL connection. Check driver and connection details.", e);
         }
+    }
+
+    /**
+     * Parse, validate, and normalize a SQL query into an optimized {@link RelNode}.
+     *
+     * Steps:
+     * 1) Sanitize input by removing trailing semicolons (Calcite's parser rejects them).
+     * 2) Parse SQL string into a {@link SqlNode} (AST).
+     * 3) Validate the AST against the JDBC-backed schema.
+     * 4) Convert the validated AST to a logical plan (RelNode).
+     * 5) Apply phased HepPlanner programs to normalize and stabilize the plan.
+     *
+     * The returned RelNode is suitable for structural comparison.
+     */
+    public static RelNode getOptimizedRelNode(Planner planner, String sql) throws Exception {
+        //System.out.println("Processing SQL: " + sql);
+
+        // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
+        String sqlForParse = sql == null ? null : sql.trim();
+        if (sqlForParse != null) {
+            // Remove a single trailing semicolon if present
+            while (sqlForParse.endsWith(";")) {
+                sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
+            }
+        }
+
+        // 2. Parse the SQL string into an AST
+        SqlNode sqlNode = planner.parse(sqlForParse);
+
+        // 3. Validate the AST
+        SqlNode validatedSqlNode = planner.validate(sqlNode);
+
+        // 4. Convert the validated AST to RelNode (Logical Plan)
+        RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
+
+        // 5. Optimize in phases to avoid oscillations and collapse redundant projections
+        // Phase 1: basic simplification
+        HepProgramBuilder p1 = new HepProgramBuilder();
+        p1.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+        p1.addRuleInstance(CoreRules.PROJECT_MERGE);
+        p1.addRuleInstance(CoreRules.PROJECT_REMOVE);
+
+        // Phase 2: normalize inner join structure safely
+        HepProgramBuilder p2 = new HepProgramBuilder();
+        p2.addMatchOrder(HepMatchOrder.TOP_DOWN);
+        p2.addMatchLimit(200);
+        p2.addRuleInstance(CoreRules.FILTER_INTO_JOIN);
+        p2.addRuleInstance(CoreRules.JOIN_ASSOCIATE);
+        p2.addRuleInstance(CoreRules.JOIN_COMMUTE);
+
+        // Phase 3: collapse projects introduced by rewrites and re-simplify
+        HepProgramBuilder p3 = new HepProgramBuilder();
+        p3.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);
+        p3.addRuleInstance(CoreRules.PROJECT_MERGE);
+        p3.addRuleInstance(CoreRules.PROJECT_REMOVE);
+        p3.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+
+        HepProgramBuilder pb = new HepProgramBuilder();
+        pb.addSubprogram(p1.build());
+        pb.addSubprogram(p2.build());
+        pb.addSubprogram(p3.build());
+        HepProgram hepProgram = pb.build();
+        HepPlanner hepPlanner = new HepPlanner(hepProgram);
+
+        hepPlanner.setRoot(logicalPlan);
+        RelNode optimizedPlan = hepPlanner.findBestExp();
+
+        //System.out.println("  -> Optimized RelNode (Logical Plan):");
+        //System.out.println(RelOptUtil.toString(optimizedPlan));
+        return optimizedPlan;
+    }
+
+    public static RelNode getRelNode(Planner planner, String sql) throws Exception {
+        //System.out.println("Processing SQL: " + sql);
+
+        // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
+        String sqlForParse = sql == null ? null : sql.trim();
+        if (sqlForParse != null) {
+            // Remove a single trailing semicolon if present
+            while (sqlForParse.endsWith(";")) {
+                sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
+            }
+        }
+
+        // 2. Parse the SQL string into an AST
+        SqlNode sqlNode = planner.parse(sqlForParse);
+
+        // 3. Validate the AST
+        SqlNode validatedSqlNode = planner.validate(sqlNode);
+
+        // 4. Convert the validated AST to RelNode (Logical Plan)
+        RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
+
+        
+        return logicalPlan;
+    }
+
+    /**
+     * Compare two SQL queries for semantic equivalence, optionally applying transformations
+     * to the first query's RelNode before comparison.
+     *
+     * Strategy (in order):
+     * 1) Compare Calcite structural digests (cheap and deterministic).
+     * 2) If different, compare normalized digests that ignore input-ref indices (e.g. $0 -> $x),
+     *    which neutralizes differences due to field index shifts (common when join inputs swap).
+     * 3) If still different, compare a canonical digest where inner-join children are treated as
+     *    an unordered set (child digests sorted). Projection order is preserved.
+     *
+     * @param sql1 First query string
+     * @param sql2 Second query string
+     * @param transformations Optional list of CoreRule names to apply to the first plan
+     * @return true if any of the above comparisons match; false otherwise or on planning error
+     */
+    public static boolean compareQueries(String sql1, String sql2, List<String> transformations) {
+        FrameworkConfig config = getFrameworkConfig();
+        Planner planner = Frameworks.getPlanner(config);
+
+        try {
+            System.out.println("Here");
+            // Get the optimized RelNode for the first query
+            RelNode rel1 = getOptimizedRelNode(planner, sql1);
+
+            System.out.println("RelNode rel1: " + rel1.explain());
+
+            if (transformations != null && !transformations.isEmpty()) 
+                rel1 = applyTransformations(rel1, transformations);
+
+            planner.close();
+            planner = Frameworks.getPlanner(config);
+
+            // Get the optimized RelNode for the second query
+            RelNode rel2 = getOptimizedRelNode(planner, sql2);
+            
+            System.out.println("Transformed RelNode rel1: " + rel1.explain());
+            System.out.println("RelNode rel2: " + rel2.explain());
+
+            // Fast path: structural digests
+            String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
+            String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
+
+            if (d1.equals(d2)) return true;
+            // Fallback 1: neutralize input indexes
+            String nd1 = normalizeDigest(d1);
+            String nd2 = normalizeDigest(d2);
+
+            if (nd1.equals(nd2)) return true;
+            
+            // Fallback 2: canonical digest that treats inner-join children as unordered
+            String c1 = canonicalDigest(rel1);
+            String c2 = canonicalDigest(rel2);
+
+            if (c1.equals(c2)) return true;
+
+            return rel1.equals(rel2);
+
+        } catch (Exception e)
+        {
+            // Planning/parsing/validation error: treat as non-equivalent.
+            System.err.println("[Calcite.compareQueries] Planning error: " + e.getMessage());
+            return false;
+        } finally {
+            planner.close();
+        }
+    }
+
+    /**
+     * Normalize a digest string by replacing input references like $0, $12 with a
+     * placeholder ($x) and collapsing repeated spaces. This reduces sensitivity to
+     * field index positions that shift when join inputs are swapped.
+     */
+    public static String normalizeDigest(String digest) {
+        if (digest == null) return null;
+        // Replace input refs like $0, $12 with a placeholder to make join-child order less significant
+        String s = digest.replaceAll("\\$\\d+", "\\$x");
+        // Collapse multiple spaces for stability
+        s = s.replaceAll("[ ]+", " ");
+        return s.trim();
+    }
+
+    /**
+     * Build a canonical digest for a plan where:
+     * - Inner-join children are treated as an unordered set (child digests sorted)
+     * - Filter conditions and expression strings are normalized via {@link #normalizeDigest(String)}
+     *
+     * Projection order is preserved. This makes the digest insensitive to inner-join child order
+     * while keeping column order significant.
+     */
+    public static String canonicalDigest(RelNode rel) {
+        if (rel == null) return "null";
+        if (rel instanceof LogicalProject p) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Project[");
+            for (int i = 0; i < p.getProjects().size(); i++) {
+                RexNode rex = p.getProjects().get(i);
+                if (i > 0) sb.append(",");
+                sb.append(normalizeDigest(rex.toString()));
+            }
+            sb.append("]->");
+            sb.append(canonicalDigest(p.getInput()));
+            return sb.toString();
+        }
+        if (rel instanceof LogicalFilter f) {
+            return "Filter(" + normalizeDigest(f.getCondition().toString()) + ")->" + canonicalDigest(f.getInput());
+        }
+        if (rel instanceof LogicalJoin j) {
+            String cond = normalizeDigest(j.getCondition().toString());
+            String left = canonicalDigest(j.getLeft());
+            String right = canonicalDigest(j.getRight());
+            String a = left;
+            String b = right;
+            // For inner joins, make children order-insensitive by sorting their digests
+            if (j.getJoinType() == JoinRelType.INNER) {
+                if (a.compareTo(b) > 0) {
+                    String t = a; a = b; b = t;
+                }
+            }
+            return "Join(" + j.getJoinType() + "," + cond + "){" + a + "|" + b + "}";
+        }
+        if (rel instanceof TableScan ts) {
+            return "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
+        }
+        // Default: normalized string of this node with placeholders, plus canonical children
+        String typeName = rel.getRelTypeName();
+        if (typeName == null) typeName = "UnknownRel";
+        String head = normalizeDigest(typeName);
+        StringBuilder sb = new StringBuilder(head);
+        sb.append("[");
+        boolean first = true;
+        for (RelNode in : rel.getInputs()) {
+            if (!first) sb.append("|");
+            sb.append(canonicalDigest(in));
+            first = false;
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    public static void iteratePrintRelNode(RelNode rel)
+    {
+        RelVisitor visitor = new RelVisitor()
+        {
+            private int depth = 0;
+
+            @Override
+            public void visit(RelNode node, int ordinal, RelNode parent)
+            {
+                String indent = " ".repeat(depth);
+                System.out.println(indent + "->" + node.getClass().getSimpleName() + ": " + node.explain());
+                
+                depth++;
+
+                super.visit(node, ordinal, parent);
+
+                depth--;
+            }
+        };
+
+        visitor.go(rel);
+    }
+
+    /**
+     * Apply an explicit list of HepPlanner CoreRules (by name) to a plan, producing a
+     * new {@link RelNode}. This is useful for experimenting with how particular rules
+     * affect normalization and equivalence.
+     *
+     * Supported rule name keys map to Calcite's {@link CoreRules}. Unknown names are
+     * reported to stdout and ignored.
+     */
+    public static RelNode applyTransformations(RelNode rel, List<String> transformations)
+    {
+        RelNode newRel = rel;
+
+        for (String transform : transformations)
+        {
+            HepProgramBuilder pb = new HepProgramBuilder();
+            switch (transform.toLowerCase())
+            {
+                //Projection Rules
+                case "projectmergerule" -> pb.addRuleInstance(CoreRules.PROJECT_MERGE);
+                case "projectremoverule" -> pb.addRuleInstance(CoreRules.PROJECT_REMOVE);
+                case "projectjointransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);
+                case "projectfiltertransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE);
+                case "projectsetoptransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_SET_OP_TRANSPOSE);
+                case "projecttablescanrule" -> pb.addRuleInstance(CoreRules.PROJECT_TABLE_SCAN);
+                
+                //Filter Rules
+                case "filtermergerule" -> pb.addRuleInstance(CoreRules.FILTER_MERGE);
+                case "filterprojecttransposerule" -> pb.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
+                case "filterjoinrule" -> pb.addRuleInstance(CoreRules.FILTER_INTO_JOIN);
+                case "filteraggregatetransposerule" -> pb.addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE);
+                case "filterwindowtransposerule" -> pb.addRuleInstance(CoreRules.FILTER_WINDOW_TRANSPOSE);
+                
+                //Join Rules
+                case "joincommuterule" -> pb.addRuleInstance(CoreRules.JOIN_COMMUTE);
+                case "joinassociaterule" -> pb.addRuleInstance(CoreRules.JOIN_ASSOCIATE);
+                case "joinpushexpressionsrule" -> pb.addRuleInstance(CoreRules.JOIN_PUSH_EXPRESSIONS);
+                case "joinconditionpushrule" -> pb.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH);
+                
+                //Aggregate Rules
+                case "aggregateprojectpullupconstantsrule" -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS);
+                case "aggregateremoverule" -> pb.addRuleInstance(CoreRules.AGGREGATE_REMOVE);
+                case "aggregatejointransposerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE);
+                case "aggregateuniontransposerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_UNION_TRANSPOSE);
+                case "aggregateprojectmergerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_MERGE);
+                case "aggregatecasetofilterrule" -> pb.addRuleInstance(CoreRules.AGGREGATE_CASE_TO_FILTER);
+
+                //Sort & limit rules
+                case "sortremoverule" -> pb.addRuleInstance(CoreRules.SORT_REMOVE);
+                case "sortuniontransposerule" -> pb.addRuleInstance(CoreRules.SORT_UNION_TRANSPOSE);
+                case "sortprojecttransposerule" -> pb.addRuleInstance(CoreRules.SORT_PROJECT_TRANSPOSE);
+                case "sortjointransposerule" -> pb.addRuleInstance(CoreRules.SORT_JOIN_TRANSPOSE);
+
+                //Set operation rules
+                case "unionmergerule" -> pb.addRuleInstance(CoreRules.UNION_MERGE);
+                case "unionpullupconstantsrule" -> pb.addRuleInstance(CoreRules.UNION_PULL_UP_CONSTANTS);
+                case "intersecttodistinctrule" -> pb.addRuleInstance(CoreRules.INTERSECT_TO_DISTINCT);
+                case "minustodistinctrule" -> pb.addRuleInstance(CoreRules.MINUS_TO_DISTINCT);
+
+                //Window rules
+                case "projectwindowtransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE);
+
+                default -> System.out.println("Unknown transformation: " + transform);
+            }
+
+            HepPlanner planner = new HepPlanner(pb.build());
+            planner.setRoot(rel);
+            newRel = planner.findBestExp();
+        }
+        
+        return newRel;
     }
 }
