@@ -15,6 +15,7 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -192,6 +193,31 @@ public class QueryPlanComparator {
         return optimizedPlan;
     }
 
+    private static RelNode getRelNode(Planner planner, String sql) throws Exception {
+        //System.out.println("Processing SQL: " + sql);
+
+        // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
+        String sqlForParse = sql == null ? null : sql.trim();
+        if (sqlForParse != null) {
+            // Remove a single trailing semicolon if present
+            while (sqlForParse.endsWith(";")) {
+                sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
+            }
+        }
+
+        // 2. Parse the SQL string into an AST
+        SqlNode sqlNode = planner.parse(sqlForParse);
+
+        // 3. Validate the AST
+        SqlNode validatedSqlNode = planner.validate(sqlNode);
+
+        // 4. Convert the validated AST to RelNode (Logical Plan)
+        RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
+
+        
+        return logicalPlan;
+    }
+
     /**
      * Compare two SQL queries for semantic equivalence.
      *
@@ -213,8 +239,6 @@ public class QueryPlanComparator {
             System.out.println("Here");
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
-
-            
 
             System.out.println("RelNode rel1: " + rel1.explain());
 
@@ -326,6 +350,28 @@ public class QueryPlanComparator {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    private static void iterateRelNode(RelNode rel)
+    {
+        RelVisitor visitor = new RelVisitor()
+        {
+            private int depth = 0;
+
+            @Override
+            public void visit(RelNode node, int ordinal, RelNode parent)
+            {
+                String indent = " ".repeat(depth);
+                System.out.println(indent + "->" + node.getClass().getSimpleName() + ": " + node.explain());
+                
+                depth++;
+
+                super.visit(node, ordinal, parent);
+
+                depth--;
+            }
+        };
+
     }
 
     /**
