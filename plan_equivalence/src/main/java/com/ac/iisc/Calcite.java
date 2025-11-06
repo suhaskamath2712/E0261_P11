@@ -3,7 +3,10 @@ package com.ac.iisc;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
@@ -50,6 +53,8 @@ import org.postgresql.ds.PGSimpleDataSource;
 public class Calcite {
 
     // --- 1. PostgreSQL Connection Configuration (UPDATE THESE) ---
+    // Driver and JDBC settings for connecting Calcite's JdbcSchema to PostgreSQL.
+    // These are used only to expose the Postgres catalog (tables/columns) to Calcite's planner.
     private static final String PG_DRIVER = "org.postgresql.Driver";
     private static final String PG_URL = "jdbc:postgresql://localhost:5432/tpch"; 
     private static final String PG_USER = "postgres";
@@ -71,16 +76,16 @@ public class Calcite {
      */
     public static FrameworkConfig getFrameworkConfig() {
         try {
-            // 1. Ensure the PostgreSQL Driver is loaded
+            // 1. Ensure the PostgreSQL Driver is loaded so DataSource/DriverManager can find it
             Class.forName(PG_DRIVER);
 
-            // 2. Establish a Calcite-managed connection (needed to access the root schema)
+            // 2. Establish a Calcite-managed connection (used to get the Calcite root schema container)
             Properties info = new Properties();
-            info.setProperty("lex", "JAVA");
-            Connection calciteConnection = DriverManager.getConnection("jdbc:calcite:", info);
-            CalciteConnection unwrapCalciteConnection = calciteConnection.unwrap(CalciteConnection.class);
+            info.setProperty("lex", "JAVA"); // parsing behavior of the Calcite connection itself
+            Connection calciteConnection = DriverManager.getConnection("jdbc:calcite:", info); // open Calcite
+            CalciteConnection unwrapCalciteConnection = calciteConnection.unwrap(CalciteConnection.class); // get Calcite API
 
-            // 3. Create a DataSource for PostgreSQL
+            // 3. Create a DataSource for PostgreSQL (Calcite will use this for metadata)
             PGSimpleDataSource dataSource = new PGSimpleDataSource();
             dataSource.setUrl(PG_URL);
             dataSource.setUser(PG_USER);
@@ -92,10 +97,10 @@ public class Calcite {
             JdbcSchema pgJdbcSchema = JdbcSchema.create(rootSchema, PG_SCHEMA, dataSource, PG_SCHEMA, null);
             rootSchema.add(PG_SCHEMA, pgJdbcSchema);
 
-        // Parser config: fold unquoted identifiers to lower-case, case-insensitive.
-        // Using Lex.MYSQL provides behavior broadly compatible with PostgreSQL catalogs.
-        SqlParser.Config parserConfig = SqlParser.config()
-            .withLex(Lex.MYSQL);
+            // Parser config: fold unquoted identifiers to lower-case, case-insensitive.
+            // Using Lex.MYSQL yields a behavior similar to PostgreSQL name resolution.
+            SqlParser.Config parserConfig = SqlParser.config()
+                .withLex(Lex.MYSQL);
 
 
             // 5. Build the Calcite Framework configuration
@@ -121,22 +126,23 @@ public class Calcite {
      *
      * The returned RelNode is suitable for structural comparison.
      */
-    public static RelNode getOptimizedRelNode(Planner planner, String sql) throws Exception {
+    public static RelNode getOptimizedRelNode(Planner planner, String sql) throws Exception
+    {
         //System.out.println("Processing SQL: " + sql);
 
         // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
         String sqlForParse = sql == null ? null : sql.trim();
         if (sqlForParse != null) {
-            // Remove a single trailing semicolon if present
+            // Remove one or more trailing semicolons if present (robustness for copy/paste SQL)
             while (sqlForParse.endsWith(";")) {
                 sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
             }
         }
 
-        // 2. Parse the SQL string into an AST
+        // 2. Parse the SQL string into an AST (SqlNode)
         SqlNode sqlNode = planner.parse(sqlForParse);
 
-        // 3. Validate the AST
+        // 3. Validate the AST: resolves names/types against the configured schema
         SqlNode validatedSqlNode = planner.validate(sqlNode);
 
         // 4. Convert the validated AST to RelNode (Logical Plan)
@@ -145,41 +151,42 @@ public class Calcite {
         // 5. Optimize in phases to avoid oscillations and collapse redundant projections
         // Phase 1: basic simplification
         HepProgramBuilder p1 = new HepProgramBuilder();
-        p1.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
-        p1.addRuleInstance(CoreRules.PROJECT_MERGE);
-        p1.addRuleInstance(CoreRules.PROJECT_REMOVE);
+        p1.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS); // fold constants, simplify predicates
+        p1.addRuleInstance(CoreRules.PROJECT_MERGE);            // collapse stacked projects
+        p1.addRuleInstance(CoreRules.PROJECT_REMOVE);           // drop identity projections
 
         // Phase 2: normalize inner join structure safely
         HepProgramBuilder p2 = new HepProgramBuilder();
-        p2.addMatchOrder(HepMatchOrder.TOP_DOWN);
-        p2.addMatchLimit(200);
-        p2.addRuleInstance(CoreRules.FILTER_INTO_JOIN);
-        p2.addRuleInstance(CoreRules.JOIN_ASSOCIATE);
-        p2.addRuleInstance(CoreRules.JOIN_COMMUTE);
+        p2.addMatchOrder(HepMatchOrder.TOP_DOWN);               // predictable traversal to minimize oscillation
+        p2.addMatchLimit(200);                                  // guard against infinite transforms
+        p2.addRuleInstance(CoreRules.FILTER_INTO_JOIN);         // push filters into joins
+        p2.addRuleInstance(CoreRules.JOIN_ASSOCIATE);           // re-associate joins
+        p2.addRuleInstance(CoreRules.JOIN_COMMUTE);             // commute join inputs
 
         // Phase 3: collapse projects introduced by rewrites and re-simplify
         HepProgramBuilder p3 = new HepProgramBuilder();
-        p3.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);
-        p3.addRuleInstance(CoreRules.PROJECT_MERGE);
-        p3.addRuleInstance(CoreRules.PROJECT_REMOVE);
-        p3.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+        p3.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);   // move projects through joins
+        p3.addRuleInstance(CoreRules.PROJECT_MERGE);            // merge adjacent projects again
+        p3.addRuleInstance(CoreRules.PROJECT_REMOVE);           // drop identities introduced
+        p3.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);// re-simplify predicates
 
         HepProgramBuilder pb = new HepProgramBuilder();
-        pb.addSubprogram(p1.build());
-        pb.addSubprogram(p2.build());
-        pb.addSubprogram(p3.build());
-        HepProgram hepProgram = pb.build();
-        HepPlanner hepPlanner = new HepPlanner(hepProgram);
+        pb.addSubprogram(p1.build()); // add phase 1
+        pb.addSubprogram(p2.build()); // add phase 2
+        pb.addSubprogram(p3.build()); // add phase 3
+        HepProgram hepProgram = pb.build();                     // compile the program
+        HepPlanner hepPlanner = new HepPlanner(hepProgram);     // initialize planner
 
-        hepPlanner.setRoot(logicalPlan);
-        RelNode optimizedPlan = hepPlanner.findBestExp();
+        hepPlanner.setRoot(logicalPlan);                        // set input plan
+        RelNode optimizedPlan = hepPlanner.findBestExp();       // execute optimization
 
         //System.out.println("  -> Optimized RelNode (Logical Plan):");
         //System.out.println(RelOptUtil.toString(optimizedPlan));
         return optimizedPlan;
     }
 
-    public static RelNode getRelNode(Planner planner, String sql) throws Exception {
+    public static RelNode getRelNode(Planner planner, String sql) throws Exception
+    {
         //System.out.println("Processing SQL: " + sql);
 
         // 1. Sanitize input: Calcite parser doesn't accept trailing ';'
@@ -191,13 +198,13 @@ public class Calcite {
             }
         }
 
-        // 2. Parse the SQL string into an AST
+    // 2. Parse the SQL string into an AST
         SqlNode sqlNode = planner.parse(sqlForParse);
 
-        // 3. Validate the AST
+    // 3. Validate the AST
         SqlNode validatedSqlNode = planner.validate(sqlNode);
 
-        // 4. Convert the validated AST to RelNode (Logical Plan)
+    // 4. Convert the validated AST to RelNode (Logical Plan)
         RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
 
         
@@ -222,7 +229,7 @@ public class Calcite {
      */
     public static boolean compareQueries(String sql1, String sql2, List<String> transformations) {
         FrameworkConfig config = getFrameworkConfig();
-        Planner planner = Frameworks.getPlanner(config);
+        Planner planner = Frameworks.getPlanner(config); // create a planner tied to this config
 
         try {
             System.out.println("Here");
@@ -232,10 +239,10 @@ public class Calcite {
             System.out.println("RelNode rel1: " + rel1.explain());
 
             if (transformations != null && !transformations.isEmpty()) 
-                rel1 = applyTransformations(rel1, transformations);
+                rel1 = applyTransformations(rel1, transformations); // apply requested one-off rules
 
-            planner.close();
-            planner = Frameworks.getPlanner(config);
+            planner.close();                          // planner cannot be reused across parse/validate cycles reliably
+            planner = Frameworks.getPlanner(config);  // create a fresh planner for the second query
 
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
@@ -243,12 +250,12 @@ public class Calcite {
             System.out.println("Transformed RelNode rel1: " + rel1.explain());
             System.out.println("RelNode rel2: " + rel2.explain());
 
-            // Fast path: structural digests
+            // Fast path: structural digests (order-sensitive and precise on structure).
             String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
             String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
 
             if (d1.equals(d2)) return true;
-            // Fallback 1: neutralize input indexes
+            // Fallback 1: neutralize input indexes (e.g., $0 → $x) to reduce false negatives
             String nd1 = normalizeDigest(d1);
             String nd2 = normalizeDigest(d2);
 
@@ -260,7 +267,7 @@ public class Calcite {
 
             if (c1.equals(c2)) return true;
 
-            return rel1.equals(rel2);
+            return rel1.equals(rel2); // final fallback: object equality (rarely helpful)
 
         } catch (Exception e)
         {
@@ -268,7 +275,7 @@ public class Calcite {
             System.err.println("[Calcite.compareQueries] Planning error: " + e.getMessage());
             return false;
         } finally {
-            planner.close();
+            planner.close(); // ensure planner resources are released
         }
     }
 
@@ -281,7 +288,7 @@ public class Calcite {
         if (digest == null) return null;
         // Replace input refs like $0, $12 with a placeholder to make join-child order less significant
         String s = digest.replaceAll("\\$\\d+", "\\$x");
-        // Collapse multiple spaces for stability
+        // Collapse multiple spaces for stability so cosmetic spacing doesn't differ
         s = s.replaceAll("[ ]+", " ");
         return s.trim();
     }
@@ -295,8 +302,8 @@ public class Calcite {
      * while keeping column order significant.
      */
     public static String canonicalDigest(RelNode rel) {
-        if (rel == null) return "null";
-        if (rel instanceof LogicalProject p) {
+        if (rel == null) return "null"; // explicit null marker for consistency
+        if (rel instanceof LogicalProject p) { // Project: keep output order significant
             StringBuilder sb = new StringBuilder();
             sb.append("Project[");
             for (int i = 0; i < p.getProjects().size(); i++) {
@@ -308,10 +315,10 @@ public class Calcite {
             sb.append(canonicalDigest(p.getInput()));
             return sb.toString();
         }
-        if (rel instanceof LogicalFilter f) {
+        if (rel instanceof LogicalFilter f) { // Filter: normalize predicate and recurse
             return "Filter(" + normalizeDigest(f.getCondition().toString()) + ")->" + canonicalDigest(f.getInput());
         }
-        if (rel instanceof LogicalJoin j) {
+        if (rel instanceof LogicalJoin j) { // Join: sort children for INNER join type
             String cond = normalizeDigest(j.getCondition().toString());
             String left = canonicalDigest(j.getLeft());
             String right = canonicalDigest(j.getRight());
@@ -325,7 +332,7 @@ public class Calcite {
             }
             return "Join(" + j.getJoinType() + "," + cond + "){" + a + "|" + b + "}";
         }
-        if (rel instanceof TableScan ts) {
+        if (rel instanceof TableScan ts) { // Table scan: include fully qualified name
             return "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
         }
         // Default: normalized string of this node with placeholders, plus canonical children
@@ -336,7 +343,7 @@ public class Calcite {
         sb.append("[");
         boolean first = true;
         for (RelNode in : rel.getInputs()) {
-            if (!first) sb.append("|");
+            if (!first) sb.append("|"); // separate child digests
             sb.append(canonicalDigest(in));
             first = false;
         }
@@ -348,23 +355,112 @@ public class Calcite {
     {
         RelVisitor visitor = new RelVisitor()
         {
-            private int depth = 0;
+            private int depth = 0; // track current depth for indentation
 
             @Override
             public void visit(RelNode node, int ordinal, RelNode parent)
             {
-                String indent = " ".repeat(depth);
+                String indent = " ".repeat(depth); // indent per depth
                 System.out.println(indent + "->" + node.getClass().getSimpleName() + ": " + node.explain());
                 
-                depth++;
+                depth++; // descend before visiting children
 
-                super.visit(node, ordinal, parent);
+                super.visit(node, ordinal, parent); // let RelVisitor handle child traversal
 
-                depth--;
+                depth--; // ascend after children are done
             }
         };
 
-        visitor.go(rel);
+        visitor.go(rel); // start traversal at root
+    }
+
+    /**
+     * Convert a Calcite RelNode graph into a simple tree of {@link RelTreeNode}
+     * using a RelVisitor. Children are kept in input order.
+     */
+    public static RelTreeNode buildRelTree(RelNode rel) {
+        if (rel == null) return null;
+
+        final Map<RelNode, RelTreeNode> built = new IdentityHashMap<>(); // map physical nodes to constructed tree nodes
+        final RelTreeNode[] rootHolder = new RelTreeNode[1];             // simple holder for root reference
+
+        RelVisitor builder = new RelVisitor() {
+            @Override
+            public void visit(RelNode node, int ordinal, RelNode parent) {
+                RelTreeNode cur = new RelTreeNode(summarizeNode(node)); // create tree node label for this RelNode
+                built.put(node, cur);                                    // remember mapping
+                if (parent == null) {
+                    rootHolder[0] = cur;                                 // this is the root
+                } else {
+                    RelTreeNode p = built.get(parent);                   // find parent's tree node
+                    if (p == null) {
+                        // In rare cases, if the parent hasn't been recorded yet, create and link it.
+                        p = new RelTreeNode(summarizeNode(parent));
+                        built.put(parent, p);
+                        if (rootHolder[0] == null) rootHolder[0] = p;    // initialize root if needed
+                    }
+                    p.addChild(cur);                                     // link child in input order
+                }
+                super.visit(node, ordinal, parent);                       // recurse on children
+            }
+        };
+
+        builder.go(rel);                                                  // perform traversal/build
+        return rootHolder[0];                                            // return root of constructed tree
+    }
+
+    // Create a concise per-node label suitable for a tree display.
+    private static String summarizeNode(RelNode rel) {
+        if (rel == null) return "(null)";
+        if (rel instanceof LogicalProject p) { // show project expressions in order
+            List<String> exprs = new ArrayList<>();
+            for (RexNode rex : p.getProjects()) exprs.add(normalizeDigest(rex.toString()));
+            return "Project[" + String.join(",", exprs) + "]";
+        }
+        if (rel instanceof LogicalFilter f) { // show normalized filter predicate
+            return "Filter(" + normalizeDigest(f.getCondition().toString()) + ")";
+        }
+        if (rel instanceof LogicalJoin j) { // include join type and normalized condition
+            return "Join(" + j.getJoinType() + "," + normalizeDigest(j.getCondition().toString()) + ")";
+        }
+        if (rel instanceof TableScan ts) { // fully qualified table name
+            return "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
+        }
+        return rel.getRelTypeName(); // fallback: node type
+    }
+
+    /**
+     * Compare two {@link RelTreeNode} trees for structural equality.
+     * If {@code ignoreChildOrder} is true, children at each node are treated as an
+     * unordered multiset via canonical digests.
+     */
+    public static boolean compareRelTrees(RelTreeNode a, RelTreeNode b, boolean ignoreChildOrder) {
+        if (!ignoreChildOrder) {
+            if (a == b) return true;
+            if (a == null || b == null) return false;
+            return a.equals(b); // strict order-sensitive equality
+        }
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+        return a.canonicalDigest().equals(b.canonicalDigest()); // order-insensitive via canonical form
+    }
+
+    /**
+     * Build trees from two RelNodes and compare them using {@link #compareRelTrees}.
+     * This is a convenience for order-sensitive or order-insensitive plan tree equality.
+     */
+    public static boolean compareRelNodes(RelNode r1, RelNode r2, boolean ignoreChildOrder) {
+        RelTreeNode t1 = buildRelTree(r1);
+        RelTreeNode t2 = buildRelTree(r2);
+        return compareRelTrees(t1, t2, ignoreChildOrder);
+    }
+
+    /**
+     * Get a canonical, order-insensitive digest string for a RelNode's tree.
+     */
+    public static String relTreeCanonicalDigest(RelNode rel) {
+        RelTreeNode t = buildRelTree(rel);
+        return t == null ? "null" : t.canonicalDigest();
     }
 
     /**
@@ -431,9 +527,9 @@ public class Calcite {
                 default -> System.out.println("Unknown transformation: " + transform);
             }
 
-            HepPlanner planner = new HepPlanner(pb.build());
-            planner.setRoot(rel);
-            newRel = planner.findBestExp();
+            HepPlanner planner = new HepPlanner(pb.build()); // one-off planner for this rule set
+            planner.setRoot(rel);                             // set input plan
+            newRel = planner.findBestExp();                   // run and get transformed plan
         }
         
         return newRel;

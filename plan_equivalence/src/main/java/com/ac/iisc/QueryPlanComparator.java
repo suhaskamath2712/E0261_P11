@@ -53,12 +53,14 @@ public class QueryPlanComparator {
                             AND C.c_nationkey <> 10
                         LIMIT 200;""";
 
-        List<String> transformations = List.of("filterjoinrule");
-
         FrameworkConfig config = Calcite.getFrameworkConfig();
         Planner planner = Frameworks.getPlanner(config);
+        List<String> transformations = List.of("filterjoinrule");
 
-        try {
+        try
+        {
+            RelTreeNode relTreeNodeA = Calcite.buildRelTree(Calcite.getRelNode(planner, sqlA));
+            System.out.println("RelTreeNode A:\n" + relTreeNodeA.toString());
             RelNode relA = Calcite.getRelNode(planner, sqlA);
             System.out.println("RelNode A: " + relA.explain());
             Calcite.iteratePrintRelNode(relA);
