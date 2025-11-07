@@ -48,6 +48,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Small, focused I/O utility. All methods are static for easy reuse from any
@@ -66,6 +68,112 @@ public class FileIO {
 	// Base directory for mutated query plans
 	private static final Path MUTATED_PLANS_DIR = Paths.get(
 			"C:\\Users\\suhas\\Downloads\\E0261_P11\\mutated_query_plans");
+
+
+	// Absolute paths to the SQL collections (under the sql_queries/ folder)
+	private static final String ORIGINAL_SQL_PATH =
+			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
+
+	private static final String REWRITTEN_SQL_PATH =
+			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\rewritten_queries.sql";
+
+	private static final String MUTATED_SQL_PATH =
+			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql";
+
+	// Read SQL files
+
+	/** Source for a query when reading from the consolidated SQL files. */
+	public enum SqlSource { ORIGINAL, REWRITTEN, MUTATED }
+
+	/**
+	 * Read a specific SQL query by its Query ID from one of the consolidated SQL
+	 * files (original, rewritten, or mutated).
+	 *
+	 * File format assumptions (based on provided files):
+	 *  - Each query is preceded by a header block with lines like:
+	 *      -- =================================================================
+	 *      -- Query ID: U1 (optional_suffix)
+	 *      -- Description: ...
+	 *      -- =================================================================
+	 *  - The SQL text for that query follows until the next header line that
+	 *    starts with "-- ===============" or EOF.
+	 *  - The "Query ID:" line may include an optional parenthetical suffix such
+	 *    as "(Rewritten)" or "(Mutated)" which should still match the same ID.
+	 *
+	 * @param source Which SQL file to read from
+	 * @param queryId The ID to look up (e.g., "U1", "O4", "A3", etc.)
+	 * @return The SQL text for the requested query, trimmed. Includes semicolons/comments inside the block.
+	 * @throws IOException If the file can't be read or the query block can't be found
+	 */
+	public static String readSqlQuery(SqlSource source, String queryId) throws IOException
+	{
+		if (queryId == null || queryId.isBlank()) {
+			throw new IllegalArgumentException("queryId must not be null or blank");
+		}
+		final String path = switch (source) {
+			case ORIGINAL -> ORIGINAL_SQL_PATH;
+			case REWRITTEN -> REWRITTEN_SQL_PATH;
+			case MUTATED -> MUTATED_SQL_PATH;
+		};
+		String content = readTextFile(path);
+		String sql = extractSqlBlockById(content, queryId);
+		if (sql == null) {
+			throw new IOException("Query ID '" + queryId + "' not found in " + path);
+		}
+		return sql;
+	}
+
+	/** Convenience: read from original SQL collection. */
+	public static String readOriginalSqlQuery(String queryId) throws IOException {
+		return readSqlQuery(SqlSource.ORIGINAL, queryId);
+	}
+
+	/** Convenience: read from rewritten SQL collection. */
+	public static String readRewrittenSqlQuery(String queryId) throws IOException {
+		return readSqlQuery(SqlSource.REWRITTEN, queryId);
+	}
+
+	/** Convenience: read from mutated SQL collection. */
+	public static String readMutatedSqlQuery(String queryId) throws IOException {
+		return readSqlQuery(SqlSource.MUTATED, queryId);
+	}
+
+	/**
+	 * Parse the given SQL file content and extract the SQL text for the section
+	 * that corresponds to the provided Query ID.
+	 */
+	private static String extractSqlBlockById(String fileContent, String queryId) {
+		if (fileContent == null) return null;
+
+		// 1) Find the header line that contains "-- Query ID: <ID>" with optional suffix e.g. (Rewritten)
+		Pattern headerPattern = Pattern.compile(
+				"(?m)^--\\s*Query ID:\\s*" + Pattern.quote(queryId) + "\\b(?:\\s*\\([^)]*\\))?\\s*$");
+		Matcher headerMatcher = headerPattern.matcher(fileContent);
+		if (!headerMatcher.find()) {
+			return null; // Query ID not present
+		}
+
+		int afterHeaderPos = headerMatcher.end();
+
+		// 2) Find the next separator line (the one after Description), then SQL starts after it
+		Pattern sepPattern = Pattern.compile("(?m)^--\\s*=+\\s*$");
+		Matcher sepAfterDesc = sepPattern.matcher(fileContent);
+		if (!sepAfterDesc.find(afterHeaderPos)) {
+			return null; // Malformed block: no separator after header/description
+		}
+		int sqlStart = sepAfterDesc.end();
+
+		// 3) The SQL block ends right before the next separator line that begins a new block, or EOF
+		Matcher nextHeader = sepPattern.matcher(fileContent);
+		if (nextHeader.find(sqlStart)) {
+			int sqlEnd = nextHeader.start();
+			return fileContent.substring(sqlStart, sqlEnd).trim();
+		} else {
+			// No more headers; consume until EOF
+			return fileContent.substring(sqlStart).trim();
+		}
+	}
+	
 
 	/**
 	 * Internal helper to read a plan JSON file for a given query ID from a folder.

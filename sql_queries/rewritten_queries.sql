@@ -725,7 +725,7 @@ SELECT
     C.c_acctbal
 FROM
     nation AS N
-LEFT JOIN
+LEFT OUTER JOIN
     customer AS C ON N.n_nationkey = C.c_nationkey
 WHERE
     C.c_nationkey > 3

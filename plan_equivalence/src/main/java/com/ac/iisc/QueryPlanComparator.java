@@ -2,73 +2,61 @@ package com.ac.iisc;
 
 import java.util.List;
 
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.tools.FrameworkConfig;
-import org.apache.calcite.tools.Frameworks;
-import org.apache.calcite.tools.Planner;
-/**
- * QueryPlanComparator
- * --------------------
- * Lightweight harness for experimenting with Apache Calcite on a PostgreSQL
- * catalog. It parses SQL into logical plans (RelNode), shows their structure,
- * and demonstrates how to obtain and walk plans.
- *
- * For full semantic equivalence checks and plan normalization, use the
- * helpers in {@link Calcite}:
- * - {@code Calcite.getFrameworkConfig()} to wire Calcite to PostgreSQL
- * - {@code Calcite.getOptimizedRelNode(...)} to parse/validate/optimize
- * - {@code Calcite.compareQueries(...)} for digest-based structural equality
- *
- * Notes and limitations (for the comparison helpers in Calcite):
- * - Only inner joins are treated as order-insensitive; outer/semi/anti joins
- *   remain order-sensitive.
- * - ORDER BY/LIMIT are part of semantics and are not normalized away.
- * - Canonical digest normalizes inner-join child ordering; projection order is
- *   preserved.
- */
-public class QueryPlanComparator {
 
-    
+public class QueryPlanComparator
+{
+    /**
+     * List of all query IDs present in the SQL collections (original, rewritten, mutated).
+     * This enables batch processing, testing, or iteration over all available queries.
+     * Update this list if new queries are added to the SQL files.
+     
+    private static final List<String> queryIDList = List.of(
+        "U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8", "U9",
+        "O1", "O2", "O3", "O4", "O5", "O6",
+        "A1", "A2", "A3", "A4", "A5",
+        "N1",
+        "F1", "F2", "F3", "F4",
+        "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
+        "Alaap", "Nested_Test", "paper_sample"
+    );*/
+    private static final List<String> queryIDList = List.of("U4");
+
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the
      * comparison result. Adjust the SQL and the transformation list as needed
      * for local experiments. Ensure the referenced tables exist in PostgreSQL.
      */
-    public static void main(String[] args) {
-        String sqlA = """
-                        select n_name, c_acctbal from nation LEFT OUTER JOIN customer
-                     ON n_nationkey = c_nationkey and c_nationkey > 3 and n_nationkey < 20 and
-                     c_nationkey <> 10 LIMIT 200;""";
-        String sqlB = """
-                        SELECT
-                            N.n_name,
-                            C.c_acctbal
-                        FROM
-                            nation AS N
-                        LEFT JOIN
-                            customer AS C ON N.n_nationkey = C.c_nationkey
-                        WHERE
-                            C.c_nationkey > 3
-                            AND N.n_nationkey < 20
-                            AND C.c_nationkey <> 10
-                        LIMIT 200;""";
+    public static void main(String[] args) throws Exception
+    {
+        // Example transformation list (can be null or customized)
 
-        FrameworkConfig config = Calcite.getFrameworkConfig();
-        Planner planner = Frameworks.getPlanner(config);
-        List<String> transformations = List.of("filterjoinrule");
-
-        try
+        // For demo: compare each query in the list between original and mutated
+        int tests = 0, truevalues = 0;
+        for (String id : queryIDList)
         {
-            RelTreeNode relTreeNodeA = Calcite.buildRelTree(Calcite.getRelNode(planner, sqlA));
-            System.out.println("RelTreeNode A:\n" + relTreeNodeA.toString());
-            RelNode relA = Calcite.getRelNode(planner, sqlA);
-            System.out.println("RelNode A: " + relA.explain());
-            Calcite.iteratePrintRelNode(relA);
-        } catch (Exception ex) {
+            String sqlA = FileIO.readOriginalSqlQuery(id);
+            String sqlB = FileIO.readRewrittenSqlQuery(id);
+
+            List<String> transformations = List.of("unionmergerule");
+
+            boolean result = Calcite.compareQueries(sqlA, sqlB, null);
+            System.out.print("Query ID: " + id + "\t" + result + "\t");
+
+            if (result)
+            {
+                System.out.println();
+                truevalues++;
+                tests++;
+                continue; // No need to check transformations if already equivalent
+            }
+
+            result = Calcite.compareQueries(sqlA, sqlB, transformations);
+            System.out.println(result);
+
+            if (result)     truevalues++;
+            tests++;
         }
 
-        boolean result1 = Calcite.compareQueries(sqlA, sqlB, transformations);
-        System.out.println("\nComparison Result (A vs B): " + result1);
-        System.out.println("------------------------------------------------------------------\n");
+        System.out.println("Total tests: " + tests + ", True results after transformations: " + truevalues);
     }
 }

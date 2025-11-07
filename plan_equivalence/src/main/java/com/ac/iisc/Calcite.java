@@ -158,7 +158,7 @@ public class Calcite {
         // Phase 2: normalize inner join structure safely
         HepProgramBuilder p2 = new HepProgramBuilder();
         p2.addMatchOrder(HepMatchOrder.TOP_DOWN);               // predictable traversal to minimize oscillation
-        p2.addMatchLimit(200);                                  // guard against infinite transforms
+        p2.addMatchLimit(200);                            // guard against infinite transforms
         p2.addRuleInstance(CoreRules.FILTER_INTO_JOIN);         // push filters into joins
         p2.addRuleInstance(CoreRules.JOIN_ASSOCIATE);           // re-associate joins
         p2.addRuleInstance(CoreRules.JOIN_COMMUTE);             // commute join inputs
@@ -180,8 +180,6 @@ public class Calcite {
         hepPlanner.setRoot(logicalPlan);                        // set input plan
         RelNode optimizedPlan = hepPlanner.findBestExp();       // execute optimization
 
-        //System.out.println("  -> Optimized RelNode (Logical Plan):");
-        //System.out.println(RelOptUtil.toString(optimizedPlan));
         return optimizedPlan;
     }
 
@@ -198,16 +196,15 @@ public class Calcite {
             }
         }
 
-    // 2. Parse the SQL string into an AST
+        // 2. Parse the SQL string into an AST
         SqlNode sqlNode = planner.parse(sqlForParse);
 
-    // 3. Validate the AST
+        // 3. Validate the AST
         SqlNode validatedSqlNode = planner.validate(sqlNode);
 
-    // 4. Convert the validated AST to RelNode (Logical Plan)
+        // 4. Convert the validated AST to RelNode (Logical Plan)
         RelNode logicalPlan = planner.rel(validatedSqlNode).rel;
 
-        
         return logicalPlan;
     }
 
@@ -227,28 +224,26 @@ public class Calcite {
      * @param transformations Optional list of CoreRule names to apply to the first plan
      * @return true if any of the above comparisons match; false otherwise or on planning error
      */
-    public static boolean compareQueries(String sql1, String sql2, List<String> transformations) {
+    public static boolean compareQueries(String sql1, String sql2, List<String> transformations)
+    {
+        //Check if SQL strings are equal, if so, return true directly
+        if (sql1.equals(sql2)) return true;
+
         FrameworkConfig config = getFrameworkConfig();
         Planner planner = Frameworks.getPlanner(config); // create a planner tied to this config
 
         try {
-            System.out.println("Here");
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
 
-            System.out.println("RelNode rel1: " + rel1.explain());
-
             if (transformations != null && !transformations.isEmpty()) 
-                rel1 = applyTransformations(rel1, transformations); // apply requested one-off rules
+                rel1 = applyTransformations(rel1, transformations); // apply rules as given by LLM
 
             planner.close();                          // planner cannot be reused across parse/validate cycles reliably
             planner = Frameworks.getPlanner(config);  // create a fresh planner for the second query
 
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
-            
-            System.out.println("Transformed RelNode rel1: " + rel1.explain());
-            System.out.println("RelNode rel2: " + rel2.explain());
 
             // Fast path: structural digests (order-sensitive and precise on structure).
             String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
@@ -267,12 +262,18 @@ public class Calcite {
 
             if (c1.equals(c2)) return true;
 
+            // Fallback 3: tree comparison ignoring child order
+            RelTreeNode tree1 = buildRelTree(rel1);
+            RelTreeNode tree2 = buildRelTree(rel2);
+
+            if (tree1.equalsIgnoreChildOrder(tree2)) return true;
+
             return rel1.equals(rel2); // final fallback: object equality (rarely helpful)
 
         } catch (Exception e)
         {
             // Planning/parsing/validation error: treat as non-equivalent.
-            System.err.println("[Calcite.compareQueries] Planning error: " + e.getMessage());
+            //System.err.println("[Calcite.compareQueries] Planning error: " + e.getMessage());
             return false;
         } finally {
             planner.close(); // ensure planner resources are released
@@ -351,27 +352,19 @@ public class Calcite {
         return sb.toString();
     }
 
-    public static void iteratePrintRelNode(RelNode rel)
+    public static void printRelTrees (String sql1, String sql2)
     {
-        RelVisitor visitor = new RelVisitor()
+        RelNode rel;
+
+        try
         {
-            private int depth = 0; // track current depth for indentation
-
-            @Override
-            public void visit(RelNode node, int ordinal, RelNode parent)
-            {
-                String indent = " ".repeat(depth); // indent per depth
-                System.out.println(indent + "->" + node.getClass().getSimpleName() + ": " + node.explain());
-                
-                depth++; // descend before visiting children
-
-                super.visit(node, ordinal, parent); // let RelVisitor handle child traversal
-
-                depth--; // ascend after children are done
-            }
-        };
-
-        visitor.go(rel); // start traversal at root
+            rel = getOptimizedRelNode(Frameworks.getPlanner(getFrameworkConfig()), sql1);
+            System.out.println("RelTreeNode tree1: \n" + buildRelTree(rel).toString());
+        }
+        catch (Exception e)
+        {
+            System.err.println("[Calcite.printRelTrees] Planning error: " + e.getMessage());
+        }
     }
 
     /**
