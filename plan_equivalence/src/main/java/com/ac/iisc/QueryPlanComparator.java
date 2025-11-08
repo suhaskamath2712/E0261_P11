@@ -37,8 +37,6 @@ public class QueryPlanComparator
             String sqlA = FileIO.readOriginalSqlQuery(id);
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
-            List<String> transformations = List.of("unionmergerule");
-
             boolean result = Calcite.compareQueries(sqlA, sqlB, null);
             System.out.print("Query ID: " + id + "\t" + result + "\t");
 
@@ -50,6 +48,7 @@ public class QueryPlanComparator
                 continue; // No need to check transformations if already equivalent
             }
 
+            List<String> transformations = List.of("unionmergerule");
             result = Calcite.compareQueries(sqlA, sqlB, transformations);
             System.out.println(result);
 

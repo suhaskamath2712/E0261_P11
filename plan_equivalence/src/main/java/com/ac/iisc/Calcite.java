@@ -21,6 +21,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -333,6 +334,17 @@ public class Calcite {
             }
             return "Join(" + j.getJoinType() + "," + cond + "){" + a + "|" + b + "}";
         }
+        // Set operations: normalize UNION/UNION ALL by flattening nested unions and
+        // sorting child digests (associative + commutative under multiset semantics).
+        if (rel instanceof Union u) {
+            boolean all = u.all;
+            List<RelNode> flatChildren = new ArrayList<>();
+            flattenUnionInputs(u, all, flatChildren);
+            List<String> childDigests = new ArrayList<>();
+            for (RelNode in : flatChildren) childDigests.add(canonicalDigest(in));
+            childDigests.sort(String::compareTo);
+            return "Union(" + (all ? "ALL" : "DISTINCT") + ")" + childDigests.toString();
+        }
         if (rel instanceof TableScan ts) { // Table scan: include fully qualified name
             return "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
         }
@@ -350,6 +362,15 @@ public class Calcite {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    // Recursively collect inputs of nested Union nodes that share the same ALL/DISTINCT property.
+    private static void flattenUnionInputs(RelNode rel, boolean targetAll, List<RelNode> out) {
+        if (rel instanceof Union u && u.all == targetAll) {
+            for (RelNode in : u.getInputs()) flattenUnionInputs(in, targetAll, out);
+        } else {
+            out.add(rel);
+        }
     }
 
     public static void printRelTrees (String sql1, String sql2)
@@ -468,6 +489,8 @@ public class Calcite {
     {
         RelNode newRel = rel;
 
+        System.out.println("RelTree before transformations: \n" + buildRelTree(newRel).toString());
+
         for (String transform : transformations)
         {
             HepProgramBuilder pb = new HepProgramBuilder();
@@ -524,7 +547,9 @@ public class Calcite {
             planner.setRoot(rel);                             // set input plan
             newRel = planner.findBestExp();                   // run and get transformed plan
         }
-        
+
+        System.out.println("RelTree after transformations: \n" + buildRelTree(newRel).toString());
+
         return newRel;
     }
 }

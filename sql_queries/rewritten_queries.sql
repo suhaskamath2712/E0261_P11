@@ -992,17 +992,17 @@ LIMIT 100;
 -- Description: A custom query calculating revenue by market segment and shipping priority.
 -- =================================================================
 SELECT
-    c.c_mktsegment,
-    SUM(l.l_extendedprice * (1 - l.l_discount) + l.l_quantity) AS revenue,
-    o.o_orderdate,
-    o.o_shippriority
+    N.n_name,
+    C.c_acctbal
 FROM
-    customer AS c,
-    orders AS o,
-    lineitem AS l
-WHERE
-    c.c_custkey = o.o_custkey
-    AND l.l_orderkey = o.o_orderkey
+    nation AS N
+LEFT OUTER JOIN
+    customer AS C
+    ON N.n_nationkey = C.c_nationkey
+   AND C.c_nationkey > 3
+   AND N.n_nationkey < 20
+   AND C.c_nationkey <> 10
+LIMIT 200;
     AND o.o_orderdate <= '1995-10-13'
     AND l.l_extendedprice BETWEEN 212 AND 3000
     AND l.l_quantity <= 123
