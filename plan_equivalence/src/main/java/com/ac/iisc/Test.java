@@ -3,7 +3,7 @@ package com.ac.iisc;
 import java.util.List;
 
 
-public class QueryPlanComparator
+public class Test
 {
     /**
      * List of all query IDs present in the SQL collections (original, rewritten, mutated).

@@ -2,6 +2,15 @@ package com.ac.iisc;
 
 import java.util.List;
 
+/**
+ * Parsed representation of the LLM's strict output contract.
+ *
+ * Contract:
+ * - Line 1: literal "true" or "false" (case-insensitive) indicating equivalence.
+ * - Lines 2..N: optional newline-separated transformation rule names from LLM.getSupportedTransformations().
+ *   Special cases: a single line equal to "No transformations needed" or
+ *   "No transformations found" is treated as an empty list.
+ */
 public class LLMResponse
 {
     private boolean queriesAreEquivalent;
@@ -13,6 +22,10 @@ public class LLMResponse
         this.transformationSteps = transformationSteps;
     }
 
+    /**
+     * Construct and validate from raw LLM text output. Throws IllegalArgumentException for malformed input
+     * or for transformation names not in the supported allow-list.
+     */
     public LLMResponse(String responseText)
     {
         if (responseText == null || responseText.isBlank()) {

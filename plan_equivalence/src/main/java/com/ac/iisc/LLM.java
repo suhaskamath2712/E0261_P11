@@ -20,6 +20,11 @@ public class LLM
             If no transformations are needed (plans are identical), output "No transformations needed".\n
             """;
     
+    /**
+     * Transformation rule names the LLM is allowed to emit.
+     * These correspond to Calcite CoreRules and are validated in LLMResponse.
+     * Keep the canonical names; unknown or misspelled names will be rejected.
+     */
     private static final List<String> SUPPORTED_TRANSFORMATIONS = List.of(
         // Projection rules
         "ProjectMergeRule",

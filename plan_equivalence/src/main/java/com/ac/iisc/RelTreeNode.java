@@ -9,6 +9,10 @@ import java.util.Objects;
  * Simple tree node to represent a RelNode tree in a language-agnostic way.
  * Each node has a textual label and a list of children in input order.
  */
+/**
+ * Tree wrapper used for order-sensitive and order-insensitive comparisons of Calcite RelNodes.
+ * Labels are simple strings; children preserve input order unless comparisons ignore order.
+ */
 public class RelTreeNode {
     private String label;
     private final List<RelTreeNode> children = new ArrayList<>();

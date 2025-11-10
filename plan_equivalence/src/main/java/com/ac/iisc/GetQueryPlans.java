@@ -18,6 +18,10 @@ import org.json.JSONObject;
  * - Cleans the JSON plan by removing execution-specific keys and lifting the root 'Plan' node
  * - Writes cleaned JSON to matching output folders, skipping IDs already exported (both legacy and new names)
  */
+/**
+ * Utilities to obtain PostgreSQL EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) output and
+ * strip execution-specific fields to enable stable plan comparison.
+ */
 public class GetQueryPlans {
 
     // DB settings - keep consistent with Python script defaults
@@ -88,16 +92,14 @@ public class GetQueryPlans {
      * @return A cleaned deep copy of the JSON structure.
      */
     private static Object cleanPlanTree(Object node) {
-        if (node instanceof JSONObject) {
-            JSONObject obj = (JSONObject) node;
+        if (node instanceof JSONObject obj) {
             JSONObject cleaned = new JSONObject();
             for (String key : obj.keySet()) {
                 if (KEYS_TO_REMOVE.contains(key)) continue;
                 cleaned.put(key, cleanPlanTree(obj.get(key)));
             }
             return cleaned;
-        } else if (node instanceof JSONArray) {
-            JSONArray arr = (JSONArray) node;
+        } else if (node instanceof JSONArray arr) {
             JSONArray out = new JSONArray();
             for (int i = 0; i < arr.length(); i++) {
                 out.put(cleanPlanTree(arr.get(i)));
