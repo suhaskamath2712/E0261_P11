@@ -17,8 +17,7 @@ import org.json.JSONObject;
  * - Runs EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for each query
  * - Cleans the JSON plan by removing execution-specific keys and lifting the root 'Plan' node
  * - Writes cleaned JSON to matching output folders, skipping IDs already exported (both legacy and new names)
- */
-/**
+ * 
  * Utilities to obtain PostgreSQL EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) output and
  * strip execution-specific fields to enable stable plan comparison.
  */

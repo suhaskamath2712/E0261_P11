@@ -238,9 +238,9 @@ LIMIT 10);
 -- =================================================================
 WITH LowCostParts AS (
     SELECT
-        ps_partkey AS id,
-        p_retailprice AS value,
-        ps_suppkey AS secondary_id
+        ps_partkey AS key,
+        p_retailprice AS price,
+        ps_suppkey AS s_key
     FROM
         partsupp
     JOIN
@@ -250,14 +250,14 @@ WITH LowCostParts AS (
     WHERE
         ps_supplycost < 100
     ORDER BY
-        value
+        price
     LIMIT 20
 ),
 RecentLineItems AS (
     SELECT
-        l_orderkey AS id,
-        l_extendedprice AS value,
-        l_partkey AS secondary_id
+        l_orderkey AS key,
+        l_extendedprice AS price,
+        l_partkey AS s_key
     FROM
         lineitem
     WHERE
@@ -265,12 +265,12 @@ RecentLineItems AS (
         AND l_shipdate < DATE '1995-01-01'
         AND l_quantity > 30
     ORDER BY
-        id
+        key
     LIMIT 20
 )
-SELECT * FROM RecentLineItems
+SELECT key, price, s_key FROM RecentLineItems
 UNION ALL
-SELECT * FROM LowCostParts;
+SELECT key, price, s_key FROM LowCostParts;
 
 -- =================================================================
 -- Query ID: U8 (Rewritten)

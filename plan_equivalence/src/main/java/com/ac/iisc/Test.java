@@ -19,7 +19,7 @@ public class Test
         "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
         "Alaap", "Nested_Test", "paper_sample"
     );*/
-    private static final List<String> queryIDList = List.of("U4");
+    private static final List<String> queryIDList = List.of("U7");
 
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the
@@ -37,7 +37,7 @@ public class Test
             String sqlA = FileIO.readOriginalSqlQuery(id);
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
-            boolean result = Calcite.compareQueries(sqlA, sqlB, null);
+            boolean result = Calcite.compareQueriesDebug(sqlA, sqlB, null, id);
             System.out.print("Query ID: " + id + "\t" + result + "\t");
 
             if (result)
@@ -48,8 +48,8 @@ public class Test
                 continue; // No need to check transformations if already equivalent
             }
 
-            List<String> transformations = List.of("unionmergerule");
-            result = Calcite.compareQueries(sqlA, sqlB, transformations);
+            List<String> transformations = List.of("UnionMergeRule");
+            result = Calcite.compareQueriesDebug(sqlA, sqlB, transformations, id+"+rules");
             System.out.println(result);
 
             if (result)     truevalues++;
