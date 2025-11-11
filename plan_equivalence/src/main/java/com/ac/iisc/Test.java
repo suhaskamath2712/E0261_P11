@@ -19,7 +19,19 @@ public class Test
         "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
         "Alaap", "Nested_Test", "paper_sample"
     );*/
-    private static final List<String> queryIDList = List.of("U7");
+    
+    private static final List<String> queryIDList = List.of("O2");
+
+    /*
+    private static final List<String> queryIDList = List.of(
+        "O2", "O3", "O4", "O5", "O6",
+        "A1", "A2", "A3", "A4", "A5",
+        "N1",
+        "F1", "F2", "F3", "F4",
+        "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
+        "Alaap", "Nested_Test", "paper_sample"
+    );
+    */
 
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the

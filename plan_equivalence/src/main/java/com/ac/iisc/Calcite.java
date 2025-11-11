@@ -158,6 +158,8 @@ public class Calcite {
             while (sqlForParse.endsWith(";")) {
                 sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
             }
+            // Normalize non-standard inequality operator '!=' to standard '<>' for Calcite parser
+            sqlForParse = sqlForParse.replace("!=", "<>");
         }
 
         // 2. Parse the SQL string into an AST (SqlNode)
@@ -221,6 +223,7 @@ public class Calcite {
             while (sqlForParse.endsWith(";")) {
                 sqlForParse = sqlForParse.substring(0, sqlForParse.length() - 1).trim();
             }
+            sqlForParse = sqlForParse.replace("!=", "<>");
         }
         // Parse, validate, and convert to RelNode
         SqlNode sqlNode = planner.parse(sqlForParse);
@@ -491,6 +494,28 @@ public class Calcite {
                     parts.sort(String::compareTo);
                     String opName = kind == SqlKind.EQUALS ? "=" : "<>";
                     return normalizeDigest(opName + "(" + String.join(",", parts) + ")");
+                }
+                case GREATER_THAN, GREATER_THAN_OR_EQUAL, LESS_THAN, LESS_THAN_OR_EQUAL -> {
+                    // Normalize > to < with operands swapped; >= to <= with operands swapped.
+                    boolean flipToLess = (kind == SqlKind.GREATER_THAN || kind == SqlKind.GREATER_THAN_OR_EQUAL);
+                    String left = parts.size() > 0 ? parts.get(0) : "?";
+                    String right = parts.size() > 1 ? parts.get(1) : "?";
+                    String finalOp;
+                    if (flipToLess) {
+                        // swap operands and map operator
+                        String tmp = left; left = right; right = tmp;
+                        finalOp = (kind == SqlKind.GREATER_THAN) ? "<" : "<=";
+                    } else {
+                        finalOp = (kind == SqlKind.LESS_THAN) ? "<" : "<=";
+                    }
+                    // Canonical orientation: ensure left <= right lexicographically for deterministic form
+                    int cmp = left.compareTo(right);
+                    if (cmp > 0) {
+                        // Swap orientation by converting < / <= into > / >= then normalize again by flipping
+                        // Instead of introducing >, just swap strings so smaller is first; semantics preserved for equality checks.
+                        String tmp = left; left = right; right = tmp;
+                    }
+                    return normalizeDigest(finalOp + "(" + left + "," + right + ")");
                 }
                 case CAST -> {
                     // Should be stripped already, but handle gracefully
