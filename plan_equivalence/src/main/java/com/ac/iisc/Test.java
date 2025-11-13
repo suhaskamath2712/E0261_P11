@@ -50,22 +50,30 @@ public class Test
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
             boolean result = Calcite.compareQueriesDebug(sqlA, sqlB, null, id);
-            System.out.print("Query ID: " + id + "\t" + result + "\t");
+            System.out.print("Query ID: " + id + "\t" + result + "\n");
 
             if (result)
+                continue; // No need to check transformations if equivalence is proved without LLM
+
+            // Try with transformations from LLM
+            // Get Query Plan Transformations from LLM
+            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            List<String> llmTransformations = llmResponse.getTransformationSteps();
+
+            boolean doesLLMThinkEquivalent = llmResponse.areQueriesEquivalent();
+            System.out.println("LLM thinks equivalence is: " + doesLLMThinkEquivalent);
+
+            if (doesLLMThinkEquivalent)
             {
-                System.out.println();
-                truevalues++;
-                tests++;
-                continue; // No need to check transformations if already equivalent
+                // Apply transformations
+                result = Calcite.compareQueriesDebug(sqlA, sqlB, llmTransformations, id+"+LLM");
+                System.out.println(result);
+            
+
+                List<String> transformations = List.of("UnionMergeRule");
+                result = Calcite.compareQueriesDebug(sqlA, sqlB, transformations, id+"+rules");
+                System.out.println(result);
             }
-
-            List<String> transformations = List.of("UnionMergeRule");
-            result = Calcite.compareQueriesDebug(sqlA, sqlB, transformations, id+"+rules");
-            System.out.println(result);
-
-            if (result)     truevalues++;
-            tests++;
         }
 
         System.out.println("Total tests: " + tests + ", True results after transformations: " + truevalues);

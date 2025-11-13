@@ -244,7 +244,7 @@ public class Calcite {
      *   <li>If still different, compare a canonical digest where inner-join children are treated as
      *       an unordered set (child digests sorted), commutative/symmetric expressions are normalized, and harmless CASTs are ignored. Projection order is preserved.</li>
      *   <li>If still different, compare tree structure ignoring child order.</li>
-     *   <li>Final fallback: object equality (rarely helpful).</li>
+    *   <li>Final fallback: object equality or deepEquals (rarely helpful).</li>
      * </ol>
      *
      * @param sql1 First query string
@@ -296,7 +296,9 @@ public class Calcite {
 
             if (tree1.equalsIgnoreChildOrder(tree2)) return true;
 
-            return rel1.equals(rel2); // final fallback: object equality (rarely helpful)
+            if (rel1.equals(rel2))  return true;
+
+            return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
 
         } catch (Exception e)
         {
@@ -345,8 +347,8 @@ public class Calcite {
             String ct2 = t2 == null ? "null" : t2.canonicalDigest();
             if (ct1.equals(ct2)) return true;
 
-            // Final object equality fallback
-            boolean eq = rel1.equals(rel2);
+            // Final object equality fallback: include deepEquals like compareQueries
+            boolean eq = rel1.equals(rel2) || rel1.deepEquals(rel2);
             if (!eq) {
                 System.out.println("[DEBUG compareQueries tag=" + tag + "] NOT EQUAL");
                 System.out.println("  Structural digest A:\n" + d1);

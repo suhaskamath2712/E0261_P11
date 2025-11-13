@@ -64,7 +64,7 @@ All methods are static on `Calcite`.
     2. Normalized digest equality (`normalizeDigest` neutralizes `$N` input refs).
     3. Canonical digest equality (`canonicalDigest`) — treats inner-join children as unordered, strips CASTs, normalizes commutative expressions.
     4. Tree equality ignoring child order (`RelTreeNode` canonical digest equality).
-    5. Final fallback: `rel1.equals(rel2)`.
+    5. Final fallback: `rel1.equals(rel2)` or `rel1.deepEquals(rel2)`.
   - Error handling: parsing/plan errors cause method to return `false` (conservative approach).
 
 - public static boolean compareQueriesDebug(String sql1, String sql2, List<String> transformations, String tag)
@@ -253,8 +253,11 @@ Important fields & methods
   - Parameters:
     - `sqlAJSON`: cleaned JSON plan for the first query
     - `sqlBJSON`: cleaned JSON plan for the second query
-  - Returns: Raw LLM response as `String` (the method currently constructs a prompt and calls the OpenAI client from env; the returned `Response` is converted to `String`).
-  - Notes: This method uses an environment-configured `OpenAIClient` and the `gpt-5` model name in the example code; adapt for your provider and API keys. May throw runtime exceptions from the client library.
+  - Returns: Assistant text extracted from the LLM response. The helper constructs a strict prompt that includes both cleaned plan JSON blobs and the allow-list of supported transformation names.
+  - Notes: Behavior details:
+    - The method checks `OPENAI_API_KEY` in the environment and returns a safe "not equivalent" contract string if missing (avoid interactive prompts).
+    - It uses the Responses API and performs best-effort extraction of the assistant's output text from the SDK `Response` object (falls back to a conservative non-equivalent value if extraction fails).
+    - The prompt requests a strict contract: first line `true`/`false`, followed (if `true`) by zero-or-more exact transformation names (one per line). Unexpected or free-form LLM output will be treated as `false` to avoid exceptions.
 
 - public static LLMResponse getLLMResponse(String sqlA, String sqlB)
   - Parameters: `sqlA` and `sqlB` are SQL strings (not precomputed JSON). The method obtains cleaned JSON plans via `GetQueryPlans.getCleanedQueryPlanJSONasString` and then contacts the LLM via `contactLLM`.
