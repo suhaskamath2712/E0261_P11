@@ -132,8 +132,8 @@ public class LLM
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
         ResponseCreateParams params = ResponseCreateParams.builder()
             .input(prompt)
-            .model("gpt-4o")
-            .temperature(0.0)
+            .model("gpt-5")
+            //.temperature(0.0)
             .build();
 
         Response resp = client.responses().create(params);
