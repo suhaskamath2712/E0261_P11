@@ -296,10 +296,11 @@ public class Calcite {
 
             if (tree1.equalsIgnoreChildOrder(tree2)) return true;
 
-            if (rel1.equals(rel2))  return true;
+            //these lines will cause a stackoverflow error for god knows what reason
+            //if (rel1.equals(rel2))  return true;
+            //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
 
-            return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
-
+            return false;
         } catch (Exception e)
         {
             // Planning/parsing/validation error: treat as non-equivalent.

@@ -20,17 +20,15 @@ public class Test
         "Alaap", "Nested_Test", "paper_sample"
     );*/
     
-    private static final List<String> queryIDList = List.of("N1");
+    //private static final List<String> queryIDList = List.of("N1");
 
     //list of queries to be tested (without plain union queries)
-    /*private static final List<String> queryIDList = List.of(
-        "O2", "O3", "O4", "O5", "O6",
-        "A1", "A2", "A3", "A4", "A5",
-        "N1",
-        "F1", "F2", "F3", "F4",
-        "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
-        "Alaap", "Nested_Test", "paper_sample"
-    );*/
+    private static final List<String> queryIDList = List.of(
+        "Q2", "Q9"
+    );
+
+    //Q2, Q9: Transformations that are output will crash the program
+    //Q20: Goes into infinite loop
 
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the
@@ -52,38 +50,41 @@ public class Test
             System.out.print("Query ID: " + id + "\t" + result + "\t");
 
             if (result)
+            {
+                System.out.println();
                 continue; // No need to check transformations if equivalence is proved without LLM
+            }
 
             // Try with transformations from LLM
             // Get Query Plan Transformations from LLM
             LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
 
             boolean doesLLMThinkEquivalent = llmResponse.areQueriesEquivalent();
-            System.out.println("LLM thinks equivalence is: " + doesLLMThinkEquivalent);
+            System.out.print(doesLLMThinkEquivalent + "\t");
 
             if (doesLLMThinkEquivalent)
             {
                 LLMtrue++;
                 //extract transformations only if LLM says equivalent
                 List<String> llmTransformations = llmResponse.getTransformationSteps();
+                
+                System.out.print("Transformations: " + llmTransformations + "\t");
 
                 if (!llmTransformations.isEmpty())
                 {
                     LLMGaveTransform++; 
-                    System.out.println("LLM Transformations: " + llmTransformations);
                     // Apply transformations
                     result = Calcite.compareQueries(sqlA, sqlB, llmTransformations);
 
                     if (result)
                         LLMGaveCorrectTransform++;
 
-                    System.out.print(result);
+                    System.out.println(result);
                 }
-                else continue;
             }
             else LLMfalse++;
 
-            System.out.println("---------------------------------------------------");
+            //System.out.println("---------------------------------------------------");
         }
 
         //Print statistics

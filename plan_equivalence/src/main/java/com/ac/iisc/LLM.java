@@ -63,7 +63,6 @@ public class LLM
         "FilterAggregateTransposeRule",
         "FilterWindowTransposeRule",
         // Join rules
-        "JoinCommuteRule",
         "JoinAssociateRule",
         "JoinPushExpressionsRule",
         "JoinConditionPushRule",
@@ -149,7 +148,7 @@ public class LLM
         }
 
         //DEBUG: Print reduced LLM output text
-        System.out.println("LLM Assistant Text: " + contentText);
+        //System.out.println("LLM Assistant Text: " + contentText);
 
         return contentText.trim();
     }
