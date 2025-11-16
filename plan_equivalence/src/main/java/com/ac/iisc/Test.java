@@ -24,7 +24,9 @@ public class Test
 
     //list of queries to be tested (without plain union queries)
     private static final List<String> queryIDList = List.of(
-        "Q2", "Q9"
+        "Q1","Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8","Q9",
+        "Q10", "Q11", "Q12", "Q13", "Q14", "Q15",
+        "Q16", "Q17", "Q18", "Q19", "Q20", "Q21", "Q22", "Q23"
     );
 
     //Q2, Q9: Transformations that are output will crash the program
@@ -68,7 +70,7 @@ public class Test
                 //extract transformations only if LLM says equivalent
                 List<String> llmTransformations = llmResponse.getTransformationSteps();
                 
-                System.out.print("Transformations: " + llmTransformations + "\t");
+                System.out.print(llmTransformations + "\t");
 
                 if (!llmTransformations.isEmpty())
                 {

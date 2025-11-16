@@ -736,37 +736,122 @@ public class Calcite {
             boolean recognized = true;
             switch (key)
             {
-                case "projectmergerule" -> pb.addRuleInstance(CoreRules.PROJECT_MERGE);
-                case "projectremoverule" -> pb.addRuleInstance(CoreRules.PROJECT_REMOVE);
-                case "projectjointransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);
-                case "projectfiltertransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE);
-                case "projectsetoptransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_SET_OP_TRANSPOSE);
-                case "projecttablescanrule" -> pb.addRuleInstance(CoreRules.PROJECT_TABLE_SCAN);
-                case "filtermergerule" -> pb.addRuleInstance(CoreRules.FILTER_MERGE);
-                case "filterprojecttransposerule" -> pb.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
-                case "filterjoinrule" -> pb.addRuleInstance(CoreRules.FILTER_INTO_JOIN);
-                case "filteraggregatetransposerule" -> pb.addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE);
-                case "filterwindowtransposerule" -> pb.addRuleInstance(CoreRules.FILTER_WINDOW_TRANSPOSE);
-                case "joincommuterule" -> pb.addRuleInstance(CoreRules.JOIN_COMMUTE);
-                case "joinassociaterule" -> pb.addRuleInstance(CoreRules.JOIN_ASSOCIATE);
-                case "joinpushexpressionsrule" -> pb.addRuleInstance(CoreRules.JOIN_PUSH_EXPRESSIONS);
-                case "joinconditionpushrule" -> pb.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH);
-                case "aggregateprojectpullupconstantsrule" -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS);
-                case "aggregateremoverule" -> pb.addRuleInstance(CoreRules.AGGREGATE_REMOVE);
-                case "aggregatejointransposerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE);
-                case "aggregateuniontransposerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_UNION_TRANSPOSE);
-                case "aggregateprojectmergerule" -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_MERGE);
-                case "aggregatecasetofilterrule" -> pb.addRuleInstance(CoreRules.AGGREGATE_CASE_TO_FILTER);
-                case "sortremoverule" -> pb.addRuleInstance(CoreRules.SORT_REMOVE);
-                case "sortuniontransposerule" -> pb.addRuleInstance(CoreRules.SORT_UNION_TRANSPOSE);
-                case "sortprojecttransposerule" -> pb.addRuleInstance(CoreRules.SORT_PROJECT_TRANSPOSE);
-                case "sortjointransposerule" -> pb.addRuleInstance(CoreRules.SORT_JOIN_TRANSPOSE);
-                case "unionmergerule" -> pb.addRuleInstance(CoreRules.UNION_MERGE);
-                case "unionpullupconstantsrule" -> pb.addRuleInstance(CoreRules.UNION_PULL_UP_CONSTANTS);
-                case "intersecttodistinctrule" -> pb.addRuleInstance(CoreRules.INTERSECT_TO_DISTINCT);
-                case "minustodistinctrule" -> pb.addRuleInstance(CoreRules.MINUS_TO_DISTINCT);
-                case "projectwindowtransposerule" -> pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE);
-                default -> recognized = false;
+                //aggregate rules
+                case "AggregateExpandDistinctAggregatesRule": pb.addRuleInstance(CoreRules.AGGREGATE_EXPAND_DISTINCT_AGGREGATES); break;
+                case "AggregateExtractProjectRule": pb.addRuleInstance(CoreRules.AGGREGATE_EXPAND_DISTINCT_AGGREGATES); break;
+                case "AggregateFilterToCaseRule": pb.addRuleInstance(CoreRules.AGGREGATE_CASE_TO_FILTER); break;
+                case "AggregateFilterTransposeRule": pb.addRuleInstance(CoreRules.AGGREGATE_FILTER_TRANSPOSE); break;
+                case "AggregateJoinJoinRemoveRule": pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_JOIN_REMOVE); break;
+                case "AggregateJoinRemoveRule": pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_REMOVE); break;
+                case "AggregateJoinTransposeRule": pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE); break;
+                case "AggregateMergeRule": pb.addRuleInstance(CoreRules.AGGREGATE_MERGE); break;
+                case "AggregateProjectMergeRule": pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_MERGE); break;
+                case "AggregateProjectPullUpConstantsRule": pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS); break;
+                case "AggregateProjectStarTableRule": pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_STAR_TABLE); break;
+                case "AggregateReduceFunctionsRule": pb.addRuleInstance(CoreRules.AGGREGATE_REDUCE_FUNCTIONS); break;
+                case "AggregateRemoveRule": pb.addRuleInstance(CoreRules.AGGREGATE_REMOVE); break;
+                case "AggregateStarTableRule": pb.addRuleInstance(CoreRules.AGGREGATE_STAR_TABLE); break;
+                case "AggregateUnionAggregateRule": pb.addRuleInstance(CoreRules.AGGREGATE_UNION_AGGREGATE); break;
+                case "AggregateUnionTransposeRule": pb.addRuleInstance(CoreRules.AGGREGATE_UNION_TRANSPOSE); break;
+                case "AggregateValuesRule": pb.addRuleInstance(CoreRules.AGGREGATE_VALUES); break;
+                
+                //calc rules
+                case "CalcMergeRule": pb.addRuleInstance(CoreRules.CALC_MERGE); break;
+                case "CalcRemoveRule": pb.addRuleInstance(CoreRules.CALC_REMOVE); break;
+                case "CalcSplitRule": pb.addRuleInstance(CoreRules.CALC_SPLIT); break;
+
+                //filter rules
+                case "FilterAggregateTransposeRule": pb.addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE); break;
+                case "FilterCalcMergeRule": pb.addRuleInstance(CoreRules.FILTER_CALC_MERGE); break;
+                case "FilterCorrelateRule": pb.addRuleInstance(CoreRules.FILTER_CORRELATE); break;
+                case "FilterJoinRule.FilterIntoJoinRule": pb.addRuleInstance(CoreRules.FILTER_INTO_JOIN); break;
+                case "FilterJoinRule.JoinConditionPushRule": pb.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH); break;
+                case "FilterMergeRule": pb.addRuleInstance(CoreRules.FILTER_MERGE); break;
+                case "FilterMultiJoinMergeRule": pb.addRuleInstance(CoreRules.FILTER_MULTI_JOIN_MERGE); break;
+                case "FilterProjectTransposeRule": pb.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE); break;
+                case "FilterSampleTransposeRule": pb.addRuleInstance(CoreRules.FILTER_SAMPLE_TRANSPOSE); break;
+                case "FilterSetOpTransposeRule": pb.addRuleInstance(CoreRules.FILTER_SET_OP_TRANSPOSE); break;
+                case "FilterTableFunctionTransposeRule": pb.addRuleInstance(CoreRules.FILTER_TABLE_FUNCTION_TRANSPOSE); break;
+                case "FilterToCalcRule": pb.addRuleInstance(CoreRules.FILTER_TO_CALC); break;
+                case "FilterWindowTransposeRule": pb.addRuleInstance(CoreRules.FILTER_WINDOW_TRANSPOSE); break;
+                
+                //join rules
+                case "JoinAddRedundantSemiJoinRule": pb.addRuleInstance(CoreRules.JOIN_ADD_REDUNDANT_SEMI_JOIN); break;
+                case "JoinAssociateRule": pb.addRuleInstance(CoreRules.JOIN_ASSOCIATE); break;
+                case "JoinCommuteRule": pb.addRuleInstance(CoreRules.JOIN_COMMUTE); break;
+                case "JoinDeriveIsNotNullFilterRule": pb.addRuleInstance(CoreRules.JOIN_DERIVE_IS_NOT_NULL_FILTER_RULE); break;
+                case "JoinExtractFilterRule": pb.addRuleInstance(CoreRules.JOIN_EXTRACT_FILTER); break;
+                case "JoinProjectBothTransposeRule": pb.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE); break;
+                case "JoinProjectLeftTransposeRule": pb.addRuleInstance(CoreRules.JOIN_PROJECT_LEFT_TRANSPOSE); break;
+                case "JoinProjectRightTransposeRule": pb.addRuleInstance(CoreRules.JOIN_PROJECT_RIGHT_TRANSPOSE); break;
+                case "JoinPushExpressionsRule": pb.addRuleInstance(CoreRules.JOIN_PUSH_EXPRESSIONS); break;
+                case "JoinPushTransitivePredicatesRule": pb.addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES); break;
+                case "JoinToCorrelateRule": pb.addRuleInstance(CoreRules.JOIN_TO_CORRELATE); break;
+                case "JoinToMultiJoinRule": pb.addRuleInstance(CoreRules.JOIN_TO_MULTI_JOIN); break;
+                case "JoinLeftUnionTransposeRule": pb.addRuleInstance(CoreRules.JOIN_LEFT_UNION_TRANSPOSE); break;
+                case "JoinRightUnionTransposeRule": pb.addRuleInstance(CoreRules.JOIN_RIGHT_UNION_TRANSPOSE); break;
+
+                //minus rules
+                case "MinusMergeRule": pb.addRuleInstance(CoreRules.MINUS_MERGE); break;
+                case "MinusToDistinctRule": pb.addRuleInstance(CoreRules.MINUS_TO_DISTINCT); break;
+
+                //project rules
+                case "ProjectAggregateMergeRule": pb.addRuleInstance(CoreRules.PROJECT_AGGREGATE_MERGE); break;
+                case "ProjectCalcMergeRule": pb.addRuleInstance(CoreRules.PROJECT_CALC_MERGE); break;
+                case "ProjectCorrelateTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_CORRELATE_TRANSPOSE); break;
+                case "ProjectFilterTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE); break;
+                case "ProjectJoinJoinRemoveRule": pb.addRuleInstance(CoreRules.PROJECT_JOIN_JOIN_REMOVE); break;
+                case "ProjectJoinRemoveRule": pb.addRuleInstance(CoreRules.PROJECT_JOIN_REMOVE); break;
+                case "ProjectJoinTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE); break;
+                case "ProjectMergeRule": pb.addRuleInstance(CoreRules.PROJECT_MERGE); break;
+                case "ProjectMultiJoinMergeRule": pb.addRuleInstance(CoreRules.PROJECT_MULTI_JOIN_MERGE); break;
+                case "ProjectRemoveRule": pb.addRuleInstance(CoreRules.PROJECT_REMOVE); break;
+                case "ProjectSetOpTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_SET_OP_TRANSPOSE); break;
+                case "ProjectToCalcRule": pb.addRuleInstance(CoreRules.PROJECT_TO_CALC); break;
+                case "ProjectToWindowRule": pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE); break;
+                case "ProjectToWindowRule.CalcToWindowRule": pb.addRuleInstance(CoreRules.CALC_TO_WINDOW); break;
+                case "ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule": pb.addRuleInstance(CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW); break;
+                case "ProjectWindowTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE); break;
+
+                //reduce rules
+                case "ReduceDecimalsRule": pb.addRuleInstance(CoreRules.CALC_REDUCE_DECIMALS); break;
+                case "ReduceExpressionsRule.CalcReduceExpressionsRule": pb.addRuleInstance(CoreRules.CALC_REDUCE_EXPRESSIONS); break;
+                case "ReduceExpressionsRule.FilterReduceExpressionsRule": pb.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS); break;
+                case "ReduceExpressionsRule.JoinReduceExpressionsRule": pb.addRuleInstance(CoreRules.JOIN_REDUCE_EXPRESSIONS); break;
+                case "ReduceExpressionsRule.ProjectReduceExpressionsRule": pb.addRuleInstance(CoreRules.PROJECT_REDUCE_EXPRESSIONS); break;
+                case "ReduceExpressionsRule.WindowReduceExpressionsRule": pb.addRuleInstance(CoreRules.WINDOW_REDUCE_EXPRESSIONS); break;
+
+                //semi join rules
+                case "SemiJoinFilterTransposeRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_FILTER_TRANSPOSE); break;
+                case "SemiJoinJoinTransposeRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_JOIN_TRANSPOSE); break;
+                case "SemiJoinProjectTransposeRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_PROJECT_TRANSPOSE); break;
+                case "SemiJoinRemoveRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_REMOVE); break;
+                case "SemiJoinRule.JoinOnUniqueToSemiJoinRule": pb.addRuleInstance(CoreRules.JOIN_ON_UNIQUE_TO_SEMI_JOIN); break;
+                case "SemiJoinRule.JoinToSemiJoinRule": pb.addRuleInstance(CoreRules.JOIN_TO_SEMI_JOIN); break;
+                case "SemiJoinRule.ProjectToSemiJoinRule": pb.addRuleInstance(CoreRules.PROJECT_TO_SEMI_JOIN); break;
+
+                //sort rules
+                case "SortJoinCopyRule": pb.addRuleInstance(CoreRules.SORT_JOIN_COPY); break;
+                case "SortJoinTransposeRule": pb.addRuleInstance(CoreRules.SORT_JOIN_TRANSPOSE); break;
+                case "SortProjectTransposeRule": pb.addRuleInstance(CoreRules.SORT_PROJECT_TRANSPOSE); break;
+                case "SortRemoveConstantKeysRule": pb.addRuleInstance(CoreRules.SORT_REMOVE_CONSTANT_KEYS); break;
+                case "SortRemoveRedundantRule": pb.addRuleInstance(CoreRules.SORT_REMOVE_REDUNDANT); break;
+                case "SortRemoveRule": pb.addRuleInstance(CoreRules.SORT_REMOVE); break;
+                case "SortUnionTransposeRule": pb.addRuleInstance(CoreRules.SORT_UNION_TRANSPOSE); break;
+
+                //union rules
+                case "UnionMergeRule": pb.addRuleInstance(CoreRules.UNION_MERGE); break;
+                case "UnionPullUpConstantsRule": pb.addRuleInstance(CoreRules.UNION_PULL_UP_CONSTANTS); break;
+                case "UnionToDistinctRule": pb.addRuleInstance(CoreRules.UNION_TO_DISTINCT); break;
+
+                //additional rules
+                case "CoerceInputsRule": pb.addRuleInstance(CoreRules.COERCE_INPUTS); break;
+                case "ExchangeRemoveConstantKeysRule": pb.addRuleInstance(CoreRules.EXCHANGE_REMOVE_CONSTANT_KEYS); break;
+                case "IntersectToDistinctRule": pb.addRuleInstance(CoreRules.INTERSECT_TO_DISTINCT); break;
+                case "MatchRule": pb.addRuleInstance(CoreRules.MATCH); break;
+                case "MultiJoinOptimizeBushyRule": pb.addRuleInstance(CoreRules.MULTI_JOIN_OPTIMIZE_BUSHY); break;
+                case "SampleToFilterRule": pb.addRuleInstance(CoreRules.SAMPLE_TO_FILTER); break;
+                case "TableScanRule": pb.addRuleInstance(CoreRules.PROJECT_TABLE_SCAN); break;
             }
 
             if (!recognized) continue;

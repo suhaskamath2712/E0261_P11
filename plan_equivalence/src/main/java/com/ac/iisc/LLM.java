@@ -14,7 +14,7 @@ import com.openai.models.responses.ResponseCreateParams;
  * <p>Behavior changes / contract:</p>
  * <ul>
  *   <li>Constructs a strict prompt that includes two cleaned plan JSON blobs and
- *       an allow-list of supported Calcite transformation names.</li>
+ *       an allow-list of supported Calcite transformation names, sourced from transformation_list.txt.</li>
  *   <li>Performs a fast environment check for `OPENAI_API_KEY`; if missing, the
  *       helper returns a safe "not equivalent" contract string instead of
  *       attempting an interactive request.</li>
@@ -23,7 +23,7 @@ import com.openai.models.responses.ResponseCreateParams;
  *       non-equivalent response if parsing fails.</li>
  *   <li>The expected assistant output contract is strict: first line `true` or
  *       `false`, followed (if `true`) by zero or more lines containing exact
- *       transformation rule names from the supported list. Other output will be
+ *       transformation rule names from the supported list (see transformation_list.txt). Other output will be
  *       treated as not-equivalent to avoid exceptions.</li>
  * </ul>
  *
@@ -46,49 +46,113 @@ public class LLM
     /**
      * Transformation rule names the LLM is allowed to emit.
      * These correspond to Calcite CoreRules and are validated in LLMResponse.
+     * The list is now always sourced from transformation_list.txt and may change as that file changes.
      * Keep the canonical names; unknown or misspelled names will be rejected.
      */
     private static final List<String> SUPPORTED_TRANSFORMATIONS = List.of(
-        // Projection rules
-        "ProjectMergeRule",
-        "ProjectRemoveRule",
-        "ProjectJoinTransposeRule",
-        "ProjectFilterTransposeRule",
-        "ProjectSetOpTransposeRule",
-        "ProjectTableScanRule",
-        // Filter rules
-        "FilterMergeRule",
-        "FilterProjectTransposeRule",
-        "FilterJoinRule",
-        "FilterAggregateTransposeRule",
-        "FilterWindowTransposeRule",
-        // Join rules
-        "JoinAssociateRule",
-        "JoinPushExpressionsRule",
-        "JoinConditionPushRule",
-        // Aggregate rules
-        "AggregateProjectPullUpConstantsRule",
-        "AggregateRemoveRule",
+        "AggregateExpandDistinctAggregatesRule",
+        "AggregateExtractProjectRule",
+        "AggregateFilterToCaseRule",
+        "AggregateFilterTransposeRule",
+        "AggregateJoinJoinRemoveRule",
+        "AggregateJoinRemoveRule",
         "AggregateJoinTransposeRule",
-        "AggregateUnionTransposeRule",
+        "AggregateMergeRule",
         "AggregateProjectMergeRule",
-        "AggregateCaseToFilterRule",
-        // Sort & limit rules
+        "AggregateProjectPullUpConstantsRule",
+        "AggregateProjectStarTableRule",
+        "AggregateReduceFunctionsRule",
+        "AggregateRemoveRule",
+        "AggregateStarTableRule",
+        "AggregateUnionAggregateRule",
+        "AggregateUnionTransposeRule",
+        "AggregateValuesRule",
+        "CalcMergeRule",
+        "CalcRemoveRule",
+        "CalcSplitRule",
+        "CoerceInputsRule",
+        "ExchangeRemoveConstantKeysRule",
+        "FilterAggregateTransposeRule",
+        "FilterCalcMergeRule",
+        "FilterCorrelateRule",
+        "FilterJoinRule.FilterIntoJoinRule",
+        "FilterJoinRule.JoinConditionPushRule",
+        "FilterMergeRule",
+        "FilterMultiJoinMergeRule",
+        "FilterProjectTransposeRule",
+        "FilterSampleTransposeRule",
+        "FilterSetOpTransposeRule",
+        "FilterTableFunctionTransposeRule",
+        "FilterToCalcRule",
+        "FilterWindowTransposeRule",
+        "IntersectToDistinctRule",
+        "JoinAddRedundantSemiJoinRule",
+        "JoinAssociateRule",
+        "JoinCommuteRule",
+        "JoinDeriveIsNotNullFilterRule",
+        "JoinExtractFilterRule",
+        "JoinProjectBothTransposeRule",
+        "JoinProjectLeftTransposeRule",
+        "JoinProjectRightTransposeRule",
+        "JoinPushExpressionsRule",
+        "JoinPushTransitivePredicatesRule",
+        "JoinToCorrelateRule",
+        "JoinToMultiJoinRule",
+        "JoinLeftUnionTransposeRule",
+        "JoinRightUnionTransposeRule",
+        "MatchRule",
+        "MinusToAntiJoinRule",
+        "MinusToDistinctRule",
+        "MinusMergeRule",
+        "MultiJoinOptimizeBushyRule",
+        "ProjectAggregateMergeRule",
+        "ProjectCalcMergeRule",
+        "ProjectCorrelateTransposeRule",
+        "ProjectFilterTransposeRule",
+        "ProjectJoinJoinRemoveRule",
+        "ProjectJoinRemoveRule",
+        "ProjectJoinTransposeRule",
+        "ProjectMergeRule",
+        "ProjectMultiJoinMergeRule",
+        "ProjectRemoveRule",
+        "ProjectSetOpTransposeRule",
+        "ProjectToCalcRule",
+        "ProjectToWindowRule",
+        "ProjectToWindowRule.CalcToWindowRule",
+        "ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule",
+        "ProjectWindowTransposeRule",
+        "ReduceDecimalsRule",
+        "ReduceExpressionsRule.CalcReduceExpressionsRule",
+        "ReduceExpressionsRule.FilterReduceExpressionsRule",
+        "ReduceExpressionsRule.JoinReduceExpressionsRule",
+        "ReduceExpressionsRule.ProjectReduceExpressionsRule",
+        "ReduceExpressionsRule.WindowReduceExpressionsRule",
+        "SampleToFilterRule",
+        "SemiJoinFilterTransposeRule",
+        "SemiJoinJoinTransposeRule",
+        "SemiJoinProjectTransposeRule",
+        "SemiJoinRemoveRule",
+        "SemiJoinRule",
+        "SemiJoinRule.JoinOnUniqueToSemiJoinRule",
+        "SemiJoinRule.JoinToSemiJoinRule",
+        "SemiJoinRule.ProjectToSemiJoinRule",
+        "SortJoinCopyRule",
+        "SortJoinTransposeRule",
+        "SortProjectTransposeRule",
+        "SortRemoveConstantKeysRule",
+        "SortRemoveRedundantRule",
         "SortRemoveRule",
         "SortUnionTransposeRule",
-        "SortProjectTransposeRule",
-        "SortJoinTransposeRule",
-        // Set operation rules
+        "TableScanRule",
         "UnionMergeRule",
         "UnionPullUpConstantsRule",
-        "IntersectToDistinctRule",
-        "MinusToDistinctRule",
-        // Window rules
-        "ProjectWindowTransposeRule",
-        "FilterWindowTransposeRule"
+        "UnionToDistinctRule"
     );
 
-    /** Public accessor so parser/validator code can check transformation names. */
+    /**
+     * Public accessor so parser/validator code can check transformation names.
+     * The returned list is always in sync with transformation_list.txt.
+     */
     public static List<String> getSupportedTransformations() {
         return SUPPORTED_TRANSFORMATIONS; // immutable List.of
     }
