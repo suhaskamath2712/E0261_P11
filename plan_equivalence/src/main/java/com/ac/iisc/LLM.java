@@ -88,7 +88,6 @@ public class LLM
         "IntersectToDistinctRule",
         "JoinAddRedundantSemiJoinRule",
         "JoinAssociateRule",
-        "JoinCommuteRule",
         "JoinDeriveIsNotNullFilterRule",
         "JoinExtractFilterRule",
         "JoinProjectBothTransposeRule",
@@ -148,6 +147,7 @@ public class LLM
         "UnionPullUpConstantsRule",
         "UnionToDistinctRule"
     );
+    
 
     /**
      * Public accessor so parser/validator code can check transformation names.

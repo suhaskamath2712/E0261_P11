@@ -4,10 +4,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
 import org.apache.calcite.config.Lex;
@@ -28,12 +32,14 @@ import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
@@ -45,18 +51,37 @@ import org.postgresql.ds.PGSimpleDataSource;
  * <p>Responsibilities:</p>
  * <ul>
  *   <li>Build a Calcite {@link FrameworkConfig} backed by a PostgreSQL schema (via JDBC).</li>
- *   <li>Parse/validate SQL to {@link RelNode} and optionally optimize it using HepPlanner phases.</li>
- *   <li>Provide utilities to compare two queries for structural equivalence using digests
- *       and a canonical formatter that is insensitive to inner-join child order, commutative/symmetric expressions, and harmless CASTs.</li>
- *   <li>Apply specific CoreRules by name to a {@link RelNode} for controlled normalization.</li>
+ *   <li>Parse/validate SQL to {@link RelNode} and optionally optimize it using phased HepPlanner programs.</li>
+ *   <li>Provide utilities to compare two queries for structural equivalence using multi-stage
+ *       digests and a canonical formatter that is insensitive to inner-join child order,
+ *       commutative/symmetric expressions, and harmless CASTs. The canonicalizer is
+ *       DAG/cycle-safe so it can operate on shared-subgraph plans without causing
+ *       uncontrolled recursion.</li>
+ *   <li>Apply specific {@link org.apache.calcite.rel.rules.CoreRules} by name to a {@link RelNode}
+ *       using a registry-driven approach (`RULE_MAP`). Rules are looked up by lowercase keys
+ *       and applied together as a composite Hep program (with a small number of fixpoint passes)
+ *       to reduce oscillation and better converge when rules enable each other.</li>
+ *   <li>Normalize scalar subqueries by converting them to correlates and invoking Calcite's
+ *       decorrelator to produce equivalent join+aggregate forms where possible. This helps
+ *       align plans that express the same logic as a SCALAR_QUERY on one side and as a
+ *       join+aggregate on the other.</li>
  * </ul>
  *
  * <p>Notes:</p>
  * <ul>
  *   <li>Unquoted identifiers are folded to lower-case to align with PostgreSQL catalogs.</li>
  *   <li>Trailing semicolons are stripped before parsing for robustness.</li>
- *   <li>Canonical digest normalizes inner-join child ordering, commutative/symmetric expressions, and ignores harmless CASTs; projection order is preserved.</li>
- *   <li>Sort/Limit nodes are normalized to ignore sort keys but preserve row limits.</li>
+ *   <li>Canonical digest normalizes inner-join child ordering, commutative/symmetric expressions,
+ *       and ignores harmless CASTs; projection order is preserved. The canonicalizer uses a
+ *       recursion-path set to avoid StackOverflow when traversing DAGs.</li>
+ *   <li>`applyTransformations` accepts a list of transformation names (case-insensitive keys into
+ *       `RULE_MAP`) and builds a single HepProgram that is applied to the plan repeatedly until
+ *       a small fixpoint is reached (or a pass limit is hit).</li>
+ *   <li>`normalizeSubqueriesAndDecorrelate` performs a best-effort conversion of RexSubQuery
+ *       expressions into relational correlates and then attempts to decorrelate them to joins
+ *       and aggregates. This is done symmetrically for both sides prior to comparison.</li>
+ *   <li>Because plan equivalence is heuristic, the comparison performs multiple fallbacks:
+ *       structural digest → input-ref-normalized digest → canonical digest → tree canonical digest.</li>
  * </ul>
  */
 public class Calcite {
@@ -267,11 +292,21 @@ public class Calcite {
             if (transformations != null && !transformations.isEmpty()) 
                 rel1 = applyTransformations(rel1, transformations); // apply rules as given by LLM
 
+            // Normalize sub-queries and decorrelate to align scalar subquery vs join forms
+            rel1 = normalizeSubqueriesAndDecorrelate(rel1);
+
             planner.close();                          // planner cannot be reused across parse/validate cycles reliably
             planner = Frameworks.getPlanner(config);  // create a fresh planner for the second query
 
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
+            if (transformations != null && !transformations.isEmpty()) {
+                // Apply the same transformations to B as a symmetric normalization step
+                rel2 = applyTransformations(rel2, transformations);
+            }
+
+            // Normalize sub-queries and decorrelate symmetrically for the second plan as well
+            rel2 = normalizeSubqueriesAndDecorrelate(rel2);
 
             // Fast path: structural digests (order-sensitive and precise on structure).
             String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
@@ -293,14 +328,13 @@ public class Calcite {
             // Fallback 3: tree comparison ignoring child order
             RelTreeNode tree1 = buildRelTree(rel1);
             RelTreeNode tree2 = buildRelTree(rel2);
-
-            if (tree1.equalsIgnoreChildOrder(tree2)) return true;
-
+            
             //these lines will cause a stackoverflow error for god knows what reason
             //if (rel1.equals(rel2))  return true;
             //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
 
-            return false;
+
+            return tree1.equalsIgnoreChildOrder(tree2);
         } catch (Exception e)
         {
             // Planning/parsing/validation error: treat as non-equivalent.
@@ -326,9 +360,14 @@ public class Calcite {
             if (transformations != null && !transformations.isEmpty()) {
                 rel1 = applyTransformations(rel1, transformations);
             }
+            rel1 = normalizeSubqueriesAndDecorrelate(rel1);
             planner.close();
             planner = Frameworks.getPlanner(config);
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
+            if (transformations != null && !transformations.isEmpty()) {
+                rel2 = applyTransformations(rel2, transformations);
+            }
+            rel2 = normalizeSubqueriesAndDecorrelate(rel2);
 
             String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
             String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
@@ -348,8 +387,8 @@ public class Calcite {
             String ct2 = t2 == null ? "null" : t2.canonicalDigest();
             if (ct1.equals(ct2)) return true;
 
-            // Final object equality fallback: include deepEquals like compareQueries
-            boolean eq = rel1.equals(rel2) || rel1.deepEquals(rel2);
+            // Final object equality fallback removed to avoid deep recursion and cycles
+            boolean eq = false;
             if (!eq) {
                 System.out.println("[DEBUG compareQueries tag=" + tag + "] NOT EQUAL");
                 System.out.println("  Structural digest A:\n" + d1);
@@ -403,6 +442,18 @@ public class Calcite {
     // ...existing code...
     public static String canonicalDigest(RelNode rel) {
         if (rel == null) return "null"; // explicit null marker for consistency
+        Set<RelNode> path = Collections.newSetFromMap(new IdentityHashMap<>());
+        return canonicalDigestInternal(rel, path);
+    }
+
+    private static String canonicalDigestInternal(RelNode rel, Set<RelNode> path) {
+        if (rel == null) return "null";
+        if (path.contains(rel)) {
+            String typeName = rel.getRelTypeName();
+            if (typeName == null) typeName = "UnknownRel";
+            return typeName + "[...cycle...]";
+        }
+        path.add(rel);
         if (rel instanceof LogicalProject p) { // Project: keep output order significant
             StringBuilder sb = new StringBuilder();
             sb.append("Project[");
@@ -412,25 +463,50 @@ public class Calcite {
                 sb.append(canonicalizeRex(rex));
             }
             sb.append("]->");
-            sb.append(canonicalDigest(p.getInput()));
+            sb.append(canonicalDigestInternal(p.getInput(), path));
+            path.remove(rel);
             return sb.toString();
         }
         if (rel instanceof LogicalFilter f) { // Filter: normalize predicate and recurse
-            return "Filter(" + canonicalizeRex(f.getCondition()) + ")->" + canonicalDigest(f.getInput());
+            String result = "Filter(" + canonicalizeRex(f.getCondition()) + ")->" + canonicalDigestInternal(f.getInput(), path);
+            path.remove(rel);
+            return result;
         }
-        if (rel instanceof LogicalJoin j) { // Join: sort children for INNER join type
-            String condStr = canonicalizeRex(j.getCondition());
-            String left = canonicalDigest(j.getLeft());
-            String right = canonicalDigest(j.getRight());
-            String a = left;
-            String b = right;
-            // For inner joins, make children order-insensitive by sorting their digests
+        if (rel instanceof LogicalJoin j) {
             if (j.getJoinType() == JoinRelType.INNER) {
-                if (a.compareTo(b) > 0) {
-                    String t = a; a = b; b = t;
+                // Flatten nested inner joins into a set of factors and a set of conjunctive conditions
+                List<RelNode> factors = new ArrayList<>();
+                List<RexNode> conds = new ArrayList<>();
+                collectInnerJoinFactors(j, factors, conds);
+
+                // Canonicalize factor digests and sort
+                List<String> factorDigests = new ArrayList<>();
+                for (RelNode f : factors) {
+                    factorDigests.add(canonicalDigestInternal(f, path));
                 }
+                factorDigests.sort(String::compareTo);
+
+                // Canonicalize join conditions: split by AND, canonicalize each, sort
+                List<String> condDigests = new ArrayList<>();
+                for (RexNode c : conds) {
+                    decomposeConj(c, condDigests);
+                }
+                // Remove duplicate conjuncts
+                condDigests = new ArrayList<>(new java.util.LinkedHashSet<>(condDigests));
+                condDigests.sort(String::compareTo);
+                String condPart = condDigests.isEmpty() ? "true" : String.join("&", condDigests);
+                String result = "Join(INNER," + condPart + "){" + String.join("|", factorDigests) + "}";
+                path.remove(rel);
+                return result;
+            } else {
+                String condStr = canonicalizeRex(j.getCondition());
+                String left = canonicalDigestInternal(j.getLeft(), path);
+                String right = canonicalDigestInternal(j.getRight(), path);
+                // keep non-inner join child order significant
+                String result = "Join(" + j.getJoinType() + "," + condStr + "){" + left + "|" + right + "}";
+                path.remove(rel);
+                return result;
             }
-            return "Join(" + j.getJoinType() + "," + condStr + "){" + a + "|" + b + "}";
         }
         // Set operations: normalize UNION/UNION ALL by flattening nested unions and
         // sorting child digests (associative + commutative under multiset semantics).
@@ -439,19 +515,25 @@ public class Calcite {
             List<RelNode> flatChildren = new ArrayList<>();
             flattenUnionInputs(u, all, flatChildren);
             List<String> childDigests = new ArrayList<>();
-            for (RelNode in : flatChildren) childDigests.add(canonicalDigest(in));
+            for (RelNode in : flatChildren) childDigests.add(canonicalDigestInternal(in, path));
             childDigests.sort(String::compareTo);
-            return "Union(" + (all ? "ALL" : "DISTINCT") + ")" + childDigests.toString();
+            String result = "Union(" + (all ? "ALL" : "DISTINCT") + ")" + childDigests.toString();
+            path.remove(rel);
+            return result;
         }
         if (rel instanceof TableScan ts) { // Table scan: include fully qualified name
-            return "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
+            String result = "Scan(" + String.join(".", ts.getTable().getQualifiedName()) + ")";
+            path.remove(rel);
+            return result;
         }
         if (rel instanceof LogicalSort s) { // Sort/Limit: ignore sort keys, keep fetch/offset presence
             String fetch = s.fetch == null ? "" : ("fetch=" + canonicalizeRex(s.fetch));
             String offset = s.offset == null ? "" : ("offset=" + canonicalizeRex(s.offset));
             String meta = (fetch + (fetch.isEmpty() || offset.isEmpty() ? "" : ",") + offset).trim();
             String head = meta.isEmpty() ? "Sort" : ("Sort(" + meta + ")");
-            return head + "->" + canonicalDigest(s.getInput());
+            String result = head + "->" + canonicalDigestInternal(s.getInput(), path);
+            path.remove(rel);
+            return result;
         }
         // Default: normalized string of this node with placeholders, plus canonical children
         String typeName = rel.getRelTypeName();
@@ -462,11 +544,13 @@ public class Calcite {
         boolean first = true;
         for (RelNode in : rel.getInputs()) {
             if (!first) sb.append("|"); // separate child digests
-            sb.append(canonicalDigest(in));
+            sb.append(canonicalDigestInternal(in, path));
             first = false;
         }
         sb.append("]");
-        return sb.toString();
+        String result = sb.toString();
+        path.remove(rel);
+        return result;
     }
     
     /**
@@ -501,7 +585,7 @@ public class Calcite {
                 case GREATER_THAN, GREATER_THAN_OR_EQUAL, LESS_THAN, LESS_THAN_OR_EQUAL -> {
                     // Normalize > to < with operands swapped; >= to <= with operands swapped.
                     boolean flipToLess = (kind == SqlKind.GREATER_THAN || kind == SqlKind.GREATER_THAN_OR_EQUAL);
-                    String left = parts.size() > 0 ? parts.get(0) : "?";
+                    String left = !parts.isEmpty() ? parts.get(0) : "?";
                     String right = parts.size() > 1 ? parts.get(1) : "?";
                     String finalOp;
                     if (flipToLess) {
@@ -531,6 +615,43 @@ public class Calcite {
             }
         }
         return normalizeDigest(n.toString());
+    }
+
+    // Helper: collect factors and conditions from a nested INNER join tree
+    private static void collectInnerJoinFactors(RelNode node, List<RelNode> factors, List<RexNode> conds) {
+        // Unwrap trivial projection (all input refs) to reach a deeper join
+        if (node instanceof LogicalProject p) {
+            boolean onlyRefs = true;
+            for (RexNode e : p.getProjects()) {
+                if (!(e instanceof RexInputRef)) { onlyRefs = false; break; }
+            }
+            if (onlyRefs) {
+                collectInnerJoinFactors(p.getInput(), factors, conds);
+                return;
+            }
+        }
+        if (node instanceof LogicalJoin j && j.getJoinType() == JoinRelType.INNER) {
+            if (j.getCondition() != null) {
+                conds.add(j.getCondition());
+            }
+            collectInnerJoinFactors(j.getLeft(), factors, conds);
+            collectInnerJoinFactors(j.getRight(), factors, conds);
+        } else {
+            factors.add(node);
+        }
+    }
+
+    // Helper: decompose a condition into conjuncts, canonicalize each, and add to output
+    private static void decomposeConj(RexNode cond, List<String> out) {
+        if (cond == null) return;
+        RexNode n = stripAllCasts(cond);
+        if (n instanceof RexCall call && call.getOperator() != null && call.getOperator().getKind() == SqlKind.AND) {
+            for (RexNode op : call.getOperands()) decomposeConj(op, out);
+        } else {
+            String s = canonicalizeRex(n);
+            if ("true".equalsIgnoreCase(s)) return; // drop no-op conjuncts
+            out.add(s);
+        }
     }
     /**
      * Recursively strip all CASTs from a RexNode tree.
@@ -710,6 +831,106 @@ public class Calcite {
         return t == null ? "null" : t.canonicalDigest();
     }
 
+    // Registry mapping lowercase transformation keys to rule-adder consumers.
+    private static final Map<String, Consumer<HepProgramBuilder>> RULE_MAP = new HashMap<>();
+    static {
+        RULE_MAP.put("aggregateexpanddistinctaggregatesrule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_EXPAND_DISTINCT_AGGREGATES));
+        RULE_MAP.put("aggregateextractprojectrule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_EXPAND_DISTINCT_AGGREGATES));
+        RULE_MAP.put("aggregatefiltertocaserule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_CASE_TO_FILTER));
+        RULE_MAP.put("aggregatefiltertransposerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_FILTER_TRANSPOSE));
+        RULE_MAP.put("aggregatejoinjoinremoverule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_JOIN_REMOVE));
+        RULE_MAP.put("aggregatejoinremoverule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_REMOVE));
+        RULE_MAP.put("aggregatejointransposerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE));
+        RULE_MAP.put("aggregatemergerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_MERGE));
+        RULE_MAP.put("aggregateprojectmergerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_MERGE));
+        RULE_MAP.put("aggregateprojectpullupconstantsrule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS));
+        RULE_MAP.put("aggregateprojectstartablerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_STAR_TABLE));
+        RULE_MAP.put("aggregatereducefunctionsrule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_REDUCE_FUNCTIONS));
+        RULE_MAP.put("aggregateremoverule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_REMOVE));
+        RULE_MAP.put("aggregatestartablerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_STAR_TABLE));
+        RULE_MAP.put("aggregateunionaggregaterule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_UNION_AGGREGATE));
+        RULE_MAP.put("aggregateuniontransposerule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_UNION_TRANSPOSE));
+        RULE_MAP.put("aggregatevaluesrule", pb -> pb.addRuleInstance(CoreRules.AGGREGATE_VALUES));
+        RULE_MAP.put("calcmergerule", pb -> pb.addRuleInstance(CoreRules.CALC_MERGE));
+        RULE_MAP.put("calcremoverule", pb -> pb.addRuleInstance(CoreRules.CALC_REMOVE));
+        RULE_MAP.put("calcsplitrule", pb -> pb.addRuleInstance(CoreRules.CALC_SPLIT));
+        RULE_MAP.put("filteraggregatetransposerule", pb -> pb.addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE));
+        RULE_MAP.put("filtercalcmergerule", pb -> pb.addRuleInstance(CoreRules.FILTER_CALC_MERGE));
+        RULE_MAP.put("filtercorrelaterule", pb -> pb.addRuleInstance(CoreRules.FILTER_CORRELATE));
+        RULE_MAP.put("filterjoinrule.filterintojoinrule", pb -> pb.addRuleInstance(CoreRules.FILTER_INTO_JOIN));
+        RULE_MAP.put("filterjoinrule.joinconditionpushrule", pb -> pb.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH));
+        RULE_MAP.put("filtermergerule", pb -> pb.addRuleInstance(CoreRules.FILTER_MERGE));
+        RULE_MAP.put("filtermultijoinmergerule", pb -> pb.addRuleInstance(CoreRules.FILTER_MULTI_JOIN_MERGE));
+        RULE_MAP.put("filterprojecttransposerule", pb -> pb.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE));
+        RULE_MAP.put("filtersampletransposerule", pb -> pb.addRuleInstance(CoreRules.FILTER_SAMPLE_TRANSPOSE));
+        RULE_MAP.put("filtersetoptransposerule", pb -> pb.addRuleInstance(CoreRules.FILTER_SET_OP_TRANSPOSE));
+        RULE_MAP.put("filtertablefunctiontransposerule", pb -> pb.addRuleInstance(CoreRules.FILTER_TABLE_FUNCTION_TRANSPOSE));
+        RULE_MAP.put("filtertocalcrule", pb -> pb.addRuleInstance(CoreRules.FILTER_TO_CALC));
+        RULE_MAP.put("filterwindowtransposerule", pb -> pb.addRuleInstance(CoreRules.FILTER_WINDOW_TRANSPOSE));
+        RULE_MAP.put("joinaddredundantsemijoinrule", pb -> pb.addRuleInstance(CoreRules.JOIN_ADD_REDUNDANT_SEMI_JOIN));
+        RULE_MAP.put("joinassociaterule", pb -> pb.addRuleInstance(CoreRules.JOIN_ASSOCIATE));
+        RULE_MAP.put("joincommuterule", pb -> pb.addRuleInstance(CoreRules.JOIN_COMMUTE));
+        RULE_MAP.put("joinderiveisnotnullfilterrule", pb -> pb.addRuleInstance(CoreRules.JOIN_DERIVE_IS_NOT_NULL_FILTER_RULE));
+        RULE_MAP.put("joinextractfilterrule", pb -> pb.addRuleInstance(CoreRules.JOIN_EXTRACT_FILTER));
+        RULE_MAP.put("joinprojectbothtransposerule", pb -> pb.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE));
+        RULE_MAP.put("joinprojectlefttransposerule", pb -> pb.addRuleInstance(CoreRules.JOIN_PROJECT_LEFT_TRANSPOSE));
+        RULE_MAP.put("joinprojectrighttransposerule", pb -> pb.addRuleInstance(CoreRules.JOIN_PROJECT_RIGHT_TRANSPOSE));
+        RULE_MAP.put("joinpushexpressionsrule", pb -> pb.addRuleInstance(CoreRules.JOIN_PUSH_EXPRESSIONS));
+        RULE_MAP.put("joinpushtransitivepredicatesrule", pb -> pb.addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES));
+        RULE_MAP.put("jointocorrelaterule", pb -> pb.addRuleInstance(CoreRules.JOIN_TO_CORRELATE));
+        RULE_MAP.put("jointomultijoinrule", pb -> pb.addRuleInstance(CoreRules.JOIN_TO_MULTI_JOIN));
+        RULE_MAP.put("joinleftuniontransposerule", pb -> pb.addRuleInstance(CoreRules.JOIN_LEFT_UNION_TRANSPOSE));
+        RULE_MAP.put("joinrightuniontransposerule", pb -> pb.addRuleInstance(CoreRules.JOIN_RIGHT_UNION_TRANSPOSE));
+        RULE_MAP.put("minusmergerule", pb -> pb.addRuleInstance(CoreRules.MINUS_MERGE));
+        RULE_MAP.put("minustodistinctrule", pb -> pb.addRuleInstance(CoreRules.MINUS_TO_DISTINCT));
+        RULE_MAP.put("projectaggregatemergerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_AGGREGATE_MERGE));
+        RULE_MAP.put("projectcalcmergerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_CALC_MERGE));
+        RULE_MAP.put("projectcorrelatetransposerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_CORRELATE_TRANSPOSE));
+        RULE_MAP.put("projectfiltertransposerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE));
+        RULE_MAP.put("projectjoinjoinremoverule", pb -> pb.addRuleInstance(CoreRules.PROJECT_JOIN_JOIN_REMOVE));
+        RULE_MAP.put("projectjoinremoverule", pb -> pb.addRuleInstance(CoreRules.PROJECT_JOIN_REMOVE));
+        RULE_MAP.put("projectjointransposerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE));
+        RULE_MAP.put("projectmergerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_MERGE));
+        RULE_MAP.put("projectmultijoinmergerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_MULTI_JOIN_MERGE));
+        RULE_MAP.put("projectremoverule", pb -> pb.addRuleInstance(CoreRules.PROJECT_REMOVE));
+        RULE_MAP.put("projectsetoptransposerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_SET_OP_TRANSPOSE));
+        RULE_MAP.put("projecttocalcrule", pb -> pb.addRuleInstance(CoreRules.PROJECT_TO_CALC));
+        RULE_MAP.put("projecttowindowrule", pb -> pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE));
+        RULE_MAP.put("projecttowindowrule.calctowindowrule", pb -> pb.addRuleInstance(CoreRules.CALC_TO_WINDOW));
+        RULE_MAP.put("projecttowindowrule.projecttologicalprojectandwindowrule", pb -> pb.addRuleInstance(CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW));
+        RULE_MAP.put("projectwindowtransposerule", pb -> pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE));
+        RULE_MAP.put("reducedecimalsrule", pb -> pb.addRuleInstance(CoreRules.CALC_REDUCE_DECIMALS));
+        RULE_MAP.put("reduceexpressionsrule.calcreduceexpressionsrule", pb -> pb.addRuleInstance(CoreRules.CALC_REDUCE_EXPRESSIONS));
+        RULE_MAP.put("reduceexpressionsrule.filterreduceexpressionsrule", pb -> pb.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS));
+        RULE_MAP.put("reduceexpressionsrule.joinreduceexpressionsrule", pb -> pb.addRuleInstance(CoreRules.JOIN_REDUCE_EXPRESSIONS));
+        RULE_MAP.put("reduceexpressionsrule.projectreduceexpressionsrule", pb -> pb.addRuleInstance(CoreRules.PROJECT_REDUCE_EXPRESSIONS));
+        RULE_MAP.put("reduceexpressionsrule.windowreduceexpressionsrule", pb -> pb.addRuleInstance(CoreRules.WINDOW_REDUCE_EXPRESSIONS));
+        RULE_MAP.put("semijoinfiltertransposerule", pb -> pb.addRuleInstance(CoreRules.SEMI_JOIN_FILTER_TRANSPOSE));
+        RULE_MAP.put("semijoinjointransposerule", pb -> pb.addRuleInstance(CoreRules.SEMI_JOIN_JOIN_TRANSPOSE));
+        RULE_MAP.put("semijoinprojecttransposerule", pb -> pb.addRuleInstance(CoreRules.SEMI_JOIN_PROJECT_TRANSPOSE));
+        RULE_MAP.put("semijoinremoverule", pb -> pb.addRuleInstance(CoreRules.SEMI_JOIN_REMOVE));
+        RULE_MAP.put("semijoinrule.joinonuniquetosemijoinrule", pb -> pb.addRuleInstance(CoreRules.JOIN_ON_UNIQUE_TO_SEMI_JOIN));
+        RULE_MAP.put("semijoinrule.jointosemijoinrule", pb -> pb.addRuleInstance(CoreRules.JOIN_TO_SEMI_JOIN));
+        RULE_MAP.put("semijoinrule.projecttosemijoinrule", pb -> pb.addRuleInstance(CoreRules.PROJECT_TO_SEMI_JOIN));
+        RULE_MAP.put("sortjoincopyrule", pb -> pb.addRuleInstance(CoreRules.SORT_JOIN_COPY));
+        RULE_MAP.put("sortjointransposerule", pb -> pb.addRuleInstance(CoreRules.SORT_JOIN_TRANSPOSE));
+        RULE_MAP.put("sortprojecttransposerule", pb -> pb.addRuleInstance(CoreRules.SORT_PROJECT_TRANSPOSE));
+        RULE_MAP.put("sortremoveconstantkeysrule", pb -> pb.addRuleInstance(CoreRules.SORT_REMOVE_CONSTANT_KEYS));
+        RULE_MAP.put("sortremoveredundantrule", pb -> pb.addRuleInstance(CoreRules.SORT_REMOVE_REDUNDANT));
+        RULE_MAP.put("sortremoverule", pb -> pb.addRuleInstance(CoreRules.SORT_REMOVE));
+        RULE_MAP.put("sortuniontransposerule", pb -> pb.addRuleInstance(CoreRules.SORT_UNION_TRANSPOSE));
+        RULE_MAP.put("unionmergerule", pb -> pb.addRuleInstance(CoreRules.UNION_MERGE));
+        RULE_MAP.put("unionpullupconstantsrule", pb -> pb.addRuleInstance(CoreRules.UNION_PULL_UP_CONSTANTS));
+        RULE_MAP.put("uniontodistrictrule", pb -> pb.addRuleInstance(CoreRules.UNION_TO_DISTINCT));
+        RULE_MAP.put("coerceinputsrule", pb -> pb.addRuleInstance(CoreRules.COERCE_INPUTS));
+        RULE_MAP.put("exchangeremoveconstantkeysrule", pb -> pb.addRuleInstance(CoreRules.EXCHANGE_REMOVE_CONSTANT_KEYS));
+        RULE_MAP.put("intersecttodistrictrule", pb -> pb.addRuleInstance(CoreRules.INTERSECT_TO_DISTINCT));
+        RULE_MAP.put("matchrule", pb -> pb.addRuleInstance(CoreRules.MATCH));
+        RULE_MAP.put("multijoinoptimizebushyrule", pb -> pb.addRuleInstance(CoreRules.MULTI_JOIN_OPTIMIZE_BUSHY));
+        RULE_MAP.put("sampletofilterrule", pb -> pb.addRuleInstance(CoreRules.SAMPLE_TO_FILTER));
+        RULE_MAP.put("tablescanrule", pb -> pb.addRuleInstance(CoreRules.PROJECT_TABLE_SCAN));
+    }
+
     // (Removed) stripTopLevelCasts: superseded by stripAllCasts which handles recursive CAST removal
 
     /**
@@ -729,141 +950,89 @@ public class Calcite {
 
     //System.out.println("RelTree before transformations: \n" + buildRelTree(newRel).toString());
 
-        for (String transform : transformations)
-        {
-            String key = transform == null ? "" : transform.toLowerCase();
-            HepProgramBuilder pb = new HepProgramBuilder();
-            boolean recognized = true;
-            switch (key)
-            {
-                //aggregate rules
-                case "AggregateExpandDistinctAggregatesRule": pb.addRuleInstance(CoreRules.AGGREGATE_EXPAND_DISTINCT_AGGREGATES); break;
-                case "AggregateExtractProjectRule": pb.addRuleInstance(CoreRules.AGGREGATE_EXPAND_DISTINCT_AGGREGATES); break;
-                case "AggregateFilterToCaseRule": pb.addRuleInstance(CoreRules.AGGREGATE_CASE_TO_FILTER); break;
-                case "AggregateFilterTransposeRule": pb.addRuleInstance(CoreRules.AGGREGATE_FILTER_TRANSPOSE); break;
-                case "AggregateJoinJoinRemoveRule": pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_JOIN_REMOVE); break;
-                case "AggregateJoinRemoveRule": pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_REMOVE); break;
-                case "AggregateJoinTransposeRule": pb.addRuleInstance(CoreRules.AGGREGATE_JOIN_TRANSPOSE); break;
-                case "AggregateMergeRule": pb.addRuleInstance(CoreRules.AGGREGATE_MERGE); break;
-                case "AggregateProjectMergeRule": pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_MERGE); break;
-                case "AggregateProjectPullUpConstantsRule": pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS); break;
-                case "AggregateProjectStarTableRule": pb.addRuleInstance(CoreRules.AGGREGATE_PROJECT_STAR_TABLE); break;
-                case "AggregateReduceFunctionsRule": pb.addRuleInstance(CoreRules.AGGREGATE_REDUCE_FUNCTIONS); break;
-                case "AggregateRemoveRule": pb.addRuleInstance(CoreRules.AGGREGATE_REMOVE); break;
-                case "AggregateStarTableRule": pb.addRuleInstance(CoreRules.AGGREGATE_STAR_TABLE); break;
-                case "AggregateUnionAggregateRule": pb.addRuleInstance(CoreRules.AGGREGATE_UNION_AGGREGATE); break;
-                case "AggregateUnionTransposeRule": pb.addRuleInstance(CoreRules.AGGREGATE_UNION_TRANSPOSE); break;
-                case "AggregateValuesRule": pb.addRuleInstance(CoreRules.AGGREGATE_VALUES); break;
-                
-                //calc rules
-                case "CalcMergeRule": pb.addRuleInstance(CoreRules.CALC_MERGE); break;
-                case "CalcRemoveRule": pb.addRuleInstance(CoreRules.CALC_REMOVE); break;
-                case "CalcSplitRule": pb.addRuleInstance(CoreRules.CALC_SPLIT); break;
-
-                //filter rules
-                case "FilterAggregateTransposeRule": pb.addRuleInstance(CoreRules.FILTER_AGGREGATE_TRANSPOSE); break;
-                case "FilterCalcMergeRule": pb.addRuleInstance(CoreRules.FILTER_CALC_MERGE); break;
-                case "FilterCorrelateRule": pb.addRuleInstance(CoreRules.FILTER_CORRELATE); break;
-                case "FilterJoinRule.FilterIntoJoinRule": pb.addRuleInstance(CoreRules.FILTER_INTO_JOIN); break;
-                case "FilterJoinRule.JoinConditionPushRule": pb.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH); break;
-                case "FilterMergeRule": pb.addRuleInstance(CoreRules.FILTER_MERGE); break;
-                case "FilterMultiJoinMergeRule": pb.addRuleInstance(CoreRules.FILTER_MULTI_JOIN_MERGE); break;
-                case "FilterProjectTransposeRule": pb.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE); break;
-                case "FilterSampleTransposeRule": pb.addRuleInstance(CoreRules.FILTER_SAMPLE_TRANSPOSE); break;
-                case "FilterSetOpTransposeRule": pb.addRuleInstance(CoreRules.FILTER_SET_OP_TRANSPOSE); break;
-                case "FilterTableFunctionTransposeRule": pb.addRuleInstance(CoreRules.FILTER_TABLE_FUNCTION_TRANSPOSE); break;
-                case "FilterToCalcRule": pb.addRuleInstance(CoreRules.FILTER_TO_CALC); break;
-                case "FilterWindowTransposeRule": pb.addRuleInstance(CoreRules.FILTER_WINDOW_TRANSPOSE); break;
-                
-                //join rules
-                case "JoinAddRedundantSemiJoinRule": pb.addRuleInstance(CoreRules.JOIN_ADD_REDUNDANT_SEMI_JOIN); break;
-                case "JoinAssociateRule": pb.addRuleInstance(CoreRules.JOIN_ASSOCIATE); break;
-                case "JoinCommuteRule": pb.addRuleInstance(CoreRules.JOIN_COMMUTE); break;
-                case "JoinDeriveIsNotNullFilterRule": pb.addRuleInstance(CoreRules.JOIN_DERIVE_IS_NOT_NULL_FILTER_RULE); break;
-                case "JoinExtractFilterRule": pb.addRuleInstance(CoreRules.JOIN_EXTRACT_FILTER); break;
-                case "JoinProjectBothTransposeRule": pb.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE); break;
-                case "JoinProjectLeftTransposeRule": pb.addRuleInstance(CoreRules.JOIN_PROJECT_LEFT_TRANSPOSE); break;
-                case "JoinProjectRightTransposeRule": pb.addRuleInstance(CoreRules.JOIN_PROJECT_RIGHT_TRANSPOSE); break;
-                case "JoinPushExpressionsRule": pb.addRuleInstance(CoreRules.JOIN_PUSH_EXPRESSIONS); break;
-                case "JoinPushTransitivePredicatesRule": pb.addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES); break;
-                case "JoinToCorrelateRule": pb.addRuleInstance(CoreRules.JOIN_TO_CORRELATE); break;
-                case "JoinToMultiJoinRule": pb.addRuleInstance(CoreRules.JOIN_TO_MULTI_JOIN); break;
-                case "JoinLeftUnionTransposeRule": pb.addRuleInstance(CoreRules.JOIN_LEFT_UNION_TRANSPOSE); break;
-                case "JoinRightUnionTransposeRule": pb.addRuleInstance(CoreRules.JOIN_RIGHT_UNION_TRANSPOSE); break;
-
-                //minus rules
-                case "MinusMergeRule": pb.addRuleInstance(CoreRules.MINUS_MERGE); break;
-                case "MinusToDistinctRule": pb.addRuleInstance(CoreRules.MINUS_TO_DISTINCT); break;
-
-                //project rules
-                case "ProjectAggregateMergeRule": pb.addRuleInstance(CoreRules.PROJECT_AGGREGATE_MERGE); break;
-                case "ProjectCalcMergeRule": pb.addRuleInstance(CoreRules.PROJECT_CALC_MERGE); break;
-                case "ProjectCorrelateTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_CORRELATE_TRANSPOSE); break;
-                case "ProjectFilterTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE); break;
-                case "ProjectJoinJoinRemoveRule": pb.addRuleInstance(CoreRules.PROJECT_JOIN_JOIN_REMOVE); break;
-                case "ProjectJoinRemoveRule": pb.addRuleInstance(CoreRules.PROJECT_JOIN_REMOVE); break;
-                case "ProjectJoinTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE); break;
-                case "ProjectMergeRule": pb.addRuleInstance(CoreRules.PROJECT_MERGE); break;
-                case "ProjectMultiJoinMergeRule": pb.addRuleInstance(CoreRules.PROJECT_MULTI_JOIN_MERGE); break;
-                case "ProjectRemoveRule": pb.addRuleInstance(CoreRules.PROJECT_REMOVE); break;
-                case "ProjectSetOpTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_SET_OP_TRANSPOSE); break;
-                case "ProjectToCalcRule": pb.addRuleInstance(CoreRules.PROJECT_TO_CALC); break;
-                case "ProjectToWindowRule": pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE); break;
-                case "ProjectToWindowRule.CalcToWindowRule": pb.addRuleInstance(CoreRules.CALC_TO_WINDOW); break;
-                case "ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule": pb.addRuleInstance(CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW); break;
-                case "ProjectWindowTransposeRule": pb.addRuleInstance(CoreRules.PROJECT_WINDOW_TRANSPOSE); break;
-
-                //reduce rules
-                case "ReduceDecimalsRule": pb.addRuleInstance(CoreRules.CALC_REDUCE_DECIMALS); break;
-                case "ReduceExpressionsRule.CalcReduceExpressionsRule": pb.addRuleInstance(CoreRules.CALC_REDUCE_EXPRESSIONS); break;
-                case "ReduceExpressionsRule.FilterReduceExpressionsRule": pb.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS); break;
-                case "ReduceExpressionsRule.JoinReduceExpressionsRule": pb.addRuleInstance(CoreRules.JOIN_REDUCE_EXPRESSIONS); break;
-                case "ReduceExpressionsRule.ProjectReduceExpressionsRule": pb.addRuleInstance(CoreRules.PROJECT_REDUCE_EXPRESSIONS); break;
-                case "ReduceExpressionsRule.WindowReduceExpressionsRule": pb.addRuleInstance(CoreRules.WINDOW_REDUCE_EXPRESSIONS); break;
-
-                //semi join rules
-                case "SemiJoinFilterTransposeRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_FILTER_TRANSPOSE); break;
-                case "SemiJoinJoinTransposeRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_JOIN_TRANSPOSE); break;
-                case "SemiJoinProjectTransposeRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_PROJECT_TRANSPOSE); break;
-                case "SemiJoinRemoveRule": pb.addRuleInstance(CoreRules.SEMI_JOIN_REMOVE); break;
-                case "SemiJoinRule.JoinOnUniqueToSemiJoinRule": pb.addRuleInstance(CoreRules.JOIN_ON_UNIQUE_TO_SEMI_JOIN); break;
-                case "SemiJoinRule.JoinToSemiJoinRule": pb.addRuleInstance(CoreRules.JOIN_TO_SEMI_JOIN); break;
-                case "SemiJoinRule.ProjectToSemiJoinRule": pb.addRuleInstance(CoreRules.PROJECT_TO_SEMI_JOIN); break;
-
-                //sort rules
-                case "SortJoinCopyRule": pb.addRuleInstance(CoreRules.SORT_JOIN_COPY); break;
-                case "SortJoinTransposeRule": pb.addRuleInstance(CoreRules.SORT_JOIN_TRANSPOSE); break;
-                case "SortProjectTransposeRule": pb.addRuleInstance(CoreRules.SORT_PROJECT_TRANSPOSE); break;
-                case "SortRemoveConstantKeysRule": pb.addRuleInstance(CoreRules.SORT_REMOVE_CONSTANT_KEYS); break;
-                case "SortRemoveRedundantRule": pb.addRuleInstance(CoreRules.SORT_REMOVE_REDUNDANT); break;
-                case "SortRemoveRule": pb.addRuleInstance(CoreRules.SORT_REMOVE); break;
-                case "SortUnionTransposeRule": pb.addRuleInstance(CoreRules.SORT_UNION_TRANSPOSE); break;
-
-                //union rules
-                case "UnionMergeRule": pb.addRuleInstance(CoreRules.UNION_MERGE); break;
-                case "UnionPullUpConstantsRule": pb.addRuleInstance(CoreRules.UNION_PULL_UP_CONSTANTS); break;
-                case "UnionToDistinctRule": pb.addRuleInstance(CoreRules.UNION_TO_DISTINCT); break;
-
-                //additional rules
-                case "CoerceInputsRule": pb.addRuleInstance(CoreRules.COERCE_INPUTS); break;
-                case "ExchangeRemoveConstantKeysRule": pb.addRuleInstance(CoreRules.EXCHANGE_REMOVE_CONSTANT_KEYS); break;
-                case "IntersectToDistinctRule": pb.addRuleInstance(CoreRules.INTERSECT_TO_DISTINCT); break;
-                case "MatchRule": pb.addRuleInstance(CoreRules.MATCH); break;
-                case "MultiJoinOptimizeBushyRule": pb.addRuleInstance(CoreRules.MULTI_JOIN_OPTIMIZE_BUSHY); break;
-                case "SampleToFilterRule": pb.addRuleInstance(CoreRules.SAMPLE_TO_FILTER); break;
-                case "TableScanRule": pb.addRuleInstance(CoreRules.PROJECT_TABLE_SCAN); break;
+        // Build a composite Hep program containing all requested rules and
+        // apply them together to reach a better fixpoint than one-by-one.
+        java.util.List<Consumer<HepProgramBuilder>> ruleAdders = new java.util.ArrayList<>();
+        for (String transform : transformations) {
+            String key = transform == null ? "" : transform.trim().toLowerCase();
+            Consumer<HepProgramBuilder> adder = RULE_MAP.get(key);
+            if (adder != null) ruleAdders.add(adder);
+        }
+        if (!ruleAdders.isEmpty()) {
+            // Optional: iterate a few times to ensure convergence if rules enable each other
+            for (int pass = 0; pass < 3; pass++) {
+                String before = RelOptUtil.toString(newRel, SqlExplainLevel.DIGEST_ATTRIBUTES);
+                HepProgramBuilder pb = new HepProgramBuilder();
+                pb.addMatchOrder(HepMatchOrder.TOP_DOWN);
+                pb.addMatchLimit(1000);
+                for (Consumer<HepProgramBuilder> adder : ruleAdders) adder.accept(pb);
+                HepPlanner planner = new HepPlanner(pb.build());
+                planner.setRoot(newRel);
+                RelNode result = planner.findBestExp();
+                String after = RelOptUtil.toString(result, SqlExplainLevel.DIGEST_ATTRIBUTES);
+                newRel = result;
+                if (before.equals(after)) break; // reached fixpoint
             }
-
-            if (!recognized) continue;
-
-            HepPlanner planner = new HepPlanner(pb.build()); // one-off planner for this rule set
-            planner.setRoot(newRel);                          // apply to the latest plan
-            RelNode result = planner.findBestExp();           // run and get transformed plan
-            newRel = result;
         }
 
     //System.out.println("RelTree after transformations: \n" + buildRelTree(newRel).toString());
 
         return newRel;
+    }
+
+    /**
+     * Remove scalar/sub-query expressions and decorrelate correlates to normalized joins/aggregates.
+     * This helps align logically equivalent forms where one side uses SCALAR_QUERY with correlation and
+     * the other side uses a join + aggregate after decorrelation.
+        *
+        * <p>Notes:</p>
+        * <ul>
+        *   <li>This method is best-effort: decorrelation can fail or be inapplicable for some plans, in which case
+        *       the original plan is returned unchanged.</li>
+        *   <li>It is invoked symmetrically on both sides prior to comparison to improve chance of alignment
+        *       between scalar-subquery and join+aggregate representations.</li>
+        * </ul>
+     */
+    private static RelNode normalizeSubqueriesAndDecorrelate(RelNode rel) {
+        if (rel == null) return null;
+
+        RelNode cur = rel;
+        // First, apply sub-query removal rules to convert RexSubQuery into relational operators (often Correlate/Join+Agg)
+        HepProgramBuilder subq = new HepProgramBuilder();
+        subq.addMatchOrder(HepMatchOrder.TOP_DOWN);
+        subq.addMatchLimit(1000);
+        // Convert RexSubQuery to correlates/joins
+        subq.addRuleInstance(CoreRules.FILTER_SUB_QUERY_TO_CORRELATE);
+        subq.addRuleInstance(CoreRules.PROJECT_SUB_QUERY_TO_CORRELATE);
+        subq.addRuleInstance(CoreRules.JOIN_SUB_QUERY_TO_CORRELATE);
+        // Clean up after rewrites
+        subq.addRuleInstance(CoreRules.PROJECT_MERGE);
+        subq.addRuleInstance(CoreRules.PROJECT_REMOVE);
+        subq.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+        HepPlanner hp = new HepPlanner(subq.build());
+        hp.setRoot(cur);
+        cur = hp.findBestExp();
+
+        // Then, decorrelate to transform LogicalCorrelate into joins when possible
+        try {
+            cur = RelDecorrelator.decorrelateQuery(cur);
+        } catch (Throwable t) {
+            // Best-effort: if decorrelation not applicable, keep the current plan
+        }
+
+        // Optional additional cleanup (harmless if not needed)
+        HepProgramBuilder cleanup = new HepProgramBuilder();
+        cleanup.addMatchOrder(HepMatchOrder.TOP_DOWN);
+        cleanup.addMatchLimit(1000);
+        cleanup.addRuleInstance(CoreRules.FILTER_CORRELATE);
+        cleanup.addRuleInstance(CoreRules.PROJECT_CORRELATE_TRANSPOSE);
+        cleanup.addRuleInstance(CoreRules.PROJECT_MERGE);
+        cleanup.addRuleInstance(CoreRules.PROJECT_REMOVE);
+        cleanup.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+        HepPlanner hp2 = new HepPlanner(cleanup.build());
+        hp2.setRoot(cur);
+        cur = hp2.findBestExp();
+
+        return cur;
     }
 }

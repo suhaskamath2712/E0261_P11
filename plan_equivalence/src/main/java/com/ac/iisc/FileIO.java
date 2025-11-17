@@ -55,21 +55,8 @@ import java.util.regex.Pattern;
  * Small, focused I/O utility. All methods are static for easy reuse from any
  * part of the application (CLI tools, tests, calcite helpers, etc.).
  */
-public class FileIO {
-
-	// Base directory for original query plans
-	private static final Path ORIGINAL_PLANS_DIR = Paths.get(
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\LITHE_Queries\\standard_queries.sql");
-
-	// Base directory for rewritten query plans
-	private static final Path REWRITTEN_PLANS_DIR = Paths.get(
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\LITHE_Queries\\rewritten_queries.sql");
-
-	// Base directory for mutated query plans
-	private static final Path MUTATED_PLANS_DIR = Paths.get(
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\mutated_query_plans");
-
-
+public class FileIO 
+{
 	// Absolute paths to the SQL collections (under the sql_queries/ folder)
 	private static final String ORIGINAL_SQL_PATH =
 			"C:\\Users\\suhas\\Downloads\\E0261_P11\\LITHE_Queries\\standard_queries.sql";
@@ -139,6 +126,28 @@ public class FileIO {
 	}
 
 	/**
+	 * List all Query IDs present in the given SQL source file, in the order they
+	 * appear, de-duplicated. The Query ID is taken as the token after
+	 * "-- Query ID:" up to the first whitespace or '('.
+	 */
+	public static java.util.List<String> listQueryIds(SqlSource source) throws IOException {
+		final String path = switch (source) {
+			case ORIGINAL -> ORIGINAL_SQL_PATH;
+			case REWRITTEN -> REWRITTEN_SQL_PATH;
+			case MUTATED -> MUTATED_SQL_PATH;
+		};
+		String content = readTextFile(path);
+		java.util.LinkedHashSet<String> ids = new java.util.LinkedHashSet<>();
+		Pattern idLine = Pattern.compile("(?m)^--\\s*Query ID:\\s*([^\n\r( ]+)" );
+		Matcher m = idLine.matcher(content);
+		while (m.find()) {
+			String id = m.group(1).trim();
+			if (!id.isEmpty()) ids.add(id);
+		}
+		return new java.util.ArrayList<>(ids);
+	}
+
+	/**
 	 * Parse the given SQL file content and extract the SQL text for the section
 	 * that corresponds to the provided Query ID.
 	 */
@@ -172,74 +181,6 @@ public class FileIO {
 			// No more headers; consume until EOF
 			return fileContent.substring(sqlStart).trim();
 		}
-	}
-	
-
-	/**
-	 * Internal helper to read a plan JSON file for a given query ID from a folder.
-	 *
-	 * Behavior:
-	 *  - If queryId ends with ".json", it is treated as a file name (no change).
-	 *  - Otherwise, ".json" is appended to form the file name.
-	 *  - Reads the file content as UTF-8 and returns it as a String.
-	 *
-	 * @param baseDir The directory that contains the plan files (e.g., ORIGINAL_PLANS_DIR)
-	 * @param queryId The query identifier (e.g., "TPCH_Q11" or "TPCH_Q11.json")
-	 * @return JSON content as a String (UTF-8)
-	 * @throws IllegalArgumentException if queryId is null or blank
-	 * @throws IOException if file does not exist or cannot be read
-	 */
-	private static String readPlanFrom(Path baseDir, String queryId) throws IOException {
-		if (queryId == null || queryId.isBlank()) {
-			throw new IllegalArgumentException("queryId must not be null or blank");
-		}
-		// Accept both bare IDs and explicit filenames.
-		String fileName = queryId.endsWith(".json") ? queryId : queryId + ".json";
-		Path filePath = baseDir.resolve(fileName);
-		if (!Files.exists(filePath)) {
-			throw new IOException("Plan file not found: " + filePath.toString());
-		}
-		// Read and return raw JSON content (callers can parse if needed).
-		return Files.readString(filePath, StandardCharsets.UTF_8);
-	}
-
-	/**
-	 * Reads and returns the JSON plan content for a given query ID from the
-	 * original_query_plans folder.
-	 *
-	 * @param queryId The identifier of the query (with or without .json extension)
-	 * @return JSON content as a String (UTF-8)
-	 * @throws IllegalArgumentException if queryId is null or blank
-	 * @throws IOException if the file does not exist or cannot be read
-	 */
-	public static String readOriginalQueryPlan(String queryId) throws IOException {
-		return readPlanFrom(ORIGINAL_PLANS_DIR, queryId);
-	}
-
-	/**
-	 * Reads and returns the JSON plan for a given query ID from the
-	 * rewritten_query_plans folder.
-	 *
-	 * @param queryId The identifier of the query (with or without .json extension)
-	 * @return JSON content as a String (UTF-8)
-	 * @throws IllegalArgumentException if queryId is null or blank
-	 * @throws IOException if the file does not exist or cannot be read
-	 */
-	public static String readRewrittenQueryPlan(String queryId) throws IOException {
-		return readPlanFrom(REWRITTEN_PLANS_DIR, queryId);
-	}
-
-	/**
-	 * Reads and returns the JSON plan for a given query ID from the
-	 * mutated_query_plans folder.
-	 *
-	 * @param queryId The identifier of the query (with or without .json extension)
-	 * @return JSON content as a String (UTF-8)
-	 * @throws IllegalArgumentException if queryId is null or blank
-	 * @throws IOException if the file does not exist or cannot be read
-	 */
-	public static String readMutatedQueryPlan(String queryId) throws IOException {
-		return readPlanFrom(MUTATED_PLANS_DIR, queryId);
 	}
 
 	/**

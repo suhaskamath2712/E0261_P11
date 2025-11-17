@@ -1,0 +1,21 @@
+Query ID: Q1	false	true	[]
+Query ID: Q2	false	true	[AggregateJoinTransposeRule, FilterJoinRule.FilterIntoJoinRule, ProjectJoinTransposeRule, AggregateProjectMergeRule, ProjectMergeRule]	false
+Query ID: Q3	false	true	[AggregateJoinTransposeRule, ProjectJoinTransposeRule]	false
+Query ID: Q4	true	
+Query ID: Q5	false	true	[SemiJoinRule.JoinToSemiJoinRule]	false
+Query ID: Q6	true	
+Query ID: Q7	true	
+Query ID: Q8	true	
+Query ID: Q9	false	true	[JoinToMultiJoinRule, MultiJoinOptimizeBushyRule]	false
+Query ID: Q10	false	true	[]
+Query ID: Q11	true	
+Query ID: Q12	false	true	[CoerceInputsRule]	false
+Query ID: Q13	true	
+Query ID: Q14	true	
+Query ID: Q15	false	true	[]
+Query ID: Q16	false	true	[SemiJoinRule, SemiJoinJoinTransposeRule, JoinAssociateRule]	false
+Query ID: Q17	true	
+Query ID: Q18	true	
+Query ID: Q19	true
+Query ID: Q21	true	
+Query ID: Q22	false	true	[]	

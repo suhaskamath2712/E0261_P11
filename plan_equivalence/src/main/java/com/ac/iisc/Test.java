@@ -24,9 +24,7 @@ public class Test
 
     //list of queries to be tested (without plain union queries)
     private static final List<String> queryIDList = List.of(
-        "Q1","Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8","Q9",
-        "Q10", "Q11", "Q12", "Q13", "Q14", "Q15",
-        "Q16", "Q17", "Q18", "Q19", "Q20", "Q21", "Q22", "Q23"
+        "Q2"
     );
 
     //Q2, Q9: Transformations that are output will crash the program
@@ -48,7 +46,7 @@ public class Test
             String sqlA = FileIO.readOriginalSqlQuery(id);
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
-            boolean result = Calcite.compareQueries(sqlA, sqlB, null);
+            boolean result = Calcite.compareQueriesDebug(sqlA, sqlB, null, id);
             System.out.print("Query ID: " + id + "\t" + result + "\t");
 
             if (result)
@@ -57,9 +55,22 @@ public class Test
                 continue; // No need to check transformations if equivalence is proved without LLM
             }
 
+            List<String> transformations = List.of(
+                "AggregateJoinTransposeRule",
+                "FilterJoinRule.FilterIntoJoinRule",
+                "ProjectJoinTransposeRule",
+                "AggregateProjectMergeRule",
+                "ProjectMergeRule"
+            );
+
+            // Apply transformations
+            result = Calcite.compareQueriesDebug(sqlA, sqlB, transformations, id);
+
+            System.out.println(result);
+
             // Try with transformations from LLM
             // Get Query Plan Transformations from LLM
-            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            /*LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
 
             boolean doesLLMThinkEquivalent = llmResponse.areQueriesEquivalent();
             System.out.print(doesLLMThinkEquivalent + "\t");
@@ -84,7 +95,7 @@ public class Test
                     System.out.println(result);
                 }
             }
-            else LLMfalse++;
+            else LLMfalse++;*/
 
             //System.out.println("---------------------------------------------------");
         }

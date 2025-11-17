@@ -6,12 +6,14 @@ This document describes the public and non-trivial internal functions, helpers, 
 
 ## Overview
 
-`Calcite.java` is a utility focused on two complementary capabilities:
+`Calcite.java` is a utility focused on parsing, normalization, and robust plan comparison. It provides:
 
 - Parsing SQL strings (and extracting SQL blocks from files) into Apache Calcite `SqlNode` (AST) instances.
-- Providing lightweight AST-level rewrites (schema-free) and a small framework to convert `SqlNode` -> `RelNode` (logical plan) and apply selected Calcite `RelOptRule` transformations via a `HepPlanner`.
+- AST-level, schema-free rewrites (syntactic transforms) and a compact framework for converting `SqlNode` -> `RelNode` (logical plan) using a JDBC-backed `FrameworkConfig`.
+- Planner-driven normalization using Calcite `RelOptRule` instances applied via `HepPlanner` programs. Rule names are looked up via a registry (`RULE_MAP`) using case-insensitive keys and composed into a single Hep program that is applied iteratively (small fixpoint attempts) to improve convergence when rules enable each other.
+- Best-effort subquery normalization: scalar subqueries (RexSubQuery) are converted to correlates and a decorrelation pass is attempted so queries expressed as SCALAR_QUERY forms can align with equivalent join+aggregate plans.
 
-The file intentionally separates syntactic (AST-level) rewrites from semantic, planner-based rule transformations. It contains helper builders to create a `FrameworkConfig` backed by a JDBC schema (so validation and conversion succeed) and helper utilities for comparison/equivalence checks.
+The file intentionally separates syntactic (AST-level) rewrites from semantic, planner-based rule transformations. It contains helper builders to create a `FrameworkConfig` backed by a JDBC schema (so validation and conversion succeed) and helper utilities for comparison/equivalence checks. Comparison is heuristic and uses multiple fallbacks (structural digest → input-ref-normalized digest → DAG-safe canonical digest → tree-canonical digest).
 
 Dependencies (required at build/runtime):
 
@@ -232,31 +234,33 @@ Notes on equivalence and correctness:
 
 ### `equivalent(String sqlA, String sqlB, FrameworkConfig config)` (public static)
 
-- Purpose: Heuristic equivalence test: parse two SQL strings to `SqlNode`, convert them to `RelNode` using the supplied `FrameworkConfig`, normalize both plans with a small deterministic rule set, and compare their stringified `RelNode` representations.
+- Purpose: Heuristic equivalence test: parse two SQL strings to `SqlNode`, convert them to `RelNode` using the supplied `FrameworkConfig`, apply planner-driven normalization (including optional named rule application and subquery decorrelation), and compare using a multi-stage digest approach.
 - Signature: `public static boolean equivalent(String sqlA, String sqlB, FrameworkConfig config) throws Exception`
 - Inputs:
   - SQL strings `sqlA` and `sqlB`
   - `config`: `FrameworkConfig` providing schema details necessary for validation and conversion
-- Output: boolean `true` if the normalized stringified plans are identical; `false` otherwise
+- Output: boolean `true` if any of the normalization/comparison stages produce equality; `false` otherwise
 - Throws: May throw parsing, validation, or conversion exceptions; the signature is broad (`throws Exception`) to surface any unexpected failure.
-- Caveats:
-  - The comparison is a heuristic; stringified plans can differ even when two queries are semantically equivalent. For higher confidence, extend normalization or compare canonical logical properties.
+- Behavior notes:
+  - Normalization performed symmetrically on both plans includes: small phased Hep optimization passes, optional `CoreRules` application via `applyTransformations`, converting scalar subqueries to correlates and attempting decorrelation to join+aggregate forms, and cleanup passes.
+  - Comparison uses multiple fallbacks in order: structural digest (Calcite digest) → input-ref-normalized digest (`$0`→`$x`) → DAG-safe canonical digest (inner-join child order-insensitive, CASTs stripped, commutative operators normalized) → tree-canonical digest (order-insensitive tree form).
+  - The approach is heuristic and designed to reduce false negatives caused by representational differences between plans.
 
 
-### `applyRelTransformations(RelNode root, String[] ruleNames)` (public static)
+### `applyTransformations(RelNode root, List<String> transformations)` (public static)
 
-- Purpose: Apply a sequence of named `RelOptRule` instances to a `RelNode` using a `HepPlanner` program. Names map to `CoreRules` entries or adapter rule collections discovered reflectively.
-- Signature: `public static RelNode applyRelTransformations(RelNode root, String[] ruleNames)`
+- Purpose: Apply a list of named `CoreRules` entries (friendly string keys) to a `RelNode` using a `HepPlanner` program assembled from the project's `RULE_MAP` registry.
+- Signature: `public static RelNode applyTransformations(RelNode root, List<String> transformations)`
 - Inputs:
   - `root`: the input logical plan (`RelNode`) to transform
-  - `ruleNames`: array of friendly rule names like `ProjectMergeRule`, `FilterMergeRule`, `JoinCommuteRule`, etc.
-- Output: `RelNode` representing the planner's best expression found by `HepPlanner` (may be identical to input)
+  - `transformations`: list of friendly transformation names (case-insensitive keys that map into `RULE_MAP`)
+- Output: `RelNode` representing the transformed plan
 - Behavior & notes:
-  - Builds a `HepProgramBuilder`, resolves each friendly name to `RelOptRule` instances using `resolveCoreRules` and `resolveAdapterRules`, and adds them to the program.
-  - Unrecognized rule names are logged to `System.err` and skipped.
-  - Adapter rules (e.g., `EnumerableRules`, `JdbcRules`) are discovered reflectively so there is no hard compile-time dependency on adapter packages.
-- Limitations:
-  - Some rules are version-dependent; `resolveCoreRules` uses reflection to find similar named constants when exact constants are not available across Calcite versions.
+  - Transformation names are matched case-insensitively against `RULE_MAP` (lowercase keys). Unknown keys are ignored.
+  - All requested rules are composed into a single `HepProgram` (TOP_DOWN match order, bounded match limit) and applied to the plan. To reduce oscillation where rules enable each other, the composite program is applied iteratively for a small number of passes (fixpoint attempts).
+  - This composite/fixpoint approach is preferred to applying rules one-by-one because it generally yields more stable normalization results when rules interact.
+  - Because the method relies on `CoreRules` constants, behavior may vary across Calcite versions; the registry centralizes mappings used in this project.
+  - Unknown or unavailable adapter rules are skipped silently (logged to stderr in earlier versions); the registry-driven approach avoids runtime reflection in the hot path.
 
 
 ### `resolveCoreRules(String name)` (private static)
@@ -329,8 +333,8 @@ bool eq = Calcite.sqlNodesEqual(a, b);
 FrameworkConfig cfg = Calcite.buildPostgresFrameworkConfig("localhost",5432,"tpch","postgres","pwd");
 RelNode relA = Calcite.toRelNode(Calcite.SQLtoSqlNode(sqlA), cfg);
 RelNode relB = Calcite.toRelNode(Calcite.SQLtoSqlNode(sqlB), cfg);
-RelNode normA = Calcite.applyRelTransformations(relA, new String[]{"ProjectMergeRule","FilterMergeRule"});
-RelNode normB = Calcite.applyRelTransformations(relB, new String[]{"ProjectMergeRule","FilterMergeRule"});
+RelNode normA = Calcite.applyTransformations(relA, java.util.List.of("ProjectMergeRule","FilterMergeRule"));
+RelNode normB = Calcite.applyTransformations(relB, java.util.List.of("ProjectMergeRule","FilterMergeRule"));
 boolean same = String.valueOf(normA).equals(String.valueOf(normB));
 ```
 
@@ -361,9 +365,9 @@ Note: Replace the Postgres convenience with `buildJdbcFrameworkConfig` if you us
 
 ---
 
-## Apache Calcite planner transformations supported by `applyRelTransformations`
+## Apache Calcite planner transformations referenced by `applyTransformations`
 
-The implementation of `Calcite.applyRelTransformations(RelNode root, String[] ruleNames)` accepts friendly rule names that are mapped to Calcite `CoreRules` (and some adapter rules discovered reflectively). Below is the merged, expanded reference of the transformation rules used or referenced by this project. Each entry lists the rule name and a concise, high-level meaning. This content is maintained in `documentation/transformations.md` and is kept in sync with `transformation_list.txt` used elsewhere in the repository.
+The project uses a registry-driven mapping (`RULE_MAP`) so that `Calcite.applyTransformations(RelNode root, List<String> transformations)` can accept friendly transformation names (case-insensitive keys) that map to Calcite `CoreRules` constants (and some adapter rules discovered reflectively). Below is the merged, expanded reference of the transformation rules used or referenced by this project. Each entry lists the rule name and a concise, high-level meaning. This content is maintained in `documentation/transformations.md` and is kept in sync with `transformation_list.txt` used elsewhere in the repository.
 
 Full transformation reference (name — description):
 
