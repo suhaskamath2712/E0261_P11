@@ -11,25 +11,23 @@ import com.openai.models.responses.ResponseCreateParams;
 /**
  * LLM helper for optional plan-level comparison assistance.
  *
- * <p>Behavior changes / contract:</p>
- * <ul>
- *   <li>Constructs a strict prompt that includes two cleaned plan JSON blobs and
- *       an allow-list of supported Calcite transformation names, sourced from transformation_list.txt.</li>
- *   <li>Performs a fast environment check for `OPENAI_API_KEY`; if missing, the
- *       helper returns a safe "not equivalent" contract string instead of
- *       attempting an interactive request.</li>
- *   <li>Contacts the OpenAI Responses API and extracts assistant text from the
- *       returned object; this extraction is defensive and will fall back to a
- *       non-equivalent response if parsing fails.</li>
- *   <li>The expected assistant output contract is strict: first line `true` or
- *       `false`, followed (if `true`) by zero or more lines containing exact
- *       transformation rule names from the supported list (see transformation_list.txt). Other output will be
- *       treated as not-equivalent to avoid exceptions.</li>
- * </ul>
+ * Behavior changes / contract:
+ * - Constructs a strict prompt that includes two cleaned plan JSON blobs and
+ *   an allow-list of supported Calcite transformation names, sourced from transformation_list.txt.
+ * - Performs a fast environment check for `OPENAI_API_KEY`; if missing, the
+ *   helper returns a safe "not equivalent" contract string instead of
+ *   attempting an interactive request.
+ * - Contacts the OpenAI Responses API and extracts assistant text from the
+ *   returned object; this extraction is defensive and will fall back to a
+ *   non-equivalent response if parsing fails.
+ * - The expected assistant output contract is strict: first line `true` or
+ *   `false`, followed (if `true`) by zero or more lines containing exact
+ *   transformation rule names from the supported list (see transformation_list.txt). Other output will be
+ *   treated as not-equivalent to avoid exceptions.
  *
- * <p>Note: LLM integration is optional and the rest of the toolchain works
+ * Note: LLM integration is optional and the rest of the toolchain works
  * without it. Keep credentials out of source control and ensure your JVM
- * process inherits `OPENAI_API_KEY` (restart terminal/IDE after `setx`).</p>
+ * process inherits `OPENAI_API_KEY` (restart terminal/IDE after `setx`).
  */
 public class LLM
 {
@@ -154,7 +152,8 @@ public class LLM
      * The returned list is always in sync with transformation_list.txt.
      */
     public static List<String> getSupportedTransformations() {
-        return SUPPORTED_TRANSFORMATIONS; // immutable List.of
+        // immutable List.of
+        return SUPPORTED_TRANSFORMATIONS;
     }
     /**
      * Contact the LLM with two cleaned plan JSON strings and receive the assistant's

@@ -38,8 +38,10 @@ public class GetQueryPlans {
             "Local Hit Blocks", "Local Read Blocks", "Local Dirtied Blocks", "Local Written Blocks",
             "Temp Read Blocks", "Temp Written Blocks",
             "I/O Read Time", "I/O Write Time",
-            // remove the key 'Plan' at the top by lifting its contents
-            "Plan"
+                // remove the key 'Plan' at the top by lifting its contents
+                // We lift 'Plan' so comparison operates on the logical plan tree itself
+                // rather than the wrapper object that Postgres emits which mixes metrics.
+                "Plan"
     );
 
     // Run EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for a given SQL query.
@@ -67,7 +69,9 @@ public class GetQueryPlans {
         try (PreparedStatement ps = conn.prepareStatement(explain)) {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    // The first column contains the JSON array as text; we can parse via org.json
+                    // The first column contains the JSON array as text; parse via org.json.
+                    // Note: EXPLAIN ... ANALYZE actually executes the query. Be mindful
+                    // when running this across many or heavy queries (it will run them).
                     String json = rs.getString(1);
                     return new JSONArray(json);
                 }
@@ -153,6 +157,10 @@ public class GetQueryPlans {
         String url = "jdbc:postgresql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME;
         try (Connection conn = DriverManager.getConnection(url, DB_USER, DB_PASS))
         {   
+            // WARNING: This runs EXPLAIN with ANALYZE which executes the SQL. Running
+            // this method repeatedly on large workloads will execute many queries and
+            // can be slow and resource-intensive. Use with care or switch to a
+            // non-ANALYZE EXPLAIN if you only need estimated plans.
             JSONObject cleanedPlan = extractAndClean(explainPlan(conn, sql));
             return (cleanedPlan != null) ? cleanedPlan.toString(4) : null;
             // pretty-print with indent

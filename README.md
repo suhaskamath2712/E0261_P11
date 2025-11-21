@@ -155,3 +155,13 @@ If you want, I can:
 - Add a small `BUILD.md` with exact `javac`/`mvn` commands for your environment (PowerShell / Windows examples).
 - Add an optional `lenient` comparison mode that prints warnings when it would relax certain semantics (outer join, pre-join filters, etc.).
 
+Recent documentation and comment updates
+---------------------------------------
+- Several Java files had end-of-line comments moved so that comments appear on standalone preceding lines (improves readability and avoids trailing comment noise). This includes `Calcite.java`, `FileIO.java`, `GetQueryPlans.java`, `LLM.java`, `LLMResponse.java`, and `Test.java`.
+- Clarifying inline comments were added in `Calcite.java` around canonicalization logic (CAST stripping, commutative normalization, inner-join flattening). These are explanatory only and do not change behavior.
+- A condensed LaTeX code reference has been added at `documentation/code_reference.tex` summarising these changes.
+
+Deprecation note
+----------------
+- A deprecation warning is present for the use of `RelDecorrelator.decorrelateQuery(RelNode)` in `Calcite.java`. It remains to preserve behavior; we can migrate it to the non-deprecated API in a follow-up.
+

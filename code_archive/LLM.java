@@ -13,7 +13,8 @@ import okhttp3.Response;
 public class LLM 
 {
     private static final String url = "https://api.openai.com/v1/chat/completions";
-    private static final String API_KEY = "Main nahi Bataunga"; // Replace with your actual API key
+    // Replace with your actual API key
+    private static final String API_KEY = "Main nahi Bataunga";
     //private final String model = "gemini-1.5-flash";
     private static final String prompt = "Which model is being used?";
 

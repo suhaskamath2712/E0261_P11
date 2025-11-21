@@ -159,7 +159,8 @@ public class FileIO
 				"(?m)^--\\s*Query ID:\\s*" + Pattern.quote(queryId) + "\\b(?:\\s*\\([^)]*\\))?\\s*$");
 		Matcher headerMatcher = headerPattern.matcher(fileContent);
 		if (!headerMatcher.find()) {
-			return null; // Query ID not present
+			// Query ID not present
+			return null;
 		}
 
 		int afterHeaderPos = headerMatcher.end();
@@ -168,7 +169,8 @@ public class FileIO
 		Pattern sepPattern = Pattern.compile("(?m)^--\\s*=+\\s*$");
 		Matcher sepAfterDesc = sepPattern.matcher(fileContent);
 		if (!sepAfterDesc.find(afterHeaderPos)) {
-			return null; // Malformed block: no separator after header/description
+			// Malformed block: no separator after header/description
+			return null;
 		}
 		int sqlStart = sepAfterDesc.end();
 

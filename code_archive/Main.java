@@ -26,7 +26,8 @@ public class Main
             System.out.println("Response: " + response);
             System.out.println();
             
-            break; // Remove this break to process all files
+            // Remove this break to process all files
+            break;
         }
     }
 

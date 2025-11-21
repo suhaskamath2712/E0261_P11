@@ -20,11 +20,8 @@ public class Test
         "Alaap", "Nested_Test", "paper_sample"
     );*/
     
-    //private static final List<String> queryIDList = List.of("N1");
-
-    //list of queries to be tested (without plain union queries)
     private static final List<String> queryIDList = List.of(
-        "Q2"
+        "Q2", "Q9", "Q20"
     );
 
     //Q2, Q9: Transformations that are output will crash the program
@@ -52,7 +49,8 @@ public class Test
             if (result)
             {
                 System.out.println();
-                continue; // No need to check transformations if equivalence is proved without LLM
+                // No need to check transformations if equivalence is proved without LLM
+                continue;
             }
 
             List<String> transformations = List.of(
@@ -70,7 +68,7 @@ public class Test
 
             // Try with transformations from LLM
             // Get Query Plan Transformations from LLM
-            /*LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
 
             boolean doesLLMThinkEquivalent = llmResponse.areQueriesEquivalent();
             System.out.print(doesLLMThinkEquivalent + "\t");
@@ -95,7 +93,7 @@ public class Test
                     System.out.println(result);
                 }
             }
-            else LLMfalse++;*/
+            else LLMfalse++;
 
             //System.out.println("---------------------------------------------------");
         }

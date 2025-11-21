@@ -52,7 +52,8 @@ public class LLMResponse
         List<String> steps = new java.util.ArrayList<>();
         for (int i = 1; i < lines.length; i++) {
             String raw = lines[i].trim();
-            if (raw.isEmpty()) continue; // skip blank lines
+            // skip blank lines
+            if (raw.isEmpty()) continue;
             steps.add(raw);
         }
 
@@ -70,7 +71,8 @@ public class LLMResponse
                     throw new IllegalArgumentException("Unsupported transformation: " + step);
         }
 
-        this.transformationSteps = List.copyOf(steps); // immutable snapshot
+        // immutable snapshot
+        this.transformationSteps = List.copyOf(steps);
     }
 
     //Setter methods
