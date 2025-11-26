@@ -292,10 +292,6 @@ public class Calcite {
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
 
-            // Apply the same transformations to B as a symmetric normalization step
-            if (transformations != null && !transformations.isEmpty())
-                rel2 = applyTransformations(rel2, transformations);
-
             // Normalize sub-queries and decorrelate symmetrically for the second plan as well
             rel2 = normalizeSubqueriesAndDecorrelate(rel2);
 

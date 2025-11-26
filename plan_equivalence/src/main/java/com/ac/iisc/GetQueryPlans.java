@@ -31,18 +31,32 @@ public class GetQueryPlans {
     private static final String DB_PORT = "5432";
 
     // Keys to drop from the JSON plan tree
-    private static final Set<String> KEYS_TO_REMOVE = Set.of(
+        private static final Set<String> KEYS_TO_REMOVE = Set.of(
+            // Execution timings and counters
             "Planning Time", "Execution Time", "Actual Rows", "Actual Loops",
             "Actual Startup Time", "Actual Total Time",
+            // Buffer and I/O metrics
             "Shared Hit Blocks", "Shared Read Blocks", "Shared Dirtied Blocks", "Shared Written Blocks",
             "Local Hit Blocks", "Local Read Blocks", "Local Dirtied Blocks", "Local Written Blocks",
             "Temp Read Blocks", "Temp Written Blocks",
             "I/O Read Time", "I/O Write Time",
-                // remove the key 'Plan' at the top by lifting its contents
-                // We lift 'Plan' so comparison operates on the logical plan tree itself
-                // rather than the wrapper object that Postgres emits which mixes metrics.
-                "Plan"
-    );
+            // Top-level wrapper lifted separately
+            "Plan",
+            // Implementation-specific executor details (from sample plan)
+            "Sort Method", "Sort Space Used", "Sort Space Type", "Sort Key",
+            "Workers Launched", "Workers Planned", "Workers", "Worker Number",
+            "Parallel Aware", "Async Capable",
+            // Costing and width/row estimates
+            "Startup Cost", "Total Cost", "Plan Width", "Plan Rows",
+            // Scan/index implementation details
+            "Scan Direction", "Index Name", "Index Cond", "Rows Removed by Index Recheck", "Heap Fetches",
+            // Hash join/hash node internals
+            "Hash Buckets", "Original Hash Buckets", "Hash Batches", "Original Hash Batches", "Peak Memory Usage",
+            // Join implementation extras
+            "Inner Unique", "Join Filter", "Rows Removed by Join Filter",
+            // Planner bookkeeping / tree wrapper
+            "Parent Relationship"
+        );
 
     // Run EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for a given SQL query.
     // Returns the raw JSONArray text produced by PostgreSQL as org.json types.
