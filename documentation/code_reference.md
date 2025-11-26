@@ -197,6 +197,9 @@ Recursive deep copy stripping keys from JSON object/array elements.
 #### `private static JSONObject extractAndClean(JSONArray raw)`
 Validates raw shape, lifts `Plan`, invokes `cleanPlanTree`, returns cleaned root object.
 
+#### `private static Object removeImplementationDetails(JSONObject plan)`
+Optional normalizer that maps executor-specific node types to generic names (e.g., "Hash Join"→"Join", "Seq Scan"→"Scan"), and renames certain fields (e.g., "Hash Cond"→"Join Condition", "Relation Name"→"Relation", "Index Name"→"Index"). Not invoked by default; available for consumers that want additional genericization beyond key removal.
+
 ### Failure Modes
 - Connection failure → `SQLException` thrown to caller.
 - Unexpected JSON shape → returns `null` (caller must handle).
@@ -204,7 +207,7 @@ Validates raw shape, lifts `Plan`, invokes `cleanPlanTree`, returns cleaned root
 
 ### Performance & Cautions
 - `ANALYZE` causes actual execution: use sparingly for expensive queries.
-- JSON cleaning allocates new objects; negligible unless plan size is extremely large.
+ JSON cleaning allocates new objects; negligible unless plan size is extremely large. Genericization, if enabled, adds minor additional traversal cost.
 
 ---
 ## LLM

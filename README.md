@@ -1,3 +1,12 @@
+## Plan Cleaning Notes (GetQueryPlans)
+
+The plan cleaning logic removes implementation/executor-specific fields from PostgreSQL `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS)` output to focus on logical structure.
+
+- Keys removed (examples): timings, buffer counters, worker details, costing/width estimates, sort/hash internals, scan/index details, and planner bookkeeping. See `KEYS_TO_REMOVE` in `plan_equivalence/src/main/java/com/ac/iisc/GetQueryPlans.java` for the complete list.
+- Optional genericization helper: `removeImplementationDetails(JSONObject)` maps executor-specific node types to generic names (e.g., `Hash Join`→`Join`, `Seq Scan`→`Scan`) and renames certain fields (e.g., `Hash Cond`→`Join Condition`, `Relation Name`→`Relation`, `Index Name`→`Index`). This helper is defined but not invoked by default to preserve existing behavior.
+
+To enable genericization in a custom flow, call `removeImplementationDetails(plan)` on the lifted `Plan` object before passing it to downstream processing.
+
 Plan Equivalence Helper (E0261_P11)
 ===================================
 
