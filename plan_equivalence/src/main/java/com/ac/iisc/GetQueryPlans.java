@@ -16,6 +16,7 @@ import org.json.JSONObject;
  * - Connects once to PostgreSQL
  * - Runs EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for each query
  * - Cleans the JSON plan by removing execution-specific keys and lifting the root 'Plan' node
+ * - Provides a helper to genericize implementation-specific details (node type/field names) if needed
  * - Writes cleaned JSON to matching output folders, skipping IDs already exported (both legacy and new names)
  * 
  * Utilities to obtain PostgreSQL EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) output and
@@ -30,33 +31,33 @@ public class GetQueryPlans {
     private static final String DB_HOST = "localhost";
     private static final String DB_PORT = "5432";
 
-    // Keys to drop from the JSON plan tree
-        private static final Set<String> KEYS_TO_REMOVE = Set.of(
-            // Execution timings and counters
-            "Planning Time", "Execution Time", "Actual Rows", "Actual Loops",
-            "Actual Startup Time", "Actual Total Time",
-            // Buffer and I/O metrics
-            "Shared Hit Blocks", "Shared Read Blocks", "Shared Dirtied Blocks", "Shared Written Blocks",
-            "Local Hit Blocks", "Local Read Blocks", "Local Dirtied Blocks", "Local Written Blocks",
-            "Temp Read Blocks", "Temp Written Blocks",
-            "I/O Read Time", "I/O Write Time",
-            // Top-level wrapper lifted separately
-            "Plan",
-            // Implementation-specific executor details (from sample plan)
-            "Sort Method", "Sort Space Used", "Sort Space Type", "Sort Key",
-            "Workers Launched", "Workers Planned", "Workers", "Worker Number",
-            "Parallel Aware", "Async Capable",
-            // Costing and width/row estimates
-            "Startup Cost", "Total Cost", "Plan Width", "Plan Rows",
-            // Scan/index implementation details
-            "Scan Direction", "Index Name", "Index Cond", "Rows Removed by Index Recheck", "Heap Fetches",
-            // Hash join/hash node internals
-            "Hash Buckets", "Original Hash Buckets", "Hash Batches", "Original Hash Batches", "Peak Memory Usage",
-            // Join implementation extras
-            "Inner Unique", "Join Filter", "Rows Removed by Join Filter",
-            // Planner bookkeeping / tree wrapper
-            "Parent Relationship"
-        );
+    // Keys to drop from the JSON plan tree (implementation/executor-specific)
+    private static final Set<String> KEYS_TO_REMOVE = Set.of(
+        // Execution timings and counters
+        "Planning Time", "Execution Time", "Actual Rows", "Actual Loops",
+        "Actual Startup Time", "Actual Total Time",
+        // Buffer and I/O metrics
+        "Shared Hit Blocks", "Shared Read Blocks", "Shared Dirtied Blocks", "Shared Written Blocks",
+        "Local Hit Blocks", "Local Read Blocks", "Local Dirtied Blocks", "Local Written Blocks",
+        "Temp Read Blocks", "Temp Written Blocks",
+        "I/O Read Time", "I/O Write Time",
+        // Top-level wrapper lifted separately
+        "Plan",
+        // Implementation-specific executor details (from sample plan)
+        "Sort Method", "Sort Space Used", "Sort Space Type", "Sort Key",
+        "Workers Launched", "Workers Planned", "Workers", "Worker Number",
+        "Parallel Aware", "Async Capable",
+        // Costing and width/row estimates
+        "Startup Cost", "Total Cost", "Plan Width", "Plan Rows",
+        // Scan/index implementation details
+        "Scan Direction", "Index Name", "Index Cond", "Rows Removed by Index Recheck", "Heap Fetches",
+        // Hash join/hash node internals
+        "Hash Buckets", "Original Hash Buckets", "Hash Batches", "Original Hash Batches", "Peak Memory Usage",
+        // Join implementation extras
+        "Inner Unique", "Join Filter", "Rows Removed by Join Filter",
+        // Planner bookkeeping / tree wrapper
+        "Parent Relationship"
+    );
 
     // Run EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for a given SQL query.
     // Returns the raw JSONArray text produced by PostgreSQL as org.json types.
@@ -94,8 +95,8 @@ public class GetQueryPlans {
         return null;
     }
 
-    // Recursively remove execution-only keys from a plan tree while preserving structure.
-    // Accepts either JSONObject, JSONArray, or primitives and returns a cleaned copy.
+    // Recursively remove execution-only/implementation-specific keys from a plan tree while preserving structure.
+    // Accepts either JSONObject, JSONArray, or primitives and returns a cleaned copy. Logical structure is retained.
     /**
      * Recursively traverse a JSON plan node (JSONObject/JSONArray/primitive) and remove
      * transient execution-specific keys defined in {@link #KEYS_TO_REMOVE}.
@@ -125,6 +126,113 @@ public class GetQueryPlans {
         } else {
             return node;
         }
+    }
+
+    /**
+     * Normalize implementation-specific details into generic forms.
+     *
+     * What it does:
+     * - Maps executor node types to generic names (e.g., "Hash Join" → "Join", "Seq Scan" → "Scan").
+     * - Renames certain keys to generic equivalents (e.g., "Hash Cond" → "Join Condition").
+     * - Leaves logical fields intact (e.g., "Join Type", "Strategy", "Group Key").
+     * - Recurses into nested objects/arrays including the standard "Plans" array.
+     *
+     * Note: This function is provided for consumers that want plan genericization. It is not invoked
+     * by the default cleaning pipeline to avoid altering established behavior.
+     */
+    private static Object removeImplementationDetails(JSONObject plan)
+    {
+        if (plan == null) return null;
+        // Create a new object to avoid mutating input
+        JSONObject out = new JSONObject();
+
+        for (String key : plan.keySet()) {
+            Object val = plan.get(key);
+
+            // Recursively process children arrays named "Plans"
+            if ("Plans".equals(key) && val instanceof JSONArray arr) {
+                JSONArray newArr = new JSONArray();
+                for (int i = 0; i < arr.length(); i++) {
+                    Object child = arr.get(i);
+                    if (child instanceof JSONObject childObj) {
+                        // First apply genericization on child
+                        JSONObject cleanedChild = (JSONObject) removeImplementationDetails(childObj);
+                        // Then strip implementation metrics via existing cleaner
+                        Object fullyCleaned = cleanPlanTree(cleanedChild);
+                        newArr.put(fullyCleaned);
+                    } else {
+                        newArr.put(child);
+                    }
+                }
+                out.put(key, newArr);
+                continue;
+            }
+
+            // Map implementation-specific node types to generic types
+            if ("Node Type".equals(key) && val instanceof String s) {
+                String normalized = normalizeNodeType(s);
+                out.put(key, normalized);
+                continue;
+            }
+
+            // Rename implementation-specific condition keys to generic ones
+            if ("Hash Cond".equals(key) && val instanceof String) {
+                out.put("Join Condition", val);
+                // skip original key
+                continue;
+            }
+
+            // Genericize scan-related details by renaming
+            if ("Relation Name".equals(key)) {
+                out.put("Relation", val);
+                continue;
+            }
+
+            if ("Index Name".equals(key)) {
+                out.put("Index", val);
+                continue;
+            }
+
+            // Recurse into nested objects
+            if (val instanceof JSONObject nested) {
+                out.put(key, removeImplementationDetails(nested));
+                continue;
+            }
+
+            // Recurse into arrays (non-"Plans" arrays) to normalize any embedded objects
+            if (val instanceof JSONArray arr2) {
+                JSONArray newArr = new JSONArray();
+                for (int i = 0; i < arr2.length(); i++) {
+                    Object elem = arr2.get(i);
+                    if (elem instanceof JSONObject o) newArr.put(removeImplementationDetails(o));
+                    else newArr.put(elem);
+                }
+                out.put(key, newArr);
+                continue;
+            }
+
+            // Default: copy as-is
+            out.put(key, val);
+        }
+
+        return out;
+    }
+
+    /**
+     * Convert executor-specific node type labels into generic operator names.
+     * Unrecognized or already-logical operators (e.g., "Sort", "Aggregate") are returned as-is.
+     */
+    private static String normalizeNodeType(String s) {
+        String t = s == null ? "" : s.trim();
+        return switch (t) {
+            case "Hash Join", "Merge Join", "Nested Loop" -> "Join";
+            case "Seq Scan", "Index Scan", "Index Only Scan", "Bitmap Heap Scan", "Bitmap Index Scan" -> "Scan";
+            case "Gather Merge" -> "Gather";
+            case "Hash" -> "Build";
+            default -> t;
+        }; // genericize hash build step
+        // Keep known logical operators verbatim
+        // e.g., "Sort", "Aggregate", "Project", "Filter"
     }
 
     // Given EXPLAIN (FORMAT JSON) output (a one-element array with a root object),
