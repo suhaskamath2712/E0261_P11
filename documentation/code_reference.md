@@ -187,6 +187,12 @@ Obtains PostgreSQL execution plans (`EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS)`) f
 - Calls private `explainPlan(conn, sql)` → raw `JSONArray`.
 - Cleans & pretty-prints result (indent=4) or returns `null` if shape unexpected.
 
+#### `public static String getDatabaseSchema()`
+- Opens a short-lived JDBC connection using the class DB constants.
+- Queries `information_schema.columns` and formats a human-readable schema:
+   `Schema: <schema>`, `Table: <table>`, then `column : data_type` lines.
+- Returns an empty string if schema is unavailable or an error occurs (exceptions handled internally).
+
 ### Private Methods
 #### `private static JSONArray explainPlan(Connection conn, String sql)`
 Constructs `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) <sql>`; executes prepared statement; returns first column as parsed `JSONArray` or `null`.
@@ -234,10 +240,18 @@ Workflow:
 4. Extract assistant text; fallback contract if extraction fails.
 5. Trim and return content.
 
-Return Contract Examples:
-- Not equivalent: `false` (optionally followed by `No transformations found`)
-- Equivalent, no changes: `true` then `No transformations needed`
-- Equivalent with steps: `true` then each transformation name on its own line.
+Return Contract (JSON object):
+- The LLM is instructed to return a single JSON object with two fields:
+   - `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
+   - `transformations`: array — an ordered list of transformation names (may be empty).
+
+Example:
+```json
+{
+   "equivalent": "true",
+   "transformations": ["ProjectRemoveRule", "JoinToMultiJoinRule"]
+}
+```
 
 #### `public static LLMResponse getLLMResponse(String sqlA, String sqlB)`
 Obtains cleaned plans via `GetQueryPlans`, calls `contactLLM`, parses output into `LLMResponse`. On parsing failure returns a constructed `LLMResponse(false, List.of())`.
@@ -261,11 +275,13 @@ Obtains cleaned plans via `GetQueryPlans`, calls `contactLLM`, parses output int
 Represents and validates the structured contract returned by the LLM.
 
 ### Contract
-1. First line: `true` or `false` (case-insensitive).
-2. Subsequent lines: transformation names OR one special line:
-   - `No transformations needed`
-   - `No transformations found`
-   (Both interpreted as an empty transformation list.)
+The preferred contract is a JSON object with the following shape:
+
+- `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
+- `transformations`: array of strings — an ordered list of allowed transformation names; may be empty.
+
+For backwards compatibility the class also accepts the legacy line-oriented format where the first line
+is `true`/`false` and subsequent lines are transformation names or a single sentinel like `No transformations needed`.
 
 ### Constructors
 #### `public LLMResponse(boolean queriesAreEquivalent, List<String> transformationSteps)`
@@ -435,6 +451,20 @@ boolean eq = Calcite.compareQueries(sqlA, sqlB, rules);
 ```java
 String cleaned = GetQueryPlans.getCleanedQueryPlanJSONasString("SELECT * FROM orders o JOIN customer c ON o.custkey=c.custkey");
 System.out.println(cleaned);
+```
+
+### Introspect Database Schema
+```java
+String schema = GetQueryPlans.getDatabaseSchema();
+System.out.println(schema);
+// Example (truncated):
+// Schema: public
+//   Table: customer
+//     custkey : integer
+//     name    : text
+//   Table: orders
+//     orderkey : integer
+//     custkey  : integer
 ```
 
 ### LLM-Assisted Equivalence

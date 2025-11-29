@@ -225,6 +225,12 @@ Important methods
   - Throws: `SQLException` for DB errors
   - Behavior: Opens a JDBC connection (using DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT constants), runs `explainPlan`, extracts and cleans the Plan, and returns an indented JSON string (4 spaces). Caller responsibility: handle SQLException.
 
+- public static String getDatabaseSchema()
+  - Returns: Multi-line string enumerating schemas, tables, and columns with data types by querying `information_schema.columns`.
+  - Error handling: SQL exceptions are caught internally; on error or empty result, returns an empty string.
+  - Notes: Uses the same DB constants; connection is short-lived. Output is grouped as:
+    `Schema: <schema>` → `Table: <table>` → `column : data_type`.
+
 Notes
 -----
 - This tool runs queries with ANALYZE and BUFFERS; ensure you run it against a safe, test instance.
@@ -257,7 +263,7 @@ Important fields & methods
   - Notes: Behavior details:
     - The method checks `OPENAI_API_KEY` in the environment and returns a safe "not equivalent" contract string if missing (avoid interactive prompts).
     - It uses the Responses API and performs best-effort extraction of the assistant's output text from the SDK `Response` object (falls back to a conservative non-equivalent value if extraction fails).
-    - The prompt requests a strict contract: first line `true`/`false`, followed (if `true`) by zero-or-more exact transformation names (one per line). Unexpected or free-form LLM output will be treated as `false` to avoid exceptions.
+    - The prompt requests a strict JSON contract: a single JSON object with two fields: `equivalent` (string; `"true"`, `"false"`, or `"dont_know"`) and `transformations` (array of transformation names, may be empty). The code continues to accept the legacy line-oriented format for backward compatibility.
 
 - public static LLMResponse getLLMResponse(String sqlA, String sqlB)
   - Parameters: `sqlA` and `sqlB` are SQL strings (not precomputed JSON). The method obtains cleaned JSON plans via `GetQueryPlans.getCleanedQueryPlanJSONasString` and then contacts the LLM via `contactLLM`.
@@ -274,9 +280,12 @@ LLMResponse.java
 ---------------------------------------------------------------------
 Purpose
 -------
-Parses the strict output contract expected from the LLM. The contract is:
-- First non-empty line: `true` or `false` (case-insensitive)
-- Remaining lines: zero or more transformation rule names from `LLM.getSupportedTransformations()` or special tokens: `No transformations needed` or `No transformations found`.
+Parses the LLM output contract. The preferred contract is a JSON object with two keys:
+
+- `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
+- `transformations`: array — ordered list of transformation names (may be empty).
+
+For backward compatibility, the parser also accepts the legacy line-oriented format where the first line is `true`/`false` and subsequent lines list transformation names (or a single sentinel like `No transformations needed`).
 
 Constructors & behavior
 -----------------------

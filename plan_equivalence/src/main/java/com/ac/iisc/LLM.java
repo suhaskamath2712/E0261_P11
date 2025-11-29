@@ -20,10 +20,10 @@ import com.openai.models.responses.ResponseCreateParams;
  * - Contacts the OpenAI Responses API and extracts assistant text from the
  *   returned object; this extraction is defensive and will fall back to a
  *   non-equivalent response if parsing fails.
- * - The expected assistant output contract is strict: first line `true` or
- *   `false`, followed (if `true`) by zero or more lines containing exact
- *   transformation rule names from the supported list (see transformation_list.txt). Other output will be
- *   treated as not-equivalent to avoid exceptions.
+ * - The expected assistant output contract is a single JSON object with two fields:
+ *   `equivalent` (string; `"true"` | `"false"` | `"dont_know"`) and
+ *   `transformations` (array of transformation names, may be empty). The implementation
+ *   continues to accept the legacy line-oriented output for backward compatibility.
  *
  * Note: LLM integration is optional and the rest of the toolchain works
  * without it. Keep credentials out of source control and ensure your JVM
@@ -32,13 +32,29 @@ import com.openai.models.responses.ResponseCreateParams;
 public class LLM
 {
     private static final String BASE_PROMPT = """
-            Compare these two query plans and if they are equivalent, output true. Otherwise, output false.\n
-            If true, only the following:\n
-            A list of Apache calcite transformations that can map from the first plan to the second plan.\n
-            DO NOT OUTPUT ANYTHING ELSE. DO NOT GIVE ANY EXPLANATIONS.\n
-            Output transformations from the following supported list only:\n
-            If no transformations can map the first plan to the second plan, output "No transformations found".\n
-            If no transformations are needed (plans are identical), output "No transformations needed".\n
+            Given ORIGINAL_PLAN and TARGET_PLAN (both in simplified JSON plan format, see "Plan Format" below),
+            determine whether the two plans are equivalent by producing a sequence of Apache Calcite
+            transformations (from SUPPORTED_TRANSFORMATIONS) that maps ORIGINAL_PLAN -> TARGET_PLAN.
+
+            RESPONSE RULES:
+            1) Output exactly one JSON object and nothing else.
+            2) Schema:
+                {
+                "equivalent": <"true" or "false" or "dont_know">,
+                "transformations": [ <ordered list of transformation names from SUPPORTED_TRANSFORMATIONS> ]  // may be empty
+                }
+            3) If plans are identical (no transform needed): set "equivalent":"true" and "transformations": []
+            4) If you can propose a valid ordered list of transformations from SUPPORTED_TRANSFORMATIONS that
+            plausibly maps ORIGINAL_PLAN to TARGET_PLAN: set "equivalent":"true" and list them in order.
+            5) If you cannot find a sequence: set "equivalent":"dont_know" and set "transformations": []
+            6) Do NOT invent transformer names outside SUPPORTED_TRANSFORMATIONS. If none apply, output "dont_know".
+            7) Do not output any extra text, commentary, or diagnostics.
+
+            PLAN FORMAT (provide only fields that matter; remove costs, timings):
+            - Node: { "Node Type": "...", "Join Type": "...", "Filter": "...", "Hash Cond": "...",
+            "Group Key": [...], "Sort Key": [...], "Index Cond": "...", "Relation Name": "...",
+            "Alias": "...", "Strategy": "Hashed|Sorted|..." }
+            - A plan is nested using "Plans": [ ... ].
             """;
     
     /**
@@ -145,6 +161,28 @@ public class LLM
         "UnionPullUpConstantsRule",
         "UnionToDistinctRule"
     );
+
+    private static final String CONTEXT_PROMPT = """
+            SCHEMA CONTEXT: Use the TPCH schema for table/column names and primary keys (see attached).
+            Use it only for reasoning about join keys and uniqueness constraints.
+            """;
+    
+    private static final String EXAMPLE = """
+    ONE-SHOT EXAMPLE:
+    ORIGINAL_PLAN:
+    { "Node Type":"Join", "Join Type":"Inner", "Plans":[ { "Node Type":"Hash", "Plans":[ {"Node Type":"Seq Scan", "Relation Name":"orders"} ] }, { "Node Type":"Hash", "Plans":[ {"Node Type":"Seq Scan", "Relation Name":"customer"} ] } ], "Hash Cond":"(orders.o_custkey = customer.c_custkey)" }
+    
+    TARGET_PLAN:
+    { "Node Type":"Join", "Join Type":"Inner", "Plans":[ { "Node Type":"Seq Scan", "Relation Name":"orders" }, { "Node Type":"Seq Scan", "Relation Name":"customer" } ], "Hash Cond":"(orders.o_custkey = customer.c_custkey)" }
+    
+    EXPECTED_RESPONSE:
+    {
+    "equivalent":"true",
+    "transformations":["ProjectRemoveRule","ReduceExpressionsRule.HashReduceExpressionsRule","JoinToMultiJoinRule"]
+    }
+
+    NOW PROCESS:
+    """;
     
 
     /**
@@ -179,14 +217,15 @@ public class LLM
         sb.append(BASE_PROMPT);
         sb.append("\nSupported transformations (one per line if needed):\n");
         for (String t : SUPPORTED_TRANSFORMATIONS) sb.append(t).append('\n');
-        sb.append("\nPlan A (cleaned JSON):\n").append(sqlAJSON == null ? "(null)" : sqlAJSON);
-        sb.append("\n\nPlan B (cleaned JSON):\n").append(sqlBJSON == null ? "(null)" : sqlBJSON);
-        sb.append("\n\nOutput format:\n");
-        sb.append("First line: true or false\n");
-        sb.append("If true, follow with zero or more lines, EACH being exactly one of the supported transformation rule names above.\n");
-        sb.append("If no transformations are needed, output exactly: No transformations needed\n");
-        sb.append("If no transformations can map A to B, output exactly: No transformations found\n");
-        sb.append("Do not include any other text.\n");
+
+        //Get database schemas
+        sb.append(CONTEXT_PROMPT + "\n");
+        sb.append(GetQueryPlans.getDatabaseSchema()).append("\n");
+
+        sb.append(EXAMPLE);
+
+        sb.append("\nORIGINAL_PLAN_JSON:\n").append(sqlAJSON == null ? "(null)" : sqlAJSON);
+        sb.append("\n\nTARGET_PLAN_JSON:\n").append(sqlBJSON == null ? "(null)" : sqlBJSON);
 
         String prompt = sb.toString();
 

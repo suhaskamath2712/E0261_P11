@@ -288,4 +288,62 @@ public class GetQueryPlans {
             // pretty-print with indent
         }
     }
+
+    /**
+     * Retrieve a textual representation of the current database schema.
+     *
+     * Uses the JDBC connection parameters defined in this class to connect
+     * to PostgreSQL and queries {@code information_schema.columns} to
+     * enumerate tables and columns. The returned string groups columns by
+     * schema and table for readability.
+     *
+     * Note: This method opens a short-lived JDBC connection and performs
+     * a simple metadata query. Any SQL exceptions are handled internally
+     * and result in an empty string being returned.
+     *
+     * @return Multi-line human-readable schema description (empty string if unavailable)
+     */
+    public static String getDatabaseSchema() {
+        String url = "jdbc:postgresql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME;
+        StringBuilder sb = new StringBuilder();
+
+        try (Connection conn = DriverManager.getConnection(url, DB_USER, DB_PASS)) {
+            String q = "SELECT table_schema, table_name, column_name, data_type "
+                     + "FROM information_schema.columns "
+                     + "WHERE table_catalog = ? "
+                     + "ORDER BY table_schema, table_name, ordinal_position";
+            try (PreparedStatement ps = conn.prepareStatement(q)) {
+                ps.setString(1, DB_NAME);
+                try (ResultSet rs = ps.executeQuery()) {
+                    String lastSchema = "";
+                    String lastTable = "";
+                    while (rs.next()) {
+                        String schema = rs.getString("table_schema");
+                        String table = rs.getString("table_name");
+                        String col = rs.getString("column_name");
+                        String type = rs.getString("data_type");
+
+                        if (!schema.equals(lastSchema)) {
+                            if (sb.length() > 0) sb.append(System.lineSeparator());
+                            sb.append("Schema: ").append(schema).append(System.lineSeparator());
+                            lastSchema = schema;
+                            lastTable = "";
+                        }
+
+                        if (!table.equals(lastTable)) {
+                            sb.append("  Table: ").append(table).append(System.lineSeparator());
+                            lastTable = table;
+                        }
+
+                        sb.append("    ").append(col).append(" : ").append(type).append(System.lineSeparator());
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            // Swallow and return empty string; callers (e.g., LLM prompt) should continue gracefully
+            System.err.println("[GetQueryPlans] Unable to retrieve database schema: " + e.getMessage());
+        }
+
+        return sb.toString();
+    }
 }

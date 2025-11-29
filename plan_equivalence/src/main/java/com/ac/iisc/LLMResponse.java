@@ -2,14 +2,24 @@ package com.ac.iisc;
 
 import java.util.List;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 /**
- * Parsed representation of the LLM's strict output contract.
+ * Parsed representation of the LLM's output contract.
  *
- * Contract:
- * - Line 1: literal "true" or "false" (case-insensitive) indicating equivalence.
- * - Lines 2..N: optional newline-separated transformation rule names from LLM.getSupportedTransformations().
- *   Special cases: a single line equal to "No transformations needed" or
- *   "No transformations found" is treated as an empty list.
+ * Supported input formats:
+ * 1) JSON object form (preferred):
+ *    {
+ *      "equivalent": "true" | "false" | "dont_know",
+ *      "transformations": [ "RuleName1", "RuleName2", ... ]
+ *    }
+ * 2) Legacy line-oriented form (fallback):
+ *    First line: literal "true" or "false"
+ *    Subsequent lines: transformation names (or a single line "No transformations needed" / "No transformations found")
+ *
+ * The constructor accepts either representation and validates transformation names
+ * against `LLM.getSupportedTransformations()` where applicable.
  */
 public class LLMResponse
 {
@@ -19,12 +29,12 @@ public class LLMResponse
     public LLMResponse(boolean queriesAreEquivalent, List<String> transformationSteps)
     {
         this.queriesAreEquivalent = queriesAreEquivalent;
-        this.transformationSteps = transformationSteps;
+        this.transformationSteps = transformationSteps == null ? List.of() : List.copyOf(transformationSteps);
     }
 
     /**
-     * Construct and validate from raw LLM text output. Throws IllegalArgumentException for malformed input
-     * or for transformation names not in the supported allow-list.
+     * Construct and validate from raw LLM output. Accepts either JSON object or legacy line format.
+     * Throws IllegalArgumentException for malformed input or for unsupported transformation names.
      */
     public LLMResponse(String responseText)
     {
@@ -32,8 +42,42 @@ public class LLMResponse
             throw new IllegalArgumentException("LLM response is empty or null");
         }
 
-        // Normalize newlines and split
-        String normalized = responseText.replace("\r", "").trim();
+        String trimmed = responseText.trim();
+
+        // Attempt JSON parse first (preferred new contract)
+        if (trimmed.startsWith("{")) {
+            try {
+                JSONObject obj = new JSONObject(trimmed);
+                // Equivalent may be boolean or string; accept both
+                boolean eq = false;
+                if (obj.has("equivalent")) {
+                    Object v = obj.get("equivalent");
+                    if (v instanceof Boolean b) eq = b;
+                    else eq = String.valueOf(v).trim().equalsIgnoreCase("true");
+                } else {
+                    throw new IllegalArgumentException("JSON response missing 'equivalent' field");
+                }
+                this.queriesAreEquivalent = eq;
+
+                List<String> steps = new java.util.ArrayList<>();
+                if (obj.has("transformations") && !obj.isNull("transformations")) {
+                    JSONArray arr = obj.getJSONArray("transformations");
+                    for (int i = 0; i < arr.length(); i++) {
+                        String s = arr.getString(i).trim();
+                        if (!s.isEmpty()) steps.add(s);
+                    }
+                }
+
+                validateTransformations(steps);
+                this.transformationSteps = List.copyOf(steps);
+                return;
+            } catch (org.json.JSONException jse) {
+                // Fall through to legacy parsing below
+            }
+        }
+
+        // Legacy line-based format (backwards compatibility)
+        String normalized = trimmed.replace("\r", "").trim();
         String[] lines = normalized.split("\n+");
         if (lines.length == 0) {
             throw new IllegalArgumentException("LLM response contained no parsable lines");
@@ -63,16 +107,17 @@ public class LLMResponse
             steps.clear();
         }
 
-        // Validate transformations against supported list (only if there are steps)
-        if (!steps.isEmpty()) {
-            List<String> supported = LLM.getSupportedTransformations();
-            for (String step : steps)
-                if (!supported.contains(step))
-                    throw new IllegalArgumentException("Unsupported transformation: " + step);
-        }
-
-        // immutable snapshot
+        validateTransformations(steps);
         this.transformationSteps = List.copyOf(steps);
+    }
+
+    private void validateTransformations(List<String> steps) {
+        if (steps == null || steps.isEmpty()) return;
+        List<String> supported = LLM.getSupportedTransformations();
+        for (String step : steps) {
+            if (!supported.contains(step))
+                throw new IllegalArgumentException("Unsupported transformation: " + step);
+        }
     }
 
     //Setter methods
@@ -80,7 +125,7 @@ public class LLMResponse
         this.queriesAreEquivalent = queriesAreEquivalent;
     }
     public void setTransformationSteps(List<String> transformationSteps) {
-        this.transformationSteps = transformationSteps;
+        this.transformationSteps = transformationSteps == null ? List.of() : List.copyOf(transformationSteps);
     }
 
     //Getter methods

@@ -7,6 +7,18 @@ The plan cleaning logic removes implementation/executor-specific fields from Pos
 
 To enable genericization in a custom flow, call `removeImplementationDetails(plan)` on the lifted `Plan` object before passing it to downstream processing.
 
+Database Schema Introspection
+-----------------------------
+You can now print a concise view of the connected PostgreSQL database schema (schemas, tables, columns, and data types) using:
+
+```java
+String schema = GetQueryPlans.getDatabaseSchema();
+System.out.println(schema);
+```
+
+- Connection details come from the constants in `GetQueryPlans` (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`).
+- Output groups columns under their schema and table for readability.
+
 Plan Equivalence Helper (E0261_P11)
 ===================================
 
@@ -168,7 +180,8 @@ Recent documentation and comment updates
 ---------------------------------------
 - Several Java files had end-of-line comments moved so that comments appear on standalone preceding lines (improves readability and avoids trailing comment noise). This includes `Calcite.java`, `FileIO.java`, `GetQueryPlans.java`, `LLM.java`, `LLMResponse.java`, and `Test.java`.
 - Clarifying inline comments were added in `Calcite.java` around canonicalization logic (CAST stripping, commutative normalization, inner-join flattening). These are explanatory only and do not change behavior.
-- A condensed LaTeX code reference has been added at `documentation/code_reference.tex` summarising these changes.
+- Markdown code reference is available at `documentation/code_reference.md` (supersedes the LaTeX draft in `documentation/code_reference.tex`).
+- Added `GetQueryPlans.getDatabaseSchema()` for quick schema inspection.
 
 Deprecation note
 ----------------
