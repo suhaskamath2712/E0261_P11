@@ -1,6 +1,5 @@
 package com.ac.iisc;
 
-import java.sql.SQLException;
 import java.util.List;
 
 
@@ -22,46 +21,17 @@ public class Test
     );*/
     
     private static final List<String> queryIDList = List.of(
-        "Q5"
+        "Q21", "Q22"
     );
 
-    //Q2, Q9: Transformations that are output will crash the program
-    //Q20: Goes into infinite loop
-
+    //Q20 : Goes into infinite loop
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the
      * comparison result. Adjust the SQL and the transformation list as needed
      * for local experiments. Ensure the referenced tables exist in PostgreSQL.
      */
     public static void main(String[] args) throws Exception
-    {
-        // Example transformation list (can be null or customized)
-
-        // For demo: compare each query in the list between original and mutated
-
-        for (String id : queryIDList)
-        {
-            String sqlA = FileIO.readOriginalSqlQuery(id);
-            String sqlB = FileIO.readRewrittenSqlQuery(id);
-
-            String sqlAJSON = null;
-            String sqlBJSON = null;
-            try
-            {
-                sqlAJSON = GetQueryPlans.getCleanedQueryPlanJSONasString(sqlA);
-                sqlBJSON = GetQueryPlans.getCleanedQueryPlanJSONasString(sqlB);
-            }
-            catch (SQLException ex)
-            {
-                System.err.println("Error obtaining query plans: " + ex.getMessage());
-            }
-
-            System.out.println("Query ID: " + id);
-            System.out.println("Original Query Plan JSON: " + sqlAJSON);
-            System.out.println("Rewritten Query Plan JSON: " + sqlBJSON);
-        }
-        
-        /*
+    {            
         int LLMtrue = 0, LLMfalse = 0, LLMGaveTransform = 0, LLMGaveCorrectTransform = 0;
         for (String id : queryIDList)
         {
@@ -116,6 +86,6 @@ public class Test
         System.out.println("LLM predicted equivalence for: " + LLMtrue);
         System.out.println("LLM predicted non-equivalence for: " + LLMfalse);
         System.out.println("LLM provided transformations for: " + LLMGaveTransform);
-        System.out.println("LLM provided correct transformations for: " + LLMGaveCorrectTransform); */
+        System.out.println("LLM provided correct transformations for: " + LLMGaveCorrectTransform); 
     }
 }
