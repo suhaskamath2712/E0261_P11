@@ -1,0 +1,20 @@
+Query ID: Q1	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: Q2	true	false
+Query ID: Q3	false	true	[JoinToMultiJoinRule, AggregateJoinTransposeRule, AggregateRemoveRule]	false
+Query ID: Q4	true	true	[]
+Query ID: Q5	false	true	[JoinAddRedundantSemiJoinRule]	false
+Query ID: Q6	true	true	[]
+Query ID: Q7	true	true	[]
+Query ID: Q8	true	true	[]
+Query ID: Q9	false	true	[JoinToMultiJoinRule, JoinPushTransitivePredicatesRule, MultiJoinOptimizeBushyRule]	false
+Query ID: Q10	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule, ProjectRemoveRule]	false
+Query ID: Q11	true	true	[]
+Query ID: Q12	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: Q13	true	true	[]
+Query ID: Q14	true	true	[]
+Query ID: Q15	false	true	[FilterJoinRule.FilterIntoJoinRule, ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule, FilterWindowTransposeRule, ProjectMergeRule, SortProjectTransposeRule, SortRemoveRedundantRule]	false
+Query ID: Q16	false	true	[SemiJoinRule, SemiJoinJoinTransposeRule, JoinToMultiJoinRule]	false
+Query ID: Q18   true    true    []     
+Query ID: Q19   true    true    []
+Query ID: Q21   true    true    []
+Query ID: Q22   false   true    [AggregateExtractProjectRule, FilterProjectTransposeRule, FilterMergeRule, AggregateMergeRule, SortRemoveRedundantRule, ProjectRemoveRule]        false

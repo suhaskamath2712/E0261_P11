@@ -24,7 +24,7 @@ public class Test
         "Q21", "Q22"
     );
 
-    //Q20 : Goes into infinite loop
+    //Q17, Q20 : Goes into infinite loop
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the
      * comparison result. Adjust the SQL and the transformation list as needed
@@ -40,13 +40,6 @@ public class Test
 
             boolean result = Calcite.compareQueries(sqlA, sqlB, null);
             System.out.print("Query ID: " + id + "\t" + result + "\t");
-
-            if (result)
-            {
-                System.out.println();
-                // No need to check transformations if equivalence is proved without LLM
-                continue;
-            }
 
             // Try with transformations from LLM
             // Get Query Plan Transformations from LLM

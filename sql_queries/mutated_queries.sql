@@ -494,7 +494,7 @@ order by
 	o_year desc;
 
 -- =================================================================
--- Query ID: TPCH_Q11 (Mutated)
+-- Query ID: LITHE_11 (Mutated)
 -- Description: Important Stock Identification Query. Finds parts from a nation that represent a significant
 -- fraction of the total stock value.
 -- Change: Changed multiplier from 0.00001 to 0.0001.
@@ -522,7 +522,7 @@ ORDER BY
     total_value DESC;
 
 -- =================================================================
--- Query ID: TPCH_Q12 (Mutated)
+-- Query ID: LITHE_12 (Mutated)
 -- Description: Shipping Modes and Order Priority Query. Determines if late shipping is related to order priority.
 -- Change: Changed shipmode from 'SHIP' to 'MAIL'.
 -- =================================================================
@@ -582,7 +582,7 @@ order by
 	c_count desc;
 
 -- =================================================================
--- Query ID: TPCH_Q14 (Mutated)
+-- Query ID: LITHE_14 (Mutated)
 -- Description: Promotion Effect Query. Monitors market share of promotional parts.
 -- Change: Changed date interval from 1 month to 6 months.
 -- =================================================================
@@ -638,7 +638,7 @@ order by
     s_suppkey;
 
 -- =================================================================
--- Query ID: TPCH_Q16 (Mutated)
+-- Query ID: LITHE_16 (Mutated)
 -- Description: Parts/Supplier Relationship Query. Counts suppliers for parts matching certain criteria,
 -- excluding suppliers with complaints.
 -- Change: Changed brand from '<> Brand#23' to '= Brand#23'.
@@ -692,7 +692,7 @@ WHERE p.p_brand = 'Brand#53'
   AND l.l_quantity < avg_lineitem.threshold_quantity;
 
 -- =================================================================
--- Query ID: ETPCH_Q18 (Mutated)
+-- Query ID: LITHE_18 (Mutated)
 -- Description: Large Volume Customer Query. Finds top customers who have placed a large volume of orders.
 -- Change: Changed quantity from > 300 to < 10.
 -- =================================================================
@@ -1035,7 +1035,7 @@ SELECT
 FROM PromoData;
 
 -- =================================================================
--- Query ID: ETPCH_Q13 (Mutated)
+-- Query ID: LITHE_13 (Mutated)
 -- Description: Extended TPC-H Q13, analyzing customer distribution by order count.
 -- Change: Changed comment logic from NOT LIKE to LIKE.
 -- =================================================================
@@ -1061,7 +1061,7 @@ ORDER BY
     custdist DESC, c_count DESC;
 
 -- =================================================================
--- Query ID: ETPCH_Q2 (Mutated)
+-- Query ID: LITHE_2 (Mutated)
 -- Description: Extended TPC-H Q2, finding the minimum cost supplier for a part in Europe.
 -- Change: Changed part size from 15 to 45.
 -- =================================================================
@@ -1090,7 +1090,7 @@ ORDER BY
 LIMIT 100;
 
 -- =================================================================
--- Query ID: ETPCH_Q22 (Mutated)
+-- Query ID: LITHE_22 (Mutated)
 -- Description: Simplified ETPCH Q22, Global Sales Opportunity Query, using the standard customer table.
 -- Change: Changed the list of country codes.
 -- =================================================================
@@ -1124,7 +1124,7 @@ GROUP BY cntrycode
 ORDER BY cntrycode;
 
 -- =================================================================
--- Query ID: ETPCH_Q8 (Mutated)
+-- Query ID: LITHE_8 (Mutated)
 -- Description: Simplified ETPCH Q8, calculating market share using standard tables.
 -- Change: Changed part type from 'ECONOMY ANODIZED STEEL' to 'LARGE PLATED TIN'.
 -- =================================================================
@@ -1155,51 +1155,6 @@ GROUP BY o_year
 ORDER BY o_year;
 
 -- =================================================================
--- Query ID: ETPCH_Q11 (Mutated)
--- Description: Extended TPC-H Q11, identifying important stock in India.
--- Change: Changed nation from 'INDIA' to 'GERMANY'.
--- =================================================================
-SELECT
-    ps.ps_partkey,
-    n.n_name,
-    SUM(ps.ps_supplycost * ps.ps_availqty) AS total_value
-FROM
-    partsupp ps, supplier s, nation n
-WHERE
-    ps.ps_suppkey = s.s_suppkey
-    AND s.s_nationkey = n.n_nationkey
-    AND n.n_name = 'GERMANY'
-GROUP BY
-    ps.ps_partkey, n.n_name
-HAVING
-    SUM(ps.ps_supplycost * ps.ps_availqty) >
-    (SELECT SUM(ps_inner.ps_supplycost * ps_inner.ps_availqty) * 0.00001
-     FROM partsupp ps_inner, supplier s_inner, nation n_inner
-     WHERE ps_inner.ps_suppkey = s_inner.s_suppkey
-       AND s_inner.s_nationkey = n_inner.n_nationkey
-       AND n_inner.n_name = 'GERMANY')
-ORDER BY total_value DESC;
-
--- =================================================================
--- Query ID: ETPCH_Q16 (Mutated)
--- Description: Extended TPC-H Q16, analyzing parts/supplier relationships.
--- Change: Removed the NOT IN clause, broadening the supplier pool.
--- =================================================================
-SELECT
-    p.p_brand, p.p_type, p.p_size, COUNT(DISTINCT ps.ps_suppkey) AS supplier_cnt
-FROM
-    part p, partsupp ps
-WHERE
-    p.p_partkey = ps.ps_partkey
-    AND p.p_brand <> 'Brand#23'
-    AND p.p_type NOT LIKE 'MEDIUM POLISHED%'
-    AND p.p_size IN (1, 4, 7)
-GROUP BY
-    p.p_brand, p.p_type, p.p_size
-ORDER BY
-    supplier_cnt DESC, p.p_brand, p.p_type, p.p_size;
-
--- =================================================================
 -- Query ID: ETPCH_Q17 (Mutated)
 -- Description: Simplified ETPCH Q17, calculating revenue for small-quantity orders using the standard lineitem table.
 -- Change: Changed the multiplier from 0.7 to 0.2.
@@ -1227,7 +1182,7 @@ WHERE
     AND l.l_quantity < paq.avg_q;
 
 -- =================================================================
--- Query ID: ETPCH_Q19 (Mutated)
+-- Query ID: LITHE_19 (Mutated)
 -- Description: Simplified ETPCH Q19, Discounted Revenue Query using the standard lineitem table.
 -- Change: Changed 'DELIVER IN PERSON' to 'TAKE BACK RETURN'.
 -- =================================================================

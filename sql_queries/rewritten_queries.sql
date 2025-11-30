@@ -1054,62 +1054,6 @@ ORDER BY
     order_year DESC;
 
 -- =================================================================
--- Query ID: TPCH_Q11 (Rewritten)
--- Description: Important Stock Identification Query. Finds parts from a nation that represent a significant
--- fraction of the total stock value.
--- =================================================================
-WITH IndiaStock AS (
-    SELECT
-        ps.ps_partkey,
-        SUM(ps.ps_supplycost * ps.ps_availqty) AS total_value
-    FROM
-        partsupp ps
-    JOIN
-        supplier s ON ps.ps_suppkey = s.s_suppkey
-    JOIN
-        nation n ON s.s_nationkey = n.n_nationkey
-    WHERE
-        n.n_name = 'INDIA'
-    GROUP BY
-        ps.ps_partkey
-)
-SELECT
-    I.ps_partkey,
-    'INDIA' as n_name,
-    I.total_value
-FROM
-    IndiaStock I
-WHERE
-    I.total_value > (
-        SELECT SUM(total_value) * 0.00001 FROM IndiaStock
-    )
-ORDER BY
-    I.total_value DESC;
-
--- =================================================================
--- Query ID: TPCH_Q12 (Rewritten)
--- Description: Shipping Modes and Order Priority Query. Determines if late shipping is related to order priority.
--- =================================================================
-SELECT
-    l.l_shipmode,
-    SUM(CASE WHEN o.o_orderpriority = '1-URGENT' OR o.o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END) AS high_line_count,
-    SUM(CASE WHEN o.o_orderpriority NOT IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS low_line_count
-FROM
-    orders o
-JOIN
-    lineitem l ON o.o_orderkey = l.l_orderkey
-WHERE
-    l.l_shipmode = 'SHIP'
-    AND l.l_commitdate < l.l_receiptdate
-    AND l.l_shipdate < l.l_commitdate
-    AND l.l_receiptdate >= '1995-01-01'
-    AND l.l_receiptdate < ('1995-01-01'::date + INTERVAL '1 year')
-GROUP BY
-    l.l_shipmode
-ORDER BY
-    l.l_shipmode;
-
--- =================================================================
 -- Query ID: TPCH_Q13 (Rewritten)
 -- Description: Customer Distribution Query. Counts customers by the number of orders they have placed.
 -- =================================================================
@@ -1137,25 +1081,6 @@ GROUP BY
 ORDER BY
     custdist DESC,
     c_orders.order_count DESC;
-
--- =================================================================
--- Query ID: TPCH_Q14 (Rewritten)
--- Description: Promotion Effect Query. Monitors market share of promotional parts.
--- =================================================================
-SELECT
-    100.00 * SUM(
-        CASE
-            WHEN p.p_type LIKE 'PROMO%' THEN l.l_extendedprice * (1 - l.l_discount)
-            ELSE 0
-        END
-    ) / SUM(l.l_extendedprice * (1 - l.l_discount)) AS promo_revenue
-FROM
-    lineitem l
-JOIN
-    part p ON l.l_partkey = p.p_partkey
-WHERE
-    l.l_shipdate >= '1995-01-01'
-    AND l.l_shipdate < ('1995-01-01'::date + INTERVAL '1 month');
 
 -- =================================================================
 -- Query ID: ETPCH_Q15 (Rewritten)
@@ -1186,97 +1111,6 @@ WHERE
     r.total_revenue = (SELECT MAX(total_revenue) FROM RevenueCTE)
 ORDER BY
     s.s_suppkey;
-
--- =================================================================
--- Query ID: TPCH_Q16 (Rewritten)
--- Description: Parts/Supplier Relationship Query. Counts suppliers for parts matching certain criteria,
--- excluding suppliers with complaints.
--- =================================================================
-SELECT
-    p.p_brand,
-    p.p_type,
-    p.p_size,
-    COUNT(DISTINCT ps.ps_suppkey) AS supplier_cnt
-FROM
-    partsupp ps
-JOIN
-    part p ON p.p_partkey = ps.ps_partkey
-WHERE
-    p.p_brand <> 'Brand#23'
-    AND p.p_type NOT LIKE 'MEDIUM POLISHED%'
-    AND p.p_size IN (1, 4, 7)
-    AND NOT EXISTS (
-        SELECT 1
-        FROM supplier s
-        WHERE s.s_suppkey = ps.ps_suppkey
-          AND s.s_comment LIKE '%Customer%Complaints%'
-    )
-GROUP BY
-    p.p_brand,
-    p.p_type,
-    p.p_size
-ORDER BY
-    supplier_cnt DESC,
-    p.p_brand,
-    p.p_type,
-    p.p_size;
-
--- =================================================================
--- Query ID: TPCH_Q17 (Rewritten)
--- Description: Small-Quantity-Order Revenue Query. Calculates average yearly revenue for parts with low quantity.
--- =================================================================
-WITH AvgQuantity AS (
-    SELECT l_partkey, 0.7 * AVG(l_quantity) AS threshold
-    FROM lineitem
-    GROUP BY l_partkey
-)
-SELECT
-    SUM(l.l_extendedprice) / 7.0 AS avg_yearly
-FROM
-    lineitem l
-JOIN
-    part p ON p.p_partkey = l.l_partkey
-JOIN
-    AvgQuantity aq ON aq.l_partkey = l.l_partkey
-WHERE
-    p.p_brand = 'Brand#53'
-    AND p.p_container = 'MED BAG'
-    AND l.l_quantity < aq.threshold;
-
--- =================================================================
--- Query ID: ETPCH_Q18 (Rewritten)
--- Description: Large Volume Customer Query. Finds top customers who have placed a large volume of orders.
--- =================================================================
-WITH LargeOrders AS (
-    SELECT l_orderkey
-    FROM lineitem
-    GROUP BY l_orderkey
-    HAVING SUM(l_quantity) > 300
-)
-SELECT
-    c.c_name,
-    c.c_custkey,
-    o.o_orderkey,
-    o.o_orderdate,
-    o.o_totalprice,
-    SUM(l.l_quantity)
-FROM
-    customer c
-JOIN
-    orders o ON c.c_custkey = o.o_custkey
-JOIN
-    lineitem l ON o.o_orderkey = l.l_orderkey
-WHERE
-    o.o_orderkey IN (SELECT l_orderkey FROM LargeOrders)
-GROUP BY
-    c.c_name,
-    c.c_custkey,
-    o.o_orderkey,
-    o.o_orderdate,
-    o.o_totalprice
-ORDER BY
-    o.o_totalprice DESC,
-    o.o_orderdate;
 
 -- =================================================================
 -- Query ID: Nested_Test (Rewritten)
@@ -1596,151 +1430,6 @@ SELECT
 FROM PromoData;
 
 -- =================================================================
--- Query ID: ETPCH_Q13 (Rewritten)
--- Description: Extended TPC-H Q13, analyzing customer distribution by order count.
--- =================================================================
-SELECT
-    c_orders.c_count,
-    c_orders.o_orderdate,
-    count(*) AS custdist
-FROM (
-    SELECT
-        c_custkey,
-        o_orderdate,
-        count(o_orderkey) AS c_count
-    FROM
-        customer
-    LEFT OUTER JOIN
-        orders ON c_custkey = o_custkey AND o_comment NOT LIKE '%special%requests%'
-    GROUP BY
-        c_custkey, o_orderdate
-) AS c_orders
-GROUP BY
-    c_orders.c_count, c_orders.o_orderdate
-ORDER BY
-    custdist DESC, c_count DESC;
-
--- =================================================================
--- Query ID: ETPCH_Q2 (Rewritten)
--- Description: Extended TPC-H Q2, finding the minimum cost supplier for a part in Europe.
--- =================================================================
-SELECT
-    s.s_acctbal, s.s_name, n.n_name, p.p_partkey, p.p_mfgr, s.s_address, s.s_phone, s.s_comment
-FROM
-    part p, supplier s, partsupp ps, nation n, region r
-WHERE
-    p.p_partkey = ps.ps_partkey
-    AND s.s_suppkey = ps.ps_suppkey
-    AND s.s_nationkey = n.n_nationkey
-    AND n.n_regionkey = r.r_regionkey
-    AND p.p_size = 15
-    AND p.p_type LIKE '%BRASS'
-    AND r.r_name = 'EUROPE'
-    AND ps.ps_supplycost = (
-        SELECT MIN(ps_min.ps_supplycost)
-        FROM partsupp ps_min
-        JOIN supplier s_min ON s_min.s_suppkey = ps_min.ps_suppkey
-        JOIN nation n_min ON s_min.s_nationkey = n_min.n_nationkey
-        JOIN region r_min ON n_min.n_regionkey = r_min.r_regionkey
-        WHERE r_min.r_name = 'EUROPE' AND ps_min.ps_partkey = p.p_partkey
-    )
-ORDER BY
-    s.s_acctbal DESC, n.n_name, s.s_name, p.p_partkey
-LIMIT 100;
-
--- =================================================================
--- Query ID: ETPCH_Q8 (Rewritten)
--- Description: Simplified ETPCH Q8, calculating market share using standard tables.
--- =================================================================
-WITH MarketData AS (
-    SELECT
-        EXTRACT(YEAR FROM o.o_orderdate) AS o_year,
-        l.l_extendedprice * (1 - l.l_discount) AS volume,
-        n2.n_name AS nation
-    FROM
-        part p, supplier s, lineitem l, orders o, customer c, nation n1, nation n2, region r
-    WHERE
-        p.p_partkey = l.l_partkey
-        AND s.s_suppkey = l.l_suppkey
-        AND l.l_orderkey = o.o_orderkey
-        AND o.o_custkey = c.c_custkey
-        AND c.c_nationkey = n1.n_nationkey
-        AND n1.n_regionkey = r.r_regionkey
-        AND s.s_nationkey = n2.n_nationkey
-        AND r.r_name = 'ASIA'
-        AND p.p_type = 'ECONOMY ANODIZED STEEL'
-        AND o.o_orderdate BETWEEN '1995-01-01' AND '1996-12-31'
-)
-SELECT
-    o_year,
-    SUM(CASE WHEN nation = 'INDIA' THEN volume ELSE 0 END) / SUM(volume) AS mkt_share
-FROM MarketData
-GROUP BY o_year
-ORDER BY o_year;
-
--- =================================================================
--- Query ID: ETPCH_Q11 (Rewritten)
--- Description: Extended TPC-H Q11, identifying important stock in India.
--- =================================================================
-SELECT
-    ps.ps_partkey,
-    n.n_name,
-    SUM(ps.ps_supplycost * ps.ps_availqty) AS total_value
-FROM
-    partsupp ps, supplier s, nation n
-WHERE
-    ps.ps_suppkey = s.s_suppkey
-    AND s.s_nationkey = n.n_nationkey
-    AND n.n_name = 'INDIA'
-GROUP BY
-    ps.ps_partkey, n.n_name
-HAVING
-    SUM(ps.ps_supplycost * ps.ps_availqty) >
-    (SELECT SUM(ps_inner.ps_supplycost * ps_inner.ps_availqty) * 0.00001
-     FROM partsupp ps_inner, supplier s_inner, nation n_inner
-     WHERE ps_inner.ps_suppkey = s_inner.s_suppkey
-       AND s_inner.s_nationkey = n_inner.n_nationkey
-       AND n_inner.n_name = 'INDIA')
-ORDER BY total_value DESC;
-
--- =================================================================
--- Query ID: ETPCH_Q16 (Rewritten)
--- Description: Extended TPC-H Q16, analyzing parts/supplier relationships.
--- =================================================================
-SELECT
-    p.p_brand, p.p_type, p.p_size, COUNT(DISTINCT ps.ps_suppkey) AS supplier_cnt
-FROM
-    part p, partsupp ps
-WHERE
-    p.p_partkey = ps.ps_partkey
-    AND p.p_brand <> 'Brand#23'
-    AND p.p_type NOT LIKE 'MEDIUM POLISHED%'
-    AND p.p_size IN (1, 4, 7)
-    AND ps.ps_suppkey NOT IN (SELECT s.s_suppkey FROM supplier s WHERE s.s_comment LIKE '%Customer%Complaints%')
-GROUP BY
-    p.p_brand, p.p_type, p.p_size
-ORDER BY
-    supplier_cnt DESC, p.p_brand, p.p_type, p.p_size;
-
--- =================================================================
--- Query ID: ETPCH_Q19 (Rewritten)
--- Description: Simplified ETPCH Q19, Discounted Revenue Query using the standard lineitem table.
--- =================================================================
-SELECT
-    SUM(l.l_extendedprice * (1 - l.l_discount)) AS revenue
-FROM
-    lineitem l, part p
-WHERE
-    l.l_partkey = p.p_partkey
-    AND l.l_shipmode IN ('AIR', 'AIR REG')
-    AND l.l_shipinstruct = 'DELIVER IN PERSON'
-    AND (
-        (p.p_brand = 'Brand#12' AND p.p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND l.l_quantity BETWEEN 1 AND 11 AND p.p_size BETWEEN 1 AND 5)
-     OR (p.p_brand = 'Brand#23' AND p.p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND l.l_quantity BETWEEN 10 AND 20 AND p.p_size BETWEEN 1 AND 10)
-     OR (p.p_brand = 'Brand#34' AND p.p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND l.l_quantity BETWEEN 20 AND 30 AND p.p_size BETWEEN 1 AND 15)
-    );
-
--- =================================================================
 -- Query ID: ETPCH_Q21 (Rewritten)
 -- Description: Simplified ETPCH Q21, finding suppliers in Argentina who kept orders waiting, using standard tables.
 -- =================================================================
@@ -1809,41 +1498,6 @@ WHERE
     AND o.o_orderdate BETWEEN '1995-01-01' AND '1995-12-31';
 
 -- =================================================================
--- Query ID: ETPCH_Q22 (Optimized)
--- Description: Finds potential customers in specific countries who have high account balances but have not yet placed any orders.
--- Fix: Replaced a correlated subquery for the average account balance with a CTE (AvgBalance) to calculate the average only once.
---      Also replaced NOT IN with a more performant NOT EXISTS clause.
--- =================================================================
-WITH AvgBalance AS (
-    SELECT AVG(c_acctbal) as avg_bal
-    FROM customer
-    WHERE c_acctbal > 0.00
-      AND SUBSTRING(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-),
-FilteredCustomers AS (
-    SELECT
-        SUBSTRING(c.c_phone, 1, 2) AS cntrycode,
-        c.c_acctbal
-    FROM
-        customer c, AvgBalance ab
-    WHERE
-        SUBSTRING(c.c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-        AND c.c_acctbal > ab.avg_bal
-        AND NOT EXISTS (
-            SELECT 1
-            FROM orders o
-            WHERE o.o_custkey = c.c_custkey
-        )
-)
-SELECT
-    cntrycode,
-    COUNT(*) AS numcust,
-    SUM(c_acctbal) AS totacctbal
-FROM FilteredCustomers
-GROUP BY cntrycode
-ORDER BY cntrycode;
-
--- =================================================================
 -- Query ID: ETPCH_Q17 (Optimized)
 -- Description: Calculates the average yearly revenue for parts with low order quantities.
 -- Fix: Replaced the correlated subquery for average quantity with a CTE (PartAvgQuantity).
@@ -1909,4 +1563,136 @@ WHERE
     AND ps.ps_availqty > lq.half_sum_qty
 ORDER BY
     s.s_name;
+
+-- =================================================================
+-- Query ID: LITHE_1
+-- Description: Standard query Q1 (pricing summary).
+-- =================================================================
+SELECT l_returnflag, l_linestatus, SUM(l_quantity) AS sum_qty, SUM(l_extendedprice) AS sum_base_price, SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price, SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge, AVG(l_quantity) AS avg_qty, AVG(l_extendedprice) AS avg_price, AVG(l_discount) AS avg_disc, COUNT(*) AS count_order FROM lineitem WHERE l_shipdate < '1998-11-29' GROUP BY l_returnflag, l_linestatus ORDER BY l_returnflag, l_linestatus;
+
+-- =================================================================
+-- Query ID: LITHE_2
+-- Description: Standard query Q2 (minimum cost supplier-like).
+-- =================================================================
+WITH min_supplycost AS ( SELECT ps_partkey, MIN(ps_supplycost) AS min_cost FROM partsupp JOIN supplier ON s_suppkey = ps_suppkey JOIN nation ON s_nationkey = n_nationkey JOIN region ON n_regionkey = r_regionkey WHERE r_name = 'EUROPE' GROUP BY ps_partkey ) SELECT s_acctbal, s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment FROM part JOIN partsupp ON p_partkey = ps_partkey JOIN supplier ON s_suppkey = ps_suppkey JOIN nation ON s_nationkey = n_nationkey JOIN region ON n_regionkey = r_regionkey JOIN min_supplycost ON part.p_partkey = min_supplycost.ps_partkey AND partsupp.ps_supplycost = min_supplycost.min_cost WHERE p_size = 15 AND p_type LIKE '%BRASS' AND r_name = 'EUROPE' ORDER BY s_acctbal DESC, n_name, s_name, p_partkey LIMIT 100;
+
+-- =================================================================
+-- Query ID: LITHE_3
+-- Description: Standard query Q3 (shipping priority revenue).
+-- =================================================================
+with customer_orders_cte as ( select o_orderkey, o_orderdate, o_shippriority from customer, orders where c_mktsegment = 'FURNITURE' and c_custkey = o_custkey and o_orderdate < date '1995-01-01' ), lineitem_revenue_cte as ( select l_orderkey, sum(l_extendedprice * (1 - l_discount)) as revenue from lineitem where l_shipdate > date '1995-01-01' group by l_orderkey ) select co.o_orderkey, lr.revenue, co.o_orderdate, co.o_shippriority from customer_orders_cte co join lineitem_revenue_cte lr on co.o_orderkey = lr.l_orderkey order by lr.revenue desc, co.o_orderdate;
+
+-- =================================================================
+-- Query ID: LITHE_4
+-- Description: Standard query Q4 (order priority counting).
+-- =================================================================
+select o_orderpriority, count(*) as order_count from orders where o_orderdate >= date '1994-01-01' and o_orderdate < date '1994-01-01' + interval '3' month and exists ( select * from lineitem where l_orderkey = o_orderkey and l_commitdate < l_receiptdate ) group by o_orderpriority order by o_orderpriority ;
+
+-- =================================================================
+-- Query ID: LITHE_5
+-- Description: Standard query Q5 (local supplier volume-like).
+-- =================================================================
+with filtered_orders as ( select * from orders where o_orderkey in ( select l_orderkey from lineitem ) ) select n_name, sum(l_extendedprice * (1 - l_discount)) as revenue from customer, filtered_orders as orders, lineitem, supplier, nation, region where c_custkey = o_custkey and l_orderkey = o_orderkey and l_suppkey = s_suppkey and c_nationkey = s_nationkey and s_nationkey = n_nationkey and n_regionkey = r_regionkey and r_name = 'ASIA' and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + interval '1' year group by n_name order by revenue desc;
+
+-- =================================================================
+-- Query ID: LITHE_6
+-- Description: Standard query Q6 (discounted revenue variant).
+-- =================================================================
+select sum(l_extendedprice * l_discount) as revenue from lineitem where l_shipdate >= date '1993-01-01' and l_shipdate < date '1994-03-01' + interval '1' year and l_discount between 0.06 - 0.01 and 0.06 + 0.01 and l_quantity < 10 ;
+
+-- =================================================================
+-- Query ID: LITHE_7
+-- Description: Standard query Q7 (trade volume between two nations).
+-- =================================================================
+select supp_nation, cust_nation, l_year, sum(volume) as revenue from ( select n1.n_name as supp_nation, n2.n_name as cust_nation, extract(year from l_shipdate) as l_year, l_extendedprice * (1 - l_discount) as volume from supplier, lineitem, orders, customer, nation n1, nation n2 where s_suppkey = l_suppkey and o_orderkey = l_orderkey and c_custkey = o_custkey and s_nationkey = n1.n_nationkey and c_nationkey = n2.n_nationkey and ( (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE') or (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY') ) and l_shipdate between date '1995-01-01' and date '1996-12-31' ) as shipping group by supp_nation, cust_nation, l_year order by supp_nation, cust_nation, l_year ;
+
+-- =================================================================
+-- Query ID: LITHE_8
+-- Description: Standard query Q8 (market share by year).
+-- =================================================================
+select o_year, sum(case when nation = 'INDIA' then volume else 0 end) / sum(volume) as mkt_share from ( select extract(year from o_orderdate) as o_year, l_extendedprice * (1 - l_discount) as volume, n2.n_name as nation from part, supplier, lineitem, orders, customer, nation n1, nation n2, region where p_partkey = l_partkey and s_suppkey = l_suppkey and l_orderkey = o_orderkey and o_custkey = c_custkey and c_nationkey = n1.n_nationkey and n1.n_regionkey = r_regionkey and r_name = 'ASIA' and s_nationkey = n2.n_nationkey and o_orderdate between date '1995-01-01' and date '1996-12-31' and p_type = 'ECONOMY ANODIZED STEEL' ) as all_nations group by o_year order by o_year ;
+
+-- =================================================================
+-- Query ID: LITHE_9
+-- Description: Standard query Q9 (profit by nation and year).
+-- =================================================================
+SELECT n_name AS nation, EXTRACT(YEAR FROM o_orderdate) AS o_year, SUM(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS sum_profit FROM part JOIN partsupp ON p_partkey = ps_partkey JOIN lineitem ON l_partkey = p_partkey AND l_suppkey = ps_suppkey JOIN supplier ON s_suppkey = l_suppkey JOIN orders ON o_orderkey = l_orderkey JOIN nation ON s_nationkey = n_nationkey WHERE p_name LIKE 'co%' GROUP BY n_name, o_year ORDER BY n_name, o_year DESC;
+
+-- =================================================================
+-- Query ID: LITHE_10
+-- Description: Standard query Q10 (returned item reporting).
+-- =================================================================
+SELECT c.c_custkey, c.c_name, SUM(l.l_extendedprice * (1 - l.l_discount)) AS revenue, c.c_acctbal, n.n_name, c.c_address, c.c_phone, c.c_comment FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN lineitem l ON l.l_orderkey = o.o_orderkey JOIN nation n ON c.c_nationkey = n.n_nationkey WHERE o.o_orderdate BETWEEN DATE '1995-01-01' AND DATE '1995-03-31' AND l.l_returnflag = 'R' GROUP BY c.c_custkey, c.c_name, c.c_acctbal, c.c_phone, n.n_name, c.c_address, c.c_comment ORDER BY revenue DESC;
+
+-- =================================================================
+-- Query ID: LITHE_11
+-- Description: Standard query Q11 (important stock identification).
+-- =================================================================
+SELECT ps_partkey, n_name, SUM(ps_supplycost * ps_availqty) AS total_value FROM partsupp, supplier, nation where ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'INDIA' GROUP BY ps_partkey, n_name HAVING SUM(ps_supplycost * ps_availqty) > ( SELECT SUM(ps_supplycost * ps_availqty) * 0.00001 FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey and s_nationkey = n_nationkey and n_name = 'INDIA' ) ORDER BY total_value DESC ;
+
+-- =================================================================
+-- Query ID: LITHE_12
+-- Description: Standard query Q12 (shipping modes and order priority analysis).
+-- =================================================================
+SELECT l_shipmode, SUM(CASE WHEN o_orderpriority IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS high_line_count, SUM(CASE WHEN o_orderpriority NOT IN ('1-URGENT', '2-HIGH') THEN 1 ELSE 0 END) AS low_line_count FROM orders JOIN lineitem ON o_orderkey = l_orderkey WHERE l_shipmode = 'SHIP' AND l_commitdate < l_receiptdate AND l_shipdate < l_commitdate AND l_receiptdate >= DATE '1995-01-01' AND l_receiptdate < DATE '1996-01-01' GROUP BY l_shipmode ORDER BY l_shipmode;
+
+-- =================================================================
+-- Query ID: LITHE_13
+-- Description: Standard query Q13 (customer distribution by order count).
+-- =================================================================
+select c_count, c_orderdate, count(*) as custdist from ( select c_custkey, o_orderdate, count(o_orderkey) from customer left outer join orders on c_custkey = o_custkey and o_comment not like '%special%requests%' group by c_custkey, o_orderdate ) as c_orders (c_custkey, c_count, c_orderdate) group by c_count, c_orderdate order by custdist desc, c_count desc ;
+
+-- =================================================================
+-- Query ID: LITHE_14
+-- Description: Standard query Q14 (promotion effect calculation).
+-- =================================================================
+select 100.00 * sum(case when p_type like 'PROMO%' then l_extendedprice * (1 - l_discount) else 0 end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue from lineitem, part where l_partkey = p_partkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + interval '1' month ;
+
+-- =================================================================
+-- Query ID: LITHE_15
+-- Description: Standard query Q15 (top supplier revenue using CTE).
+-- =================================================================
+SELECT s.s_suppkey, s.s_name, s.s_address, s.s_phone, r.total_revenue FROM ( SELECT l_suppkey AS supplier_no, SUM(l_extendedprice * (1 - l_discount)) AS total_revenue, MAX(SUM(l_extendedprice * (1 - l_discount))) OVER () AS max_revenue FROM lineitem WHERE l_shipdate >= DATE '1995-01-01' AND l_shipdate < DATE '1995-01-01' + INTERVAL '3' MONTH GROUP BY l_suppkey ) r JOIN supplier s ON s.s_suppkey = r.supplier_no WHERE r.total_revenue = r.max_revenue ORDER BY s.s_suppkey;
+
+-- =================================================================
+-- Query ID: LITHE_16
+-- Description: Standard query Q16 (parts/supplier relationship stats).
+-- =================================================================
+SELECT p_brand, p_type, p_size, COUNT(DISTINCT ps_suppkey) AS supplier_cnt FROM partsupp JOIN part ON p_partkey = ps_partkey LEFT JOIN supplier ON ps_suppkey = s_suppkey AND s_comment LIKE '%Customer%Complaints%' WHERE p_brand <> 'Brand#23' AND p_type NOT LIKE 'MEDIUM POLISHED%' AND p_size IN (1, 4, 7) AND s_suppkey IS NULL GROUP BY p_brand, p_type, p_size ORDER BY supplier_cnt DESC, p_brand, p_type, p_size;
+
+-- =================================================================
+-- Query ID: LITHE_17
+-- Description: Standard query Q17 (average yearly revenue for small-quantity orders).
+-- =================================================================
+select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#53' and p_container = 'MED BAG' and l_quantity < ( select 0.7 * avg(l_quantity) from lineitem where l_partkey = p_partkey ) ;
+
+-- =================================================================
+-- Query ID: LITHE_18
+-- Description: Standard query Q18 (customers with large order quantities).
+-- =================================================================
+select c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice, sum(l_quantity) from customer, orders, lineitem where o_orderkey in ( select l_orderkey from lineitem group by l_orderkey having sum(l_quantity) > 300 ) and c_custkey = o_custkey and o_orderkey = l_orderkey group by c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice order by o_totalprice desc, o_orderdate ;
+
+-- =================================================================
+-- Query ID: LITHE_19
+-- Description: Standard query Q19 (discounted revenue across brands and containers).
+-- =================================================================
+select sum(l_extendedprice* (1 - l_discount)) as revenue from lineitem, part where ( p_partkey = l_partkey and p_brand = 'Brand#12' and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') and l_quantity >= 1 and l_quantity <= 1 + 10 and p_size between 1 and 5 and l_shipmode in ('AIR', 'AIR REG') and l_shipinstruct = 'DELIVER IN PERSON' ) or ( p_partkey = l_partkey and p_brand = 'Brand#23' and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') and l_quantity >= 10 and l_quantity <= 10 + 10 and p_size between 1 and 10 and l_shipmode in ('AIR', 'AIR REG') and l_shipinstruct = 'DELIVER IN PERSON' ) or ( p_partkey = l_partkey and p_brand = 'Brand#34' and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') and l_quantity >= 20 and l_quantity <= 20 + 10 and p_size between 1 and 15 and l_shipmode in ('AIR', 'AIR REG') and l_shipinstruct = 'DELIVER IN PERSON' ) ;
+
+-- =================================================================
+-- Query ID: LITHE_20
+-- Description: Standard query Q20 (suppliers for ivory parts in France with availability filter).
+-- =================================================================
+with filtered_supplier as ( select * from supplier where s_nationkey in ( select n_nationkey from nation where n_name = 'FRANCE' ) ) select s_name, s_address from filtered_supplier as supplier, nation where s_suppkey in ( select ps_suppkey from partsupp where ps_partkey in ( select p_partkey from part where p_name like '%ivory%' ) and ps_availqty > ( select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + interval '1' year ) ) and s_nationkey = n_nationkey and n_name = 'FRANCE' order by s_name; 
+
+-- =================================================================
+-- Query ID: LITHE_21
+-- Description: Standard query Q21 (suppliers who kept orders waiting in Argentina).
+-- =================================================================
+select s_name, count(*) as numwait from supplier, lineitem l1, orders, nation where s_suppkey = l1.l_suppkey and o_orderkey = l1.l_orderkey and o_orderstatus = 'F' and l1.l_receiptdate > l1.l_commitdate and exists ( select * from lineitem l2 where l2.l_orderkey = l1.l_orderkey and l2.l_suppkey <> l1.l_suppkey ) and not exists ( select * from lineitem l3 where l3.l_orderkey = l1.l_orderkey and l3.l_suppkey <> l1.l_suppkey and l3.l_receiptdate > l3.l_commitdate ) and s_nationkey = n_nationkey and n_name = 'ARGENTINA' group by s_name order by numwait desc, s_name ;
+
+-- =================================================================
+-- Query ID: LITHE_22
+-- Description: Standard query Q22 (country code customer/account balance aggregation).
+-- =================================================================
+with filtered_customer as ( select * from customer where substring(c_phone from 1 for 2) in ('13', '31', '23', '29', '30', '18', '17') ) select cntrycode, count(*) as numcust, sum(c_acctbal) as totacctbal from ( select substring(c_phone from 1 for 2) as cntrycode, c_acctbal from filtered_customer where c_acctbal > ( select avg(c_acctbal) from filtered_customer where c_acctbal > 0.00 ) and not exists ( select * from orders where o_custkey = c_custkey ) ) as custsale group by cntrycode order by cntrycode;
 
