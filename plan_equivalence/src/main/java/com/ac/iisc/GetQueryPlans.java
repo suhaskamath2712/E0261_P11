@@ -80,7 +80,8 @@ public class GetQueryPlans {
      */
     private static JSONArray explainPlan(Connection conn, String sql) throws SQLException {
         // Use a PreparedStatement to avoid issues with semicolons; EXPLAIN is server-side
-        String explain = "EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) " + sql;
+        String explain = "EXPLAIN (FORMAT JSON, BUFFERS) " + sql;
+
         try (PreparedStatement ps = conn.prepareStatement(explain)) {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

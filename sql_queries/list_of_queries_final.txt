@@ -33,7 +33,6 @@ Nested/Misc
 
 F-Series (Fragmented)
 - F1: Union of JUMBO container line items with specific-range customers.
-- F2: LEFT OUTER JOIN listing nation names and customer account balances with filters.
 
 TPC-H Modified (MQ)
 - MQ1: Pricing summary report for shipped line items (aggregations by flags/status).

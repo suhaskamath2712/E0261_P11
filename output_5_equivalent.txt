@@ -1,0 +1,76 @@
+Query ID: U1	true	true	[ProjectSetOpTransposeRule, ProjectMergeRule, UnionMergeRule]	true
+Query ID: U2	true	true	[ProjectRemoveRule, UnionMergeRule, ProjectSetOpTransposeRule, ProjectMergeRule]	true
+Query ID: U3	true	true	[ProjectMergeRule, ProjectRemoveRule, UnionMergeRule]	true
+Query ID: U4	true	true	[ProjectRemoveRule, FilterMergeRule, FilterSetOpTransposeRule, ProjectSetOpTransposeRule, UnionMergeRule]	true
+Query ID: U5	true	true	[UnionMergeRule, ProjectRemoveRule]	true
+Query ID: U6	true	true	[UnionMergeRule]	true
+Query ID: U7	true	true	[]	
+Query ID: U8	true	false	
+Query ID: U9	true	true	[ProjectRemoveRule, ProjectSetOpTransposeRule, ProjectMergeRule, UnionMergeRule]	true
+Query ID: O1	false	false	
+Query ID: O2	false	false	
+Query ID: O3	false	false	
+Query ID: O4	true	true	[ProjectJoinTransposeRule, ProjectMergeRule, ProjectRemoveRule]	true
+Query ID: O5	false	false	
+Query ID: O6	true	true	[]	
+Query ID: A1	false	true	[ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: A2	true	true	[ProjectJoinTransposeRule, ProjectMergeRule, ProjectRemoveRule]	true
+Query ID: A3	true	true	[ProjectRemoveRule, ProjectMergeRule, FilterMergeRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	true
+Query ID: A4	true	true	[ProjectRemoveRule, ProjectMergeRule, AggregateProjectMergeRule]	false
+Query ID: N1	false	true	[ProjectRemoveRule, ProjectMergeRule, AggregateProjectMergeRule]	false
+Query ID: Alaap	false	false	
+Query ID: Nested_Test	true	true	[ProjectJoinTransposeRule, ProjectMergeRule, ProjectRemoveRule]	true
+Query ID: paper_sample	true	true	[ProjectRemoveRule, ProjectSetOpTransposeRule, UnionMergeRule]	true
+Query ID: F1    false   false
+Query ID: MQ1	false	true	[]	
+Query ID: MQ2	true	true	[]	
+Query ID: MQ3	true	true	[ProjectRemoveRule, ReduceExpressionsRule.FilterReduceExpressionsRule, ProjectMergeRule]	true
+Query ID: MQ4	true	true	[]	
+Query ID: MQ5	true	true	[JoinPushTransitivePredicatesRule, ReduceExpressionsRule.JoinReduceExpressionsRule]	true
+Query ID: MQ6	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: MQ10	true	true	[ProjectRemoveRule, ProjectMergeRule, AggregateProjectMergeRule]	true
+Query ID: MQ11	false	true	[ProjectRemoveRule, ProjectMergeRule]	false
+Query ID: MQ17	true	true	[]	
+Query ID: MQ18	true	true	[]	
+Query ID: MQ21	true	true	[]	
+Query ID: TPCH_Q9	true	true	[ProjectRemoveRule, ProjectMergeRule, AggregateProjectMergeRule, ReduceExpressionsRule.ProjectReduceExpressionsRule]	true
+Query ID: TPCH_Q13	true	true	[ProjectJoinTransposeRule, ProjectMergeRule, ProjectAggregateMergeRule, SortProjectTransposeRule, ProjectRemoveRule]	true	
+Query ID: ETPCH_Q1  true    true    []
+Query ID: ETPCH_Q3  true    true    []
+Query ID: ETPCH_Q4	true	true	[ProjectMergeRule, ProjectRemoveRule]	true
+Query ID: ETPCH_Q5	true	true	[ProjectRemoveRule, ProjectMergeRule, ReduceExpressionsRule.JoinReduceExpressionsRule]	true
+Query ID: ETPCH_Q6	true	true	[]	
+Query ID: ETPCH_Q6_1	true	true	[ReduceExpressionsRule.FilterReduceExpressionsRule]	true
+Query ID: ETPCH_Q6_2	true	true	[ReduceExpressionsRule.FilterReduceExpressionsRule]	true
+Query ID: ETPCH_Q7	false	true	[ReduceExpressionsRule.FilterReduceExpressionsRule, ProjectRemoveRule, ProjectMergeRule]	false
+Query ID: ETPCH_Q9	false	true	[ProjectRemoveRule, JoinToMultiJoinRule, MultiJoinOptimizeBushyRule]	false
+Query ID: ETPCH_Q10	false	true	[ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: ETPCH_Q12	false	true	[ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: ETPCH_Q14	true	true	[ProjectRemoveRule]	true
+Query ID: ETPCH_Q15	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: ETPCH_Q21	true	true	[ReduceExpressionsRule.FilterReduceExpressionsRule, ReduceExpressionsRule.JoinReduceExpressionsRule]	true
+Query ID: ETPCH_Q23	false	true	[JoinToMultiJoinRule, MultiJoinOptimizeBushyRule, JoinAssociateRule, ReduceExpressionsRule.FilterReduceExpressionsRule, ReduceExpressionsRule.ProjectReduceExpressionsRule]	false
+Query ID: ETPCH_Q24	false	true	[AggregateJoinJoinRemoveRule, AggregateJoinRemoveRule, AggregateMergeRule, AggregateReduceFunctionsRule, SortJoinTransposeRule, SortRemoveRedundantRule]	false
+Query ID: LITHE_1	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: LITHE_2	true	true	[FilterProjectTransposeRule, ReduceExpressionsRule.FilterReduceExpressionsRule, JoinToMultiJoinRule, MultiJoinOptimizeBushyRule, AggregateJoinTransposeRule, SemiJoinRule.ProjectToSemiJoinRule, ProjectMergeRule]	true
+Query ID: LITHE_3	false	true	[AggregateJoinTransposeRule, JoinToMultiJoinRule, MultiJoinOptimizeBushyRule, SortJoinTransposeRule, SortRemoveRedundantRule, ProjectRemoveRule, AggregateRemoveRule]	false
+Query ID: LITHE_4	true	true	[]	
+Query ID: LITHE_5	false	true	[JoinAddRedundantSemiJoinRule]	false
+Query ID: LITHE_6	false	true	[]	
+Query ID: LITHE_7	true	true	[]	
+Query ID: LITHE_8	true	true	[]
+Query ID: LITHE_9	false	true	[JoinToMultiJoinRule, MultiJoinOptimizeBushyRule]	false
+Query ID: LITHE_10	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: LITHE_11	true	true	[]	
+Query ID: LITHE_12	false	true	[CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]	false
+Query ID: LITHE_13	true	true	[]	
+Query ID: LITHE_14	true	true	[]	
+Query ID: LITHE_15	false	true	[FilterToCalcRule, ProjectToWindowRule.CalcToWindowRule, FilterWindowTransposeRule, AggregateRemoveRule, ProjectMergeRule, FilterMergeRule]	false
+Query ID: LITHE_16	false	true	[FilterJoinRule.FilterIntoJoinRule, SemiJoinRule, SemiJoinJoinTransposeRule, JoinAssociateRule, FilterProjectTransposeRule, ProjectRemoveRule]	false
+Query ID: LITHE_17	true	true	[]	
+Query ID: LITHE_18	true	true	[]	
+Query ID: LITHE_19	true	true	[]	
+Query ID: LITHE_20	false	false
+Query ID: LITHE_21	true	true	[]	
+Query ID: LITHE_22	false	false	
+

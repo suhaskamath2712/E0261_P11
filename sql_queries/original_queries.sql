@@ -201,14 +201,6 @@ from customer LEFT OUTER JOIN orders on c_custkey = o_custkey
  where c_custkey > 1000 and c_custkey < 1010 Order By price desc, o_orderkey, c_custkey Limit 100);
 
 -- =================================================================
--- Query ID: F2
--- Description: Selects nation names and customer account balances using a LEFT OUTER JOIN with conditions.
--- =================================================================
-select n_name, c_acctbal from nation LEFT OUTER JOIN customer
-                     ON n_nationkey = c_nationkey and c_nationkey > 3 and n_nationkey < 20 and
-                     c_nationkey != 10 LIMIT 200;
-
--- =================================================================
 -- Query ID: MQ1 (TPCH Q1)
 -- Description: Pricing Summary Report Query. Provides a summary of line item pricing.
 -- =================================================================
@@ -222,7 +214,7 @@ SELECT l_returnflag, l_linestatus,
        AVG(l_discount) AS avg_disc,
        COUNT(*) AS count_order
 FROM lineitem
-WHERE l_shipdate <= DATE '1998-12-01' - INTERVAL '71 days'
+WHERE l_shipdate <= DATE '1998-12-01' - INTERVAL '71' DAY
 GROUP BY l_returnflag, l_linestatus
 ORDER BY l_returnflag, l_linestatus;
 
@@ -266,7 +258,7 @@ LIMIT 10;
 SELECT o_orderdate, o_orderpriority, COUNT(*) AS order_count
 FROM orders
 WHERE o_orderdate >= DATE '1997-07-01'
-  AND o_orderdate < DATE '1997-07-01' + INTERVAL '3 months'
+    AND o_orderdate < DATE '1997-07-01' + INTERVAL '3' MONTH
 GROUP BY o_orderdate, o_orderpriority
 ORDER BY o_orderpriority
 LIMIT 10;
@@ -286,7 +278,7 @@ WHERE c_custkey = o_custkey
   AND n_regionkey = r_regionkey
   AND r_name = 'MIDDLE EAST'
   AND o_orderdate >= DATE '1994-01-01'
-  AND o_orderdate < DATE '1994-01-01' + INTERVAL '1 year'
+    AND o_orderdate < DATE '1994-01-01' + INTERVAL '1' YEAR
 GROUP BY n_name
 ORDER BY revenue DESC
 LIMIT 100;
@@ -299,7 +291,7 @@ SELECT l_shipmode,
        SUM(l_extendedprice * l_discount) AS revenue
 FROM lineitem
 WHERE l_shipdate >= DATE '1994-01-01'
-  AND l_shipdate < DATE '1994-01-01' + INTERVAL '1 year'
+    AND l_shipdate < DATE '1994-01-01' + INTERVAL '1' YEAR
   AND l_quantity < 24
 GROUP BY l_shipmode
 LIMIT 100;
@@ -315,7 +307,7 @@ FROM customer, orders, lineitem, nation
 WHERE c_custkey = o_custkey
   AND l_orderkey = o_orderkey
   AND o_orderdate >= DATE '1994-01-01'
-  AND o_orderdate < DATE '1994-01-01' + INTERVAL '3 months'
+    AND o_orderdate < DATE '1994-01-01' + INTERVAL '3' MONTH
   AND l_returnflag = 'R'
   AND c_nationkey = n_nationkey
 GROUP BY c_name, c_acctbal, c_phone, n_name, c_address, c_comment
@@ -450,7 +442,7 @@ order by
 	c_count desc;
 
 -- =================================================================
--- Query ID: ETPCH_Q15 (TPCH Q15) (Corrected)
+-- Query ID: ETPCH_Q15
 -- Description: Top Supplier Query. Finds the supplier with the maximum total revenue for a given period.
 -- =================================================================
 WITH revenue (supplier_no, total_revenue) AS (
@@ -553,8 +545,7 @@ ORDER BY
 -- Query ID: ETPCH_Q3 (Corrected)
 -- Description: Simplified version of ETPCH Q3, using the standard lineitem table for shipping priority analysis.
 -- =================================================================
-SELECT
-    l_orderkey,
+SELECT l_orderkey,
     SUM(l_extendedprice * (1 - l_discount)) AS revenue,
     o_orderdate,
     o_shippriority
@@ -641,7 +632,7 @@ AND l_quantity < 24;
 -- Query ID: ETPCH_Q7 (Corrected)
 -- Description: Simplified version of ETPCH Q7, analyzing trade volume between two nations using standard tables.
 -- =================================================================
-SELECT n1.n_name as supp_nation, n2.n_name as cust_nation, EXTRACT(YEAR FROM l_shipdate) as l_year, SUM(l_extendedprice*(1 - l_discount)) as revenue
+SELECT n1.n_name AS supp_nation, n2.n_name AS cust_nation, EXTRACT(YEAR FROM l_shipdate) AS l_year, SUM(l_extendedprice * (1 - l_discount)) AS revenue
 FROM customer, nation n1, nation n2, orders, supplier, lineitem
 WHERE orders.o_orderkey = lineitem.l_orderkey
 AND supplier.s_suppkey = lineitem.l_suppkey
@@ -650,8 +641,8 @@ AND customer.c_nationkey = n2.n_nationkey
 AND n1.n_nationkey = supplier.s_nationkey
 AND ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n2.n_name = 'FRANCE' AND n1.n_name = 'GERMANY'))
 AND lineitem.l_shipdate BETWEEN '1995-01-01' AND '1996-12-31'
-GROUP BY supp_nation, cust_nation, l_year
-ORDER BY supp_nation, cust_nation, l_year;
+GROUP BY n1.n_name, n2.n_name, EXTRACT(YEAR FROM l_shipdate)
+ORDER BY n1.n_name, n2.n_name, EXTRACT(YEAR FROM l_shipdate);
 
 -- =================================================================
 -- Query ID: ETPCH_Q9 (Corrected)
@@ -759,8 +750,8 @@ ORDER BY numwait DESC, s_name;
 -- Description: A simplified version of a complex query analyzing customer returns using standard tables.
 -- Note: The original logic is heavily dependent on non-standard tables and cannot be fully replicated.
 -- =================================================================
-SELECT   RIGHT(c_address, 5) AS city,
-         p_brand             AS part_brand
+SELECT   substring(c_address from char_length(c_address)-4) AS city,
+         p_brand AS part_brand
 FROM     customer,
          orders,
          lineitem,
@@ -770,7 +761,7 @@ AND      o_orderkey = l_orderkey
 AND      l_partkey = p_partkey
 AND      l_returnflag = 'R'
 AND      o_orderdate BETWEEN date '1995-01-01' AND date '1995-12-31'
-GROUP BY RIGHT(c_address, 5),
+GROUP BY substring(c_address from char_length(c_address)-4),
          p_brand
 ORDER BY city, part_brand;
 
@@ -815,13 +806,13 @@ select l_orderkey, sum(l_extendedprice * (1 - l_discount)) as revenue, o_orderda
 -- Query ID: LITHE_4
 -- Description: Standard query Q4 (order priority counting).
 -- =================================================================
-select o_orderpriority, count(*) as order_count from orders where o_orderdate >= date '1994-01-01' and o_orderdate < date '1994-01-01' + interval '3' month and exists ( select * from lineitem where l_orderkey = o_orderkey and l_commitdate < l_receiptdate ) group by o_orderpriority order by o_orderpriority ;
+select o_orderpriority, count(*) as order_count from orders where o_orderdate >= date '1994-01-01' and o_orderdate < date '1994-01-01' + INTERVAL '3' MONTH and exists ( select * from lineitem where l_orderkey = o_orderkey and l_commitdate < l_receiptdate ) group by o_orderpriority order by o_orderpriority ;
 
 -- =================================================================
 -- Query ID: LITHE_5
 -- Description: Standard query Q5 (local supplier volume-like).
 -- =================================================================
-select n_name, sum(l_extendedprice * (1 - l_discount)) as revenue from customer, orders, lineitem, supplier, nation, region where c_custkey = o_custkey and l_orderkey = o_orderkey and l_suppkey = s_suppkey and c_nationkey = s_nationkey and s_nationkey = n_nationkey and n_regionkey = r_regionkey and r_name = 'ASIA' and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + interval '1' year group by n_name order by revenue desc ;
+select n_name, sum(l_extendedprice * (1 - l_discount)) as revenue from customer, orders, lineitem, supplier, nation, region where c_custkey = o_custkey and l_orderkey = o_orderkey and l_suppkey = s_suppkey and c_nationkey = s_nationkey and s_nationkey = n_nationkey and n_regionkey = r_regionkey and r_name = 'ASIA' and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + INTERVAL '1' YEAR group by n_name order by revenue desc ;
 
 -- =================================================================
 -- Query ID: LITHE_6
@@ -851,7 +842,7 @@ select nation, o_year, sum(amount) as sum_profit from ( select n_name as nation,
 -- Query ID: LITHE_10
 -- Description: Standard query Q10 (returned item reporting).
 -- =================================================================
-select c_custkey, c_name, sum(l_extendedprice * (1 - l_discount)) as revenue, c_acctbal, n_name, c_address, c_phone, c_comment from customer, orders, lineitem, nation where c_custkey = o_custkey and l_orderkey = o_orderkey and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + interval '3' month and l_returnflag = 'R' and c_nationkey = n_nationkey group by c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment order by revenue desc ;
+select c_custkey, c_name, sum(l_extendedprice * (1 - l_discount)) as revenue, c_acctbal, n_name, c_address, c_phone, c_comment from customer, orders, lineitem, nation where c_custkey = o_custkey and l_orderkey = o_orderkey and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + INTERVAL '3' MONTH and l_returnflag = 'R' and c_nationkey = n_nationkey group by c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment order by revenue desc ;
 
 -- =================================================================
 -- Query ID: LITHE_11
@@ -863,7 +854,7 @@ SELECT ps_partkey, n_name, SUM(ps_supplycost * ps_availqty) AS total_value FROM 
 -- Query ID: LITHE_12
 -- Description: Standard query Q12 (shipping modes and order priority analysis).
 -- =================================================================
-select l_shipmode, sum(case when o_orderpriority = '1-URGENT' or o_orderpriority = '2-HIGH' then 1 else 0 end) as high_line_count, sum(case when o_orderpriority <> '1-URGENT' and o_orderpriority <> '2-HIGH' then 1 else 0 end) as low_line_count from orders, lineitem where o_orderkey = l_orderkey and l_shipmode = 'SHIP' and l_commitdate < l_receiptdate and l_shipdate < l_commitdate and l_receiptdate >= date '1995-01-01' and l_receiptdate < date '1995-01-01' + interval '1' year group by l_shipmode order by l_shipmode ;
+select l_shipmode, sum(case when o_orderpriority = '1-URGENT' or o_orderpriority = '2-HIGH' then 1 else 0 end) as high_line_count, sum(case when o_orderpriority <> '1-URGENT' and o_orderpriority <> '2-HIGH' then 1 else 0 end) as low_line_count from orders, lineitem where o_orderkey = l_orderkey and l_shipmode = 'SHIP' and l_commitdate < l_receiptdate and l_shipdate < l_commitdate and l_receiptdate >= date '1995-01-01' and l_receiptdate < date '1995-01-01' + INTERVAL '1' YEAR group by l_shipmode order by l_shipmode ;
 
 -- =================================================================
 -- Query ID: LITHE_13
@@ -875,13 +866,13 @@ select c_count, c_orderdate, count(*) as custdist from ( select c_custkey, o_ord
 -- Query ID: LITHE_14
 -- Description: Standard query Q14 (promotion effect calculation).
 -- =================================================================
-select 100.00 * sum(case when p_type like 'PROMO%' then l_extendedprice * (1 - l_discount) else 0 end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue from lineitem, part where l_partkey = p_partkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + interval '1' month ;
+select 100.00 * sum(case when p_type like 'PROMO%' then l_extendedprice * (1 - l_discount) else 0 end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue from lineitem, part where l_partkey = p_partkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + INTERVAL '1' MONTH ;
 
 -- =================================================================
 -- Query ID: LITHE_15
 -- Description: Standard query Q15 (top supplier revenue using CTE).
 -- =================================================================
-with revenue(supplier_no, total_revenue) as (select l_suppkey, sum(l_extendedprice * (1 - l_discount)) from lineitem where l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + interval '3' month group by l_suppkey) select s_suppkey, s_name, s_address, s_phone, total_revenue from supplier, revenue where s_suppkey = supplier_no and total_revenue = ( select max(total_revenue) from revenue ) order by s_suppkey ;
+with revenue(supplier_no, total_revenue) as (select l_suppkey, sum(l_extendedprice * (1 - l_discount)) from lineitem where l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + INTERVAL '3' MONTH group by l_suppkey) select s_suppkey, s_name, s_address, s_phone, total_revenue from supplier, revenue where s_suppkey = supplier_no and total_revenue = ( select max(total_revenue) from revenue ) order by s_suppkey ;
 
 -- =================================================================
 -- Query ID: LITHE_16
@@ -911,7 +902,7 @@ select sum(l_extendedprice* (1 - l_discount)) as revenue from lineitem, part whe
 -- Query ID: LITHE_20
 -- Description: Standard query Q20 (suppliers for ivory parts in France with availability filter).
 -- =================================================================
-select s_name, s_address from supplier, nation where s_suppkey in ( select ps_suppkey from partsupp where ps_partkey in ( select p_partkey from part where p_name like '%ivory%' ) and ps_availqty > ( select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + interval '1' year ) ) and s_nationkey = n_nationkey and n_name = 'FRANCE' order by s_name ;
+select s_name, s_address from supplier, nation where s_suppkey in ( select ps_suppkey from partsupp where ps_partkey in ( select p_partkey from part where p_name like '%ivory%' ) and ps_availqty > ( select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + INTERVAL '1' YEAR ) ) and s_nationkey = n_nationkey and n_name = 'FRANCE' order by s_name ;
 
 -- =================================================================
 -- Query ID: LITHE_21
