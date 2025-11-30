@@ -59,10 +59,10 @@ public class FileIO
 {
 	// Absolute paths to the SQL collections (under the sql_queries/ folder)
 	private static final String ORIGINAL_SQL_PATH =
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\LITHE_Queries\\standard_queries.sql";
+			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
 
 	private static final String REWRITTEN_SQL_PATH =
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\LITHE_Queries\\rewritten_queries.sql";
+			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\rewritten_queries.sql";
 
 	private static final String MUTATED_SQL_PATH =
 			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql";

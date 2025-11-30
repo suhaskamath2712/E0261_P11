@@ -21,7 +21,28 @@ public class Test
     );*/
     
     private static final List<String> queryIDList = List.of(
-        "Q21", "Q22"
+        // U-Series
+        "U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8", "U9",
+        // O-Series
+        "O1", "O2", "O3", "O4", "O5", "O6",
+        // A-Series
+        "A1", "A2", "A3", "A4",
+        // Nested/Misc
+        "N1", "Alaap", "Nested_Test", "paper_sample",
+        // F-Series
+        "F1", "F2",
+        // TPC-H Modified (MQ)
+        "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
+        // Standard TPC-H
+        "TPCH_Q9", "TPCH_Q13",
+        // Extended TPC-H (ETPCH)
+        "ETPCH_Q1", "ETPCH_Q3", "ETPCH_Q4", "ETPCH_Q5", "ETPCH_Q6", "ETPCH_Q6_1", "ETPCH_Q6_2",
+        "ETPCH_Q7", "ETPCH_Q9", "ETPCH_Q10", "ETPCH_Q12", "ETPCH_Q14", "ETPCH_Q15", "ETPCH_Q21",
+        "ETPCH_Q23", "ETPCH_Q24",
+        // LITHE Series
+        "LITHE_1", "LITHE_2", "LITHE_3", "LITHE_4", "LITHE_5", "LITHE_6", "LITHE_7", "LITHE_8", "LITHE_9",
+        "LITHE_10", "LITHE_11", "LITHE_12", "LITHE_13", "LITHE_14", "LITHE_15", "LITHE_16", "LITHE_17",
+        "LITHE_18", "LITHE_19", "LITHE_20", "LITHE_21", "LITHE_22"
     );
 
     //Q17, Q20 : Goes into infinite loop
@@ -32,53 +53,32 @@ public class Test
      */
     public static void main(String[] args) throws Exception
     {            
-        int LLMtrue = 0, LLMfalse = 0, LLMGaveTransform = 0, LLMGaveCorrectTransform = 0;
         for (String id : queryIDList)
         {
             String sqlA = FileIO.readOriginalSqlQuery(id);
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
-            boolean result = Calcite.compareQueries(sqlA, sqlB, null);
-            System.out.print("Query ID: " + id + "\t" + result + "\t");
+            System.out.print("Query ID: " + id + "\t" + Calcite.compareQueries(sqlA, sqlB, null) + "\t");
 
             // Try with transformations from LLM
             // Get Query Plan Transformations from LLM
-            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            /*LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
 
             boolean doesLLMThinkEquivalent = llmResponse.areQueriesEquivalent();
             System.out.print(doesLLMThinkEquivalent + "\t");
 
             if (doesLLMThinkEquivalent)
             {
-                LLMtrue++;
                 //extract transformations only if LLM says equivalent
                 List<String> llmTransformations = llmResponse.getTransformationSteps();
                 
                 System.out.print(llmTransformations + "\t");
 
                 if (!llmTransformations.isEmpty())
-                {
-                    LLMGaveTransform++; 
-                    // Apply transformations
-                    result = Calcite.compareQueries(sqlA, sqlB, llmTransformations);
+                    System.out.println(Calcite.compareQueries(sqlA, sqlB, llmTransformations));
+            }*/
 
-                    if (result)
-                        LLMGaveCorrectTransform++;
-
-                    System.out.println(result);
-                }
-            }
-            else LLMfalse++;
-
-            //System.out.println("---------------------------------------------------");
-        }
-
-        //Print statistics
-        System.out.println("Total Queries Processed: " + queryIDList.size());
-        System.out.println("Offline Proven Equivalent Queries: " + (queryIDList.size() - (LLMtrue + LLMfalse)));
-        System.out.println("LLM predicted equivalence for: " + LLMtrue);
-        System.out.println("LLM predicted non-equivalence for: " + LLMfalse);
-        System.out.println("LLM provided transformations for: " + LLMGaveTransform);
-        System.out.println("LLM provided correct transformations for: " + LLMGaveCorrectTransform); 
+            System.out.println();
+        } 
     }
 }

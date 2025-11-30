@@ -1,0 +1,98 @@
+This file lists queries that are present in both original and rewritten SQL files, with a short description for each.
+
+U-Series (Union)
+- U1: Union of top parts by available quantity with top suppliers by available quantity.
+- U2: Union of top suppliers from Germany with urgent-priority customers.
+- U3: Union of customers from USA, high-quantity parts, and nations starting with 'B'.
+- U4: Union of USA customers, Canadian suppliers, high-quantity parts, and high supply-cost parts.
+- U5: Union of recent customer orders with older high-quantity, high-price line items.
+- U6: Union of top clerks by total price with nations containing 'UNITED' by total account balance.
+- U7: Union of recent line items with parts having low supply cost.
+- U8: Union of customers with few recent orders and line items with highest average quantity.
+- U9: Union of BUILDING-segment customers with high balances and very high-balance suppliers.
+
+O-Series (Outer Join)
+- O1: RIGHT OUTER JOIN of customers and nations; counts per customer/nation.
+- O2: LEFT OUTER JOIN counting low-quantity items by ship mode and priority.
+- O3: FULL OUTER JOIN summing customer account balances for finished orders.
+- O4: Multiple OUTER JOINs retrieving part, supplier, and nation details.
+- O5: RIGHT OUTER JOIN selecting parts with specific size and availability.
+- O6: Multiple OUTER JOINs variant with different ordering.
+
+A-Series (Aggregate)
+- A1: Counts line items by ship mode under date and price constraints.
+- A2: Counts orders by priority within a specified date range.
+- A3: Selects line items with complex date and availability rules.
+- A4: Counts 'waiting' items per supplier for finished orders.
+
+Nested/Misc
+- N1: Counts suppliers per part (brand, type, size).
+- Alaap: Custom revenue calculation by market segment and shipping priority.
+- Nested_Test: Finds suppliers from France providing 'ivory' parts with sufficient stock.
+- paper_sample: Union combining high-value customers with suppliers based on average price.
+
+F-Series (Fragmented)
+- F1: Union of JUMBO container line items with specific-range customers.
+- F2: LEFT OUTER JOIN listing nation names and customer account balances with filters.
+
+TPC-H Modified (MQ)
+- MQ1: Pricing summary report for shipped line items (aggregations by flags/status).
+- MQ2: Minimum-cost supplier in a region for a specific part.
+- MQ3: Top unshipped orders by revenue for a market segment.
+- MQ4: Counts orders by priority for a given quarter.
+- MQ5: Revenue by nation for suppliers in a region during a period.
+- MQ6: Estimated revenue impact if discounts were removed for low-quantity items.
+- MQ10: Customers with returned items and their revenue.
+- MQ11: Most valuable stock by comment within a specified nation.
+- MQ17: Average extended price for small-quantity orders for a specific brand/container.
+- MQ18: Large volume customer orders with specific phone prefix.
+- MQ21: Suppliers who kept orders waiting (late shipments) for finished orders.
+
+Standard TPC-H
+- TPCH_Q9: Profit by nation and year for parts with names containing 'co'.
+- TPCH_Q13: Customer distribution by number of orders.
+
+Extended TPC-H (ETPCH)
+- ETPCH_Q1: Pricing summary across flags/status (ETPCH variant of Q1).
+- ETPCH_Q3: Top-revenue unshipped orders for 'FURNITURE' segment.
+- ETPCH_Q4: Late shipments counted by priority for a quarter.
+- ETPCH_Q5: Total revenue from suppliers in 'ASIA' region for a year.
+- ETPCH_Q6: Total revenue from discounts for a date range and quantity constraints.
+- ETPCH_Q6_1: Web-only variation of ETPCH_Q6.
+- ETPCH_Q6_2: Variation summing total revenue before union.
+- ETPCH_Q7: Trade revenue between FRANCE and GERMANY across channels.
+- ETPCH_Q9: Profit by nation and year combining web and store channels.
+- ETPCH_Q10: Top customers by revenue who returned items.
+- ETPCH_Q12: Late shipments by ship modes across channels.
+- ETPCH_Q14: Promotional parts market share percentage.
+- ETPCH_Q15: Supplier with maximum total revenue for a month.
+- ETPCH_Q21: Suppliers in ARGENTINA late on complex web orders.
+- ETPCH_Q23: Cities and brands involved in cross-channel return pattern.
+- ETPCH_Q24: Complex query for customer cities based on returns, orders, and stock.
+
+LITHE Series
+- LITHE_1: LITHE benchmark query 1 (customer-supplier-part join logic).
+- LITHE_2: LITHE benchmark query 2 (order-lineitem aggregation).
+- LITHE_3: LITHE benchmark query 3 (nation-region filter with joins).
+- LITHE_4: LITHE benchmark query 4 (parts with constraints and supplier linkage).
+- LITHE_5: LITHE benchmark query 5 (price/discount window analysis).
+- LITHE_6: LITHE benchmark query 6 (shipping modes grouped metrics).
+- LITHE_7: LITHE benchmark query 7 (customer segment with order thresholds).
+- LITHE_8: LITHE benchmark query 8 (part-brand and container constraints).
+- LITHE_9: LITHE benchmark query 9 (supplier performance aggregation).
+- LITHE_10: LITHE benchmark query 10 (top customers by derived revenue).
+- LITHE_11: LITHE benchmark query 11 (stock value by comments).
+- LITHE_12: LITHE benchmark query 12 (late shipments by priority).
+- LITHE_13: LITHE benchmark query 13 (profit by nation and year variant).
+- LITHE_14: LITHE benchmark query 14 (promotional part market share).
+- LITHE_15: LITHE benchmark query 15 (supplier max revenue identification).
+- LITHE_16: LITHE benchmark query 16 (discount revenue changes across ranges).
+- LITHE_17: LITHE benchmark query 17 (average price for constrained orders).
+- LITHE_18: LITHE benchmark query 18 (large-volume orders by phone prefix).
+- LITHE_19: LITHE benchmark query 19 (join-heavy filter with aggregation).
+- LITHE_20: LITHE benchmark query 20 (supplier promotion candidacy).
+- LITHE_21: LITHE benchmark query 21 (late shipping on complex orders).
+- LITHE_22: LITHE benchmark query 22 (cross-channel return and city analysis).
+
+Notes
+- Excluded here are queries present only in one file: original-only TPCH_Q17; rewritten-only ETPCH_Q17 and ETPCH_Q20.

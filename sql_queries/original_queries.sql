@@ -178,19 +178,6 @@ o_orderstatus = 'F' and l_receiptdate >= l_commitdate and s_nationkey
 = n_nationkey Group By s_name Order By numwait desc Limit 100;
 
 -- =================================================================
--- Query ID: A5
--- Description: A summary query that calculates various aggregates (sum, avg, count) on line items.
--- =================================================================
-Select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty,
-sum(l_extendedprice) as sum_base_price, sum(l_extendedprice
-* (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 -
-l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty,
-avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*)
-as count_order From lineitem Where l_shipdate <= l_receiptdate and
-l_receiptdate <= l_commitdate Group By l_returnflag, l_linestatus
-Order by l_returnflag, l_linestatus;
-
--- =================================================================
 -- Query ID: N1
 -- Description: Counts suppliers for parts based on brand, type, and size.
 -- =================================================================
@@ -203,35 +190,6 @@ Select p_brand, p_type, p_size, Count(*) as supplier_cnt
 
 -- =================================================================
 -- Query ID: F1
--- Description: A UNION ALL query combining high-balance customers from India with suppliers from Argentina.
--- =================================================================
-(SELECT c_name as name, c_acctbal as account_balance FROM orders,
-customer, nation WHERE c_custkey = o_custkey and c_nationkey
-= n_nationkey and c_mktsegment = 'FURNITURE' and n_name =
-'INDIA' and o_orderdate between '1998-01-01' and '1998-12-05' and
-o_totalprice <= c_acctbal) UNION ALL (SELECT s_name as name,
-s_acctbal as account_balance FROM supplier, lineitem, orders, nation
-WHERE l_suppkey = s_suppkey and l_orderkey = o_orderkey
-and s_nationkey = n_nationkey and n_name = 'ARGENTINA' and
-o_orderdate between '1998-01-01' and '1998-01-05' and o_totalprice >
-s_acctbal and o_totalprice >= 30000 and 50000 >= s_acctbal Order by account_balance desc limit 20);
-
--- =================================================================
--- Query ID: F2
--- Description: Combines order details with supplier details based on various part and date conditions.
--- =================================================================
-(Select p_brand, o_clerk, l_shipmode From orders, lineitem, part Where
-l_partkey = p_partkey and o_orderkey = l_orderkey and l_shipdate >=
-o_orderdate and o_orderdate > '1994-01-01' and l_shipdate > '1995-01-01' and p_retailprice >= l_extendedprice and p_partkey < 10000 and
-l_suppkey < 10000 and p_container = 'LG CAN' Order By o_clerk LIMIT
-5) UNION ALL (Select p_brand, s_name, l_shipmode From lineitem,
-part, supplier Where l_partkey = p_partkey and s_suppkey = l_suppkey
-and l_shipdate > '1995-01-01' and s_acctbal >= l_extendedprice and
-p_partkey < 15000 and l_suppkey < 14000 and p_container = 'LG CAN'
-Order By s_name LIMIT 10);
-
--- =================================================================
--- Query ID: F3
 -- Description: Combines line items for JUMBO container parts with customers having specific keys.
 -- =================================================================
 (
@@ -243,7 +201,7 @@ from customer LEFT OUTER JOIN orders on c_custkey = o_custkey
  where c_custkey > 1000 and c_custkey < 1010 Order By price desc, o_orderkey, c_custkey Limit 100);
 
 -- =================================================================
--- Query ID: F4
+-- Query ID: F2
 -- Description: Selects nation names and customer account balances using a LEFT OUTER JOIN with conditions.
 -- =================================================================
 select n_name, c_acctbal from nation LEFT OUTER JOIN customer
@@ -523,22 +481,6 @@ WHERE
     )
 ORDER BY
     s_suppkey;
-
--- =================================================================
--- Query ID: TPCH_Q17
--- Description: Small-Quantity-Order Revenue Query. Calculates average yearly revenue for parts with low quantity.
--- =================================================================
-SELECT SUM(l.l_extendedprice) / 7.0 AS avg_yearly
-FROM lineitem l
-JOIN part p ON p.p_partkey = l.l_partkey
-JOIN (
-    SELECT l_partkey, 0.7 * AVG(l_quantity) AS threshold_quantity
-    FROM lineitem
-    GROUP BY l_partkey
-) AS avg_lineitem ON avg_lineitem.l_partkey = l.l_partkey
-WHERE p.p_brand = 'Brand#53'
-  AND p.p_container = 'MED BAG'
-  AND l.l_quantity < avg_lineitem.threshold_quantity;
 
 -- =================================================================
 -- Query ID: Nested_Test
