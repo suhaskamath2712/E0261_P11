@@ -350,7 +350,7 @@ GROUP BY
     cust.c_name,
     nat.n_name
 ORDER BY
-    cust.c_name ASC,
+    cust.c_name DESC,
     nat.n_name DESC
 LIMIT 10;
 
