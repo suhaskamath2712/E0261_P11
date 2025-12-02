@@ -1,0 +1,73 @@
+// SankeyMATIC diagram inputs - Saved: 12/2/2025, 11:32:33 AM
+// https://sankeymatic.com/build/
+
+// === Nodes and Flows ===
+
+Queries [75] Actually Equal
+Queries [74] Not Equal
+
+Actually Equal [66] LLM True Positive
+Actually Equal [9] LLM False Negative
+
+Not Equal [1] LLM False Positive
+Not Equal [73] LLM True Negative
+
+LLM True Positive [66] Invalid Transformations
+LLM False Positive [1] Invalid Transformations
+
+LLM False Negative [9] No Transformations
+LLM True Negative [73] No Transformations
+
+// === Settings ===
+
+size w 1000
+ h 600
+margin l 12
+ r 12
+ t 18
+ b 20
+bg color #ffffff
+ transparent N
+node w 25
+ h 36
+ spacing 49
+ border 0
+ theme c
+ color #888888
+ opacity 1
+flow curvature 0.5
+ inheritfrom target
+ color #999999
+ opacity 0.45
+layout order exact
+ justifyorigins N
+ justifyends N
+ reversegraph N
+ attachincompletesto nearest
+labels color #000000
+ hide N
+ highlight 0.55
+ fontface sans-serif
+ linespacing 0.2
+ relativesize 115
+ magnify 95
+labelname appears Y
+ size 25
+ weight 400
+labelvalue appears Y
+ fullprecision Y
+ position above
+ weight 400
+labelposition autoalign 1
+ scheme auto
+ first before
+ breakpoint 5
+value format ',.'
+ prefix ''
+ suffix ''
+themeoffset a 6
+ b 9
+ c 0
+ d 0
+meta mentionsankeymatic Y
+ listimbalances Y
