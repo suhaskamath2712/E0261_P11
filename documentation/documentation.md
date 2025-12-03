@@ -1,7 +1,7 @@
-E0261_P11 — Project Documentation
-=================================
+E0261_P11 — Project Documentation (Updated)
+==========================================
 
-This document describes the Java classes in the `plan_equivalence` module and documents public and important internal methods including parameters, return values, thrown exceptions, and behavioral notes. Use this as a developer reference when extending or testing the project.
+This document describes the Java classes in the `plan_equivalence` module and documents public and important internal methods including parameters, return values, thrown exceptions, and behavioral notes. It reflects recent updates to normalization (join/predicate/aggregate) and EXPLAIN retrieval error handling.
 
 Table of contents
 -----------------
@@ -85,9 +85,11 @@ All methods are static on `Calcite`.
 
 - public static String canonicalDigest(RelNode rel)
   - Returns: A canonical, stable string representing a `RelNode` where:
-    - Inner joins are made child-order-insensitive by sorting child digests
+    - Inner joins are made child-order-insensitive by flattening and sorting child digests
     - CASTs are recursively stripped in expressions
     - Commutative/symmetric operators normalized
+    - Predicates are decomposed into conjuncts, canonicalized, deduplicated, and sorted
+    - Aggregates are normalized by sorting `groupSet` and aggregate calls deterministically (function name + input index, DISTINCT tagged)
     - UNION nodes flattened and child digests sorted
     - Sort keys are ignored (fetch/offset preserved)
   - Notes: Preserves projection output order; outer joins are NOT made order-insensitive.
@@ -111,7 +113,7 @@ All methods are static on `Calcite`.
 4) Tree utilities
 
 - public static RelTreeNode buildRelTree(RelNode rel)
-  - Builds a `RelTreeNode` representation from a Calcite `RelNode` using a `RelVisitor`. Useful for tree-based comparisons and debug printing.
+  - Builds a `RelTreeNode` representation from a Calcite `RelNode` using a `RelVisitor`. Useful for tree-based comparisons and debug printing. Tree equality can ignore child order via canonical digest.
 
 - public static String relTreeCanonicalDigest(RelNode rel)
   - Returns the canonical digest of the `RelTreeNode` built from `rel`.
@@ -198,7 +200,7 @@ GetQueryPlans.java
 ---------------------------------------------------------------------
 Purpose
 -------
-Utilities to run PostgreSQL EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for each SQL and produce a cleaned JSON plan suitable for stable comparison (execution-time fields removed).
+Utilities to run PostgreSQL EXPLAIN (FORMAT JSON, BUFFERS) for each SQL and produce a cleaned JSON plan suitable for stable comparison (execution-time fields removed). The EXPLAIN retrieval call is wrapped with defensive error handling (caller sees `null` on failure).
 
 Important methods
 -----------------
@@ -208,7 +210,7 @@ Important methods
     - `sql`: SQL string to explain
   - Returns: `org.json.JSONArray` representing PostgreSQL EXPLAIN JSON output (the raw array returned by the DB), or `null` if no rows returned.
   - Throws: `SQLException` on execution errors.
-  - Behavior: Executes `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) <sql>` and parses the resulting JSON string to an `org.json.JSONArray`.
+  - Behavior: Executes `EXPLAIN (FORMAT JSON, BUFFERS) <sql>` and parses the resulting JSON string to an `org.json.JSONArray`.
 
 - private static Object cleanPlanTree(Object node)
   - Recursively removes execution-specific keys from objects/arrays using the `KEYS_TO_REMOVE` set.
@@ -223,7 +225,7 @@ Important methods
   - Parameters: `sql`: SQL text to EXPLAIN
   - Returns: Pretty-printed JSON string of the cleaned plan, or `null` if not obtainable
   - Throws: `SQLException` for DB errors
-  - Behavior: Opens a JDBC connection (using DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT constants), runs `explainPlan`, extracts and cleans the Plan, and returns an indented JSON string (4 spaces). Caller responsibility: handle SQLException.
+  - Behavior: Opens a JDBC connection (using DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT constants), runs `explainPlan`, extracts and cleans the Plan, and returns an indented JSON string (4 spaces). Caller responsibility: handle SQLException. The Calcite wrapper catches `SQLException` and returns `null` for robustness.
 
 - public static String getDatabaseSchema()
   - Returns: Multi-line string enumerating schemas, tables, and columns with data types by querying `information_schema.columns`.
@@ -267,7 +269,7 @@ Important fields & methods
 
 - public static LLMResponse getLLMResponse(String sqlA, String sqlB)
   - Parameters: `sqlA` and `sqlB` are SQL strings (not precomputed JSON). The method obtains cleaned JSON plans via `GetQueryPlans.getCleanedQueryPlanJSONasString` and then contacts the LLM via `contactLLM`.
-  - Returns: `LLMResponse` parsed/validated from the raw LLM output. Returns `null` if obtaining plans failed.
+  - Returns: `LLMResponse` parsed/validated from the raw LLM output. Returns `null` if obtaining plans failed (Calcite wrapper returns `null` on EXPLAIN errors).
 
 Notes
 -----
@@ -378,7 +380,7 @@ Behavior and configuration
 - For each id:
   1. Load SQL A via `FileIO.readOriginalSqlQuery(id)`
   2. Load SQL B via `FileIO.readRewrittenSqlQuery(id)`
-  3. Call `Calcite.compareQueriesDebug(sqlA, sqlB, null, id)` and print a result line.
+  3. Call `Calcite.compareQueriesDebug(sqlA, sqlB, null, id)` and print a result line (prints layered digests when not equivalent).
   4. If not equivalent, try again with transformations (example uses `List.of("UnionMergeRule")`).
 - At the end prints summary counts.
 
@@ -401,6 +403,10 @@ Appendix: Editing notes and caveats
 - File paths in `FileIO` and DB connection details in `Calcite` and `GetQueryPlans` are hard-coded to the local workspace and simple test DB credentials; update before running on other systems.
 - LLM integration uses a third-party client; if not configured, `LLM.getLLMResponse` will fail to contact the API. The core comparison logic in `Calcite` does not require LLM.
 - Some SQL patterns may still produce planner-dependent differences. Use `Calcite.compareQueriesDebug` to inspect layered digests to decide whether to add additional safe normalizations.
+
+Version notes
+-------------
+- Some Calcite APIs used for decorrelation may be deprecated depending on Calcite version. The code isolates decorrelation and treats failures as non-blocking (best-effort only).
 
 
 If you want, I can:

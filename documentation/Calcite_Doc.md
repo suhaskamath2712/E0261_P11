@@ -1,3 +1,55 @@
+# Calcite Integration Overview (Updated)
+
+This document describes how the codebase uses Apache Calcite to parse, validate, transform, and compare SQL queries for plan equivalence, and how it retrieves cleaned PostgreSQL EXPLAIN plans. This version reflects the latest normalization and robustness updates.
+## Highlights
+
+- PostgreSQL‑backed Calcite `FrameworkConfig` for parsing and validation
+- Phased HepPlanner normalization to reduce oscillations and stabilize joins/projects
+- Canonical comparison that ignores harmless differences (join order, CASTs, input refs, predicate order)
+- Aggregate normalization (sorted `groupSet` and deterministic aggregate call ordering)
+- Pretty‑printed, cleaned EXPLAIN (FORMAT JSON, BUFFERS) plans via JDBC with defensive error handling
+
+## Components
+- `Calcite.getFrameworkConfig()`: Builds a Calcite environment backed by PostgreSQL (`PGSimpleDataSource`), adds a `JdbcSchema`, and configures the parser with `Lex.MYSQL` for lower‑case identifiers.
+- `Calcite.getOptimizedRelNode(planner, sql)`: Parses → validates → converts to `RelNode` → applies phased HepPlanner rules (`FILTER_REDUCE_EXPRESSIONS`, `PROJECT_MERGE`, `PROJECT_REMOVE`, `FILTER_INTO_JOIN`, `JOIN_ASSOCIATE`, `JOIN_COMMUTE`, `PROJECT_JOIN_TRANSPOSE`). Trailing semicolons are removed and `!=` is normalized to `<>`.
+- `Calcite.compareQueries(sql1, sql2, transformations)`: Multi‑stage equivalence using structural digest, normalized digest (input refs collapsed), canonical digest (join/predicate normalization), and tree comparison (`equalsIgnoreChildOrder`).
+- `Calcite.canonicalDigest(rel)`: Canonicalizes inner joins (flattens and sorts children), strips CASTs, sorts commutative/symmetric expressions (AND/OR/EQUALS), normalizes predicates and field refs, and now normalizes aggregates (groupSet + aggCalls ordering). Projection output order is preserved.
+- `Calcite.buildRelTree(rel)` + `RelTreeNode`: Builds an order‑preserving tree with canonical digest for order‑insensitive equality.
+- `Calcite.convertRelNodetoJSONQueryPlan(rel)`: Converts a `RelNode` to PostgreSQL SQL via `RelToSqlConverter` and retrieves a cleaned EXPLAIN JSON. External call is wrapped in try‑catch and returns `null` on failure.
+- `GetQueryPlans.getCleanedQueryPlanJSONasString(sql)`: Runs EXPLAIN (FORMAT JSON, BUFFERS); lifts the root `Plan` node and strips executor‑specific keys; returns pretty‑printed JSON.
+## Equivalence Normalization
+
+Comparison proceeds in layers:
+1. Structural digest: order‑sensitive structure.
+2. Normalized digest: collapses input refs (`$0`, `$12` → `$x`) and spacing.
+3. Canonical digest:
+  - Inner joins: flatten nested trees; sort child digests to remove commutativity.
+  - Expressions: strip CASTs; sort operands for commutative ops (AND/OR/PLUS/TIMES); handle symmetric comparisons (EQUALS/NOT_EQUALS).
+  - Predicates: decompose conjuncts (ANDs), canonicalize, deduplicate, and sort.
+  - Aggregates: sort `groupSet`; sort aggregate calls by function name + input index with DISTINCT tagging.
+4. Tree equality: compare `RelTreeNode` trees; order‑insensitive via canonical form when requested.
+### Ignored Differences
+
+- Inner‑join child order (commutativity)
+- Harmless CASTs
+- Input reference indices and cosmetic spacing
+- Predicate operand order for AND/OR
+- Aggregate call ordering (normalized deterministically)
+### Preserved Semantics
+
+- Projection output order (column positions)
+- Presence of fetch/offset in Sort/Limit
+## Subqueries and Decorrelation
+
+Subqueries are converted to correlates and decorrelated where applicable using Calcite rules and `RelDecorrelator`. This is best‑effort; if inapplicable, the original plan is retained. Note: `RelDecorrelator.decorrelateQuery` may be deprecated in some Calcite versions; current usage remains best‑effort and isolated.
+## EXPLAIN Plan Retrieval
+
+`convertRelNodetoJSONQueryPlan` renders SQL using `PostgresqlSqlDialect` and calls `GetQueryPlans` to obtain a cleaned JSON plan. Any `SQLException` is caught, a brief error is logged to `System.err`, and `null` is returned to allow graceful degradation.
+## Configuration Notes
+
+- PostgreSQL JDBC: update `PG_URL`, `PG_USER`, `PG_PASSWORD`, and `PG_SCHEMA` in `Calcite.java`.
+- Parser: `Lex.MYSQL` folds identifiers to lower‑case.
+- Planner: do not reuse `Planner` across parse/validate cycles; it is closed and recreated per query.
 # Calcite.java — API Documentation
 
 This document describes the public and non-trivial internal functions, helpers, and transformation classes implemented in `Calcite.java` (package `com.ac.iisc`). It explains purpose, inputs, outputs, usage examples, dependencies, edge cases, and related notes for each symbol.

@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Union;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -275,6 +276,9 @@ public class Calcite {
         Planner planner = Frameworks.getPlanner(config); 
 
         try {
+            // Note: Planning produces Calcite logical operators (e.g., LogicalJoin).
+            // Physical variants like HashJoin/NestedLoop do not appear here, so join
+            // type names are effectively normalized to logical forms by design.
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
 
@@ -313,11 +317,16 @@ public class Calcite {
             String c1 = canonicalDigest(rel1);
             String c2 = canonicalDigest(rel2);
 
+            // Note: canonicalDigest flattens INNER joins and sorts child digests,
+            // providing deterministic ordering to remove commutativity differences
+            // (i.e., join child order is normalized before comparison).
             if (c1.equals(c2)) return true;
 
             // Fallback 3: tree comparison ignoring child order
             RelTreeNode tree1 = buildRelTree(rel1);
             RelTreeNode tree2 = buildRelTree(rel2);
+            // equalsIgnoreChildOrder also compares via a canonical form that ignores
+            // child ordering, further neutralizing INNER-join commutativity.
             
             //these lines will cause a stackoverflow error for god knows what reason
             //if (rel1.equals(rel2))  return true;
@@ -373,6 +382,7 @@ public class Calcite {
 
             RelTreeNode t1 = buildRelTree(rel1);
             RelTreeNode t2 = buildRelTree(rel2);
+            // Tree canonical digest ignores child order, normalizing INNER-join commutativity
             String ct1 = t1 == null ? "null" : t1.canonicalDigest();
             String ct2 = t2 == null ? "null" : t2.canonicalDigest();
             if (ct1.equals(ct2)) return true;
@@ -422,6 +432,8 @@ public class Calcite {
     * - All CASTs are recursively stripped from RexNode expressions before digesting
     * - Commutative and symmetric expressions (AND, OR, EQUALS, etc.) are normalized
     * - Filter conditions and expression strings are normalized via {@link #normalizeDigest(String)}
+    * - Aggregates are normalized: groupSet sorted and aggregate calls sorted
+    *   deterministically (by function name + input index, with DISTINCT tagged)
     * Projection order is preserved. This makes the digest insensitive to inner-join child order, commutative/symmetric expressions, and harmless CASTs, while keeping column order significant.
     *
     * @param rel The input RelNode
@@ -533,6 +545,25 @@ public class Calcite {
             path.remove(rel);
             return result;
         }
+        // Aggregate: normalize groupSet and aggregate calls ordering
+        if (rel instanceof LogicalAggregate agg) {
+            java.util.List<Integer> groups = new java.util.ArrayList<>(agg.getGroupSet().asList());
+            java.util.Collections.sort(groups);
+            java.util.List<String> calls = new java.util.ArrayList<>();
+            agg.getAggCallList().forEach(call -> {
+                String func = call.getAggregation() == null ? "agg" : call.getAggregation().getName();
+                int idx = -1;
+                if (call.getArgList() != null && !call.getArgList().isEmpty()) {
+                    idx = call.getArgList().get(0);
+                }
+                calls.add(func + "@" + idx + (call.isDistinct() ? ":DISTINCT" : ""));
+            });
+            java.util.Collections.sort(calls);
+            String head = "Aggregate(groups=" + groups.toString() + ", calls=" + calls.toString() + ")";
+            String result = head + "->" + canonicalDigestInternal(agg.getInput(), path);
+            path.remove(rel);
+            return result;
+        }
         // Default: normalized string of this node with placeholders, plus canonical children
         String typeName = rel.getRelTypeName();
         if (typeName == null) typeName = "UnknownRel";
@@ -565,6 +596,9 @@ public class Calcite {
     private static String canonicalizeRex(RexNode node) {
         if (node == null) return "null";
         RexNode n = stripAllCasts(node);
+        // Predicate normalization: for commutative boolean ops (AND/OR), we sort
+        // operands during canonicalization so A AND B ≡ B AND A. This ensures
+        // filter predicate order does not affect equivalence.
         // If this is a function/operator call, canonicalize based on operator kind
         if (n instanceof RexCall call && call.getOperator() != null) {
             SqlKind kind = call.getOperator().getKind();
@@ -1089,10 +1123,9 @@ public class Calcite {
         RelToSqlConverter.Result res = converter.visitRoot(rel);
         String sql = res.asStatement().toSqlString(PostgresqlSqlDialect.DEFAULT).getSql();
         // Get query plan: protect external call with try-catch to avoid bubbling
-        // checked/unchecked exceptions into callers.
         try {
             return GetQueryPlans.getCleanedQueryPlanJSONasString(sql);
-        } catch (Exception e) {
+        } catch (SQLException  e) {
             System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Error while obtaining plan: " + e.getMessage());
             return null;
         }

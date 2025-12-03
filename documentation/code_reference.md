@@ -18,26 +18,27 @@ This document replaces the earlier LaTeX attempt. It provides a detailed, prose-
 **Location:** `plan_equivalence/src/main/java/com/ac/iisc/Calcite.java`
 
 ### Purpose
+### Purpose (Updated)
 Central integration point with Apache Calcite. It:
-- Builds a Calcite `FrameworkConfig` backed by a PostgreSQL schema via JDBC (so planner sees real catalogs)
-- Parses + validates SQL into `RelNode` logical plans
-- Applies a phased HepPlanner optimization pipeline for plan normalization (projection collapsing, join reassociation/commutation, predicate simplification, etc.)
-- Implements multi-stage equivalence comparison (structural digest → normalized digest → canonical digest → order-insensitive tree digest)
-- Canonicalizes plans by neutralizing input refs, removing all CASTs, flattening inner join factors, sorting commutative/symmetric expressions, and ignoring ordering where semantics allow
-- Applies user-specified Calcite `CoreRules` by name through a registry (`RULE_MAP`) with limited fixpoint passes
-- Performs subquery removal and decorrelation to align scalar-subquery forms with equivalent join+aggregate forms
-
-### High-Level Design Notes
+- Builds a Calcite `FrameworkConfig` backed by a PostgreSQL schema via `PGSimpleDataSource`; parser configured with `Lex.MYSQL`.
+- Parses + validates SQL into `RelNode` logical plans.
+- Applies a phased HepPlanner optimization pipeline for plan normalization (projection collapsing, join reassociation/commutation, predicate simplification, etc.).
+- Implements multi-stage equivalence comparison (structural digest → normalized digest → canonical digest → order-insensitive tree digest).
+- Canonicalizes plans by neutralizing input refs, removing all CASTs, flattening inner join factors, sorting commutative/symmetric expressions, and ignoring ordering where semantics allow.
+- Applies user-specified Calcite `CoreRules` by name through a registry (`RULE_MAP`) with limited fixpoint passes.
+- Performs subquery removal and decorrelation to align scalar-subquery forms with equivalent join+aggregate forms.
 - Planner reuse: Calcite planners are not reliably reusable across multiple parse/validate cycles; a new planner is created for each query.
 - Canonicalization: Uses a DAG-safe traversal (IdentityHashMap path set) to avoid infinite recursion when a plan has shared subgraphs.
-- Multi-tier comparison reduces false negatives: plan variants that differ only by join child order, cast noise, or input field index rewrites can still be deemed equivalent.
-- Subquery normalization is best-effort; failures silently preserve the current plan.
-- Rule application supports a batch (composite) approach rather than sequential single-rule passes to reduce oscillation.
+### Purpose (Updated)
+Obtains PostgreSQL execution plans (`EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS)`) for supplied SQL and returns a cleaned JSON representation with execution-specific metrics removed, leaving only logical plan structure.
+### Error Handling
+- External call wrapped in try-catch returning `null` on failure.
 
 ### Public API Methods (Detailed)
-#### `public static FrameworkConfig getFrameworkConfig()`
-Builds a Calcite configuration exposing the PostgreSQL schema defined by connection constants. Steps:
-1. Load PostgreSQL driver.
+### Purpose (Updated)
+Ad-hoc runner for evaluating equivalence across selected queries and testing transformation + LLM-assisted alignment.
+### Error Handling
+- Batch demo: iterate IDs, compare original vs rewritten, print layered diagnostics when not equivalent.
 2. Open a Calcite connection to obtain root schema.
 3. Wrap `PGSimpleDataSource` in a `JdbcSchema` added under the configured schema name.
 4. Configure parser with `Lex.MYSQL` (folds unquoted identifiers to lower-case).
