@@ -67,6 +67,9 @@ public class FileIO
 	private static final String MUTATED_SQL_PATH =
 			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql";
 
+	private static final String SCHEMA_SUMMARY_RESOURCE =
+			"C:\\Users\\suhas\\Downloads\\E0261_P11\\plan_equivalence\\src\\main\\resources\\tpch_schema_summary.json";
+
 	// Read SQL files
 
 	/** Source for a query when reading from the consolidated SQL files. */
@@ -123,6 +126,18 @@ public class FileIO
 	/** Convenience: read from mutated SQL collection. */
 	public static String readMutatedSqlQuery(String queryId) throws IOException {
 		return readSqlQuery(SqlSource.MUTATED, queryId);
+	}
+
+	public static String readSchemaSummary() {
+		try
+		{
+			return readTextFile(SCHEMA_SUMMARY_RESOURCE);
+		}
+		catch (IOException ex)
+		{
+			ex.printStackTrace();
+			return null; // If the resource is not found, return null
+		}
 	}
 
 	/**

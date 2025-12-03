@@ -32,29 +32,71 @@ import com.openai.models.responses.ResponseCreateParams;
 public class LLM
 {
     private static final String BASE_PROMPT = """
-            Given ORIGINAL_PLAN and TARGET_PLAN (both in simplified JSON plan format, see "Plan Format" below),
-            determine whether the two plans are equivalent by producing a sequence of Apache Calcite
-            transformations (from SUPPORTED_TRANSFORMATIONS) that maps ORIGINAL_PLAN -> TARGET_PLAN.
+            System Message:
+            You are an expert in relational query optimization and Apache Calcite transformations.
+            Always respond with exactly one JSON object matching the schema requested. Do not
+            output anything else. Use only transformation names from SUPPORTED_TRANSFORMATIONS.
+            Temperature must be 0.
+            
+            TASK:
+            Given ORIGINAL_PLAN and TARGET_PLAN (both in simplified JSON plan format),
+            decide whether they are equivalent. If equivalent, produce an ordered list of Apache
+            Calcite transformations (from SUPPORTED_TRANSFORMATIONS) that map
+            ORIGINAL_PLAN -> TARGET_PLAN.
+            
+            INPUTS PROVIDED:
+            1) SCHEMA_SUMMARY: a compact JSON describing tables and primary/foreign keys.
+            (Use the schema summary only for reasoning about join keys and uniqueness.)
+            2) SUPPORTED_TRANSFORMATIONS:
+            """;
 
-            RESPONSE RULES:
-            1) Output exactly one JSON object and nothing else.
-            2) Schema:
-                {
-                "equivalent": <"true" or "false" or "dont_know">,
-                "transformations": [ <ordered list of transformation names from SUPPORTED_TRANSFORMATIONS> ]  // may be empty
-                }
-            3) If plans are identical (no transform needed): set "equivalent":"true" and "transformations": []
-            4) If you can propose a valid ordered list of transformations from SUPPORTED_TRANSFORMATIONS that
-            plausibly maps ORIGINAL_PLAN to TARGET_PLAN: set "equivalent":"true" and list them in order.
-            5) If you cannot find a sequence: set "equivalent":"dont_know" and set "transformations": []
-            6) Do NOT invent transformer names outside SUPPORTED_TRANSFORMATIONS. If none apply, output "dont_know".
-            7) Do not output any extra text, commentary, or diagnostics.
-
-            PLAN FORMAT (provide only fields that matter; remove costs, timings):
-            - Node: { "Node Type": "...", "Join Type": "...", "Filter": "...", "Hash Cond": "...",
-            "Group Key": [...], "Sort Key": [...], "Index Cond": "...", "Relation Name": "...",
-            "Alias": "...", "Strategy": "Hashed|Sorted|..." }
-            - A plan is nested using "Plans": [ ... ].
+    private static final String PROMPT_2 = """
+            RESPONSE SCHEMA (MUST return exactly this JSON object):
+            {
+            "equivalent": <"true" | "false" | "dont_know">,
+            "transformations": [ <ordered list of exact transformation names from SUPPORTED_TRANSFORMATIONS> ],
+            "preconditions": [ <objects describing required preconditions for each transformation, in same order> ]
+            }
+            
+            RULES:
+            1) If plans are identical, return "equivalent":"true", "transformations":[], and "preconditions": [].
+            2) Only use names from SUPPORTED_TRANSFORMATIONS. If none apply, return "equivalent":"dont_know" with empty lists.
+            3) For each transformation listed, provide a corresponding precondition object describing the minimal, strictly necessary condition (e.g., "node X is Project on top of Aggregate", or "filter predicate P exists on child", "join keys (A = B) exist"). Keep preconditions concise.
+            4) Do NOT invent any transformation names. If unsure, return "dont_know".
+            5) Output NOTHING but the required JSON object.
+            
+            ONE-SHOT EXAMPLE:
+            SCHEMA_SUMMARY:
+            { "orders": {"pk":["o_orderkey"], "cols":["o_custkey","o_orderdate"]}, "customer":{"pk":["c_custkey"], "cols":["c_mktsegment"]} }
+            
+            SUPPORTED_TRANSFORMATIONS: ["AggregateProjectMergeRule","ProjectRemoveRule","JoinAssociateRule", ...]  // (full list)
+            
+            ORIGINAL_PLAN_JSON:
+            { "Node Type":"Join", "Join Type":"Inner",
+            "Plans":[
+                {"Node Type":"Project","Plans":[{"Node Type":"Aggregate","Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]}]},
+                {"Node Type":"TableScan","Relation Name":"customer"}
+            ],
+            "Join Cond":"(orders.o_custkey = customer.c_custkey)"
+            }
+            
+            TARGET_PLAN_JSON:
+            { "Node Type":"Join", "Join Type":"Inner",
+            "Plans":[
+                {"Node Type":"Aggregate","Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]},
+                {"Node Type":"TableScan","Relation Name":"customer"}
+            ],
+            "Join Cond":"(orders.o_custkey = customer.c_custkey)"
+            }
+            
+            EXPECTED_RESPONSE:
+            {
+            "equivalent":"true",
+            "transformations":["AggregateProjectMergeRule"],
+            "preconditions":[ {"requires":"Project on top of Aggregate with no column reordering"} ]
+            }
+            
+            NOW PROCESS:
             """;
     
     /**
@@ -161,28 +203,6 @@ public class LLM
         "UnionPullUpConstantsRule",
         "UnionToDistinctRule"
     );
-
-    private static final String CONTEXT_PROMPT = """
-            SCHEMA CONTEXT: Use the TPCH schema for table/column names and primary keys (see attached).
-            Use it only for reasoning about join keys and uniqueness constraints.
-            """;
-    
-    private static final String EXAMPLE = """
-    ONE-SHOT EXAMPLE:
-    ORIGINAL_PLAN:
-    { "Node Type":"Join", "Join Type":"Inner", "Plans":[ { "Node Type":"Hash", "Plans":[ {"Node Type":"Seq Scan", "Relation Name":"orders"} ] }, { "Node Type":"Hash", "Plans":[ {"Node Type":"Seq Scan", "Relation Name":"customer"} ] } ], "Hash Cond":"(orders.o_custkey = customer.c_custkey)" }
-    
-    TARGET_PLAN:
-    { "Node Type":"Join", "Join Type":"Inner", "Plans":[ { "Node Type":"Seq Scan", "Relation Name":"orders" }, { "Node Type":"Seq Scan", "Relation Name":"customer" } ], "Hash Cond":"(orders.o_custkey = customer.c_custkey)" }
-    
-    EXPECTED_RESPONSE:
-    {
-    "equivalent":"true",
-    "transformations":["ProjectRemoveRule","ReduceExpressionsRule.HashReduceExpressionsRule","JoinToMultiJoinRule"]
-    }
-
-    NOW PROCESS:
-    """;
     
 
     /**
@@ -215,14 +235,12 @@ public class LLM
         // Build strict prompt including both plans and the allowed rule list
         StringBuilder sb = new StringBuilder();
         sb.append(BASE_PROMPT);
-        sb.append("\nSupported transformations (one per line if needed):\n");
         for (String t : SUPPORTED_TRANSFORMATIONS) sb.append(t).append('\n');
+        sb.append(PROMPT_2);
 
         //Get database schemas
-        sb.append(CONTEXT_PROMPT + "\n");
-        sb.append(GetQueryPlans.getDatabaseSchema()).append("\n");
-
-        sb.append(EXAMPLE);
+        sb.append("\n\nSCHEMA_SUMMARY:\n");
+        sb.append(FileIO.readSchemaSummary());
 
         sb.append("\nORIGINAL_PLAN_JSON:\n").append(sqlAJSON == null ? "(null)" : sqlAJSON);
         sb.append("\n\nTARGET_PLAN_JSON:\n").append(sqlBJSON == null ? "(null)" : sqlBJSON);
@@ -234,7 +252,6 @@ public class LLM
         ResponseCreateParams params = ResponseCreateParams.builder()
             .input(prompt)
             .model("gpt-5")
-            //.temperature(0.0)
             .build();
 
         Response resp = client.responses().create(params);
