@@ -331,7 +331,7 @@ public class Calcite {
             //these lines will cause a stackoverflow error for god knows what reason
             //if (rel1.equals(rel2))  return true;
             //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
-
+            
             return tree1.equalsIgnoreChildOrder(tree2);
         } catch (Exception e)
         {
