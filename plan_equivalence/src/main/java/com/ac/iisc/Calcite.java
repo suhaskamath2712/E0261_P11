@@ -29,6 +29,7 @@ import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
+import org.apache.calcite.rel.rel2sql.RelToSqlConverter;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -37,6 +38,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.dialect.PostgresqlSqlDialect;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -1060,5 +1062,22 @@ public class Calcite {
         cur = hp2.findBestExp();
 
         return cur;
+    }
+
+    public static String convertRelNodetoJSONQueryPlan(RelNode rel)
+    {
+        // Convert a RelNode to a canonical digest string for comparison
+        if (rel == null) return "null";
+        RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
+        RelToSqlConverter.Result res = converter.visitRoot(rel);
+        String sql = res.asStatement().toSqlString(PostgresqlSqlDialect.DEFAULT).getSql();
+        // Get query plan: protect external call with try-catch to avoid bubbling
+        // checked/unchecked exceptions into callers.
+        try {
+            return GetQueryPlans.getCleanedQueryPlanJSONasString(sql);
+        } catch (SQLException e) {
+            System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Error while obtaining plan: " + e.getMessage());
+            return null;
+        }
     }
 }
