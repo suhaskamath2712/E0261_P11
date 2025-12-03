@@ -6,12 +6,16 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Simple tree node to represent a RelNode tree in a language-agnostic way.
- * Each node has a textual label and a list of children in input order.
- */
-/**
- * Tree wrapper used for order-sensitive and order-insensitive comparisons of Calcite RelNodes.
- * Labels are simple strings; children preserve input order unless comparisons ignore order.
+ * Lightweight tree wrapper used to represent Calcite {@code RelNode} plans in a
+ * language‑agnostic way for debugging and comparisons.
+ *
+ * Characteristics:
+ * - Each node stores a concise textual {@code label} plus a list of children
+ *   in input order.
+ * - Provides standard equality (order‑sensitive) via {@link #equals(Object)}.
+ * - Provides order‑insensitive structural comparison via
+ *   {@link #equalsIgnoreChildOrder(RelTreeNode)} using a canonical digest.
+ * - {@link #toString()} renders a readable indented tree for logs.
  */
 public class RelTreeNode {
     private String label;
@@ -24,6 +28,7 @@ public class RelTreeNode {
     }
 
     // --- Children management ---
+    /** Append a child to this node (no effect for null). */
     public void addChild(RelTreeNode child) {
         if (child != null) this.children.add(child);
     }
@@ -63,10 +68,9 @@ public class RelTreeNode {
     }
 
     /**
-     * Build a canonical digest of this tree where the order of children does not matter.
-     * The digest is constructed as: label[ sorted(childDigest1, childDigest2, ...) ].
-     * Two trees are structurally equivalent ignoring child order if and only if their
-     * canonical digests are equal.
+     * Build a canonical digest where child order is ignored by sorting child digests.
+     * Form: {@code label[childDigest1|childDigest2|...]}
+     * Two trees are order‑insensitively equivalent iff their canonical digests match.
      */
     public String canonicalDigest() {
         final String nodeLabel = label == null ? "" : label;
@@ -81,20 +85,14 @@ public class RelTreeNode {
         return nodeLabel + "[" + String.join("|", childDigests) + "]";
     }
 
-    /**
-     * Compare this tree to another, treating children as an unordered multiset.
-     * Returns true if both trees are equivalent up to permutation of children at
-     * every node.
-     */
+    /** Order‑insensitive structural equality (children treated as an unordered multiset). */
     public boolean equalsIgnoreChildOrder(RelTreeNode other) {
         if (this == other) return true;
         if (other == null) return false;
         return this.canonicalDigest().equals(other.canonicalDigest());
     }
 
-    /**
-     * Static convenience to compare two trees for order-insensitive equality.
-     */
+    /** Static convenience to compare two trees for order‑insensitive equality. */
     public static boolean equalsIgnoreChildOrder(RelTreeNode a, RelTreeNode b) {
         if (a == b) return true;
         if (a == null || b == null) return false;

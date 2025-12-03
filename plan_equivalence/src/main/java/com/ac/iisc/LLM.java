@@ -276,6 +276,8 @@ public class LLM
 
     public static LLMResponse getLLMResponse(String sqlA, String sqlB)
     {
+        // Build cleaned plan JSON for both inputs and contact the LLM.
+        // On plan retrieval failure, returns null so callers can skip LLM usage.
         String sqlAJSON;
         String sqlBJSON;
         try

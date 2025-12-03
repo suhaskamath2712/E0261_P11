@@ -2,7 +2,15 @@ package com.ac.iisc;
 
 import java.util.List;
 
-
+/**
+ * Minimal demo harness to compare SQL pairs by Query ID across the consolidated
+ * SQL collections and optionally consult the LLM for transformation hints.
+ *
+ * Notes:
+ * - This is intended for quick local runs; adjust {@code queryIDList} as needed.
+ * - LLM integration is optional; if plan retrieval fails, {@code getLLMResponse}
+ *   returns null and the code should proceed without LLM assistance.
+ */
 public class Test
 {
     /**
@@ -70,11 +78,11 @@ public class Test
             // Try with transformations from LLM
             // Get Query Plan Transformations from LLM
             LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
-
-            boolean doesLLMThinkEquivalent = llmResponse.areQueriesEquivalent();
+            // llmResponse may be null if plan retrieval or LLM interaction was unavailable
+            boolean doesLLMThinkEquivalent = llmResponse != null && llmResponse.areQueriesEquivalent();
             System.out.print(doesLLMThinkEquivalent + "\t");
 
-            if (doesLLMThinkEquivalent)
+            if (doesLLMThinkEquivalent && llmResponse != null)
             {
                 //extract transformations only if LLM says equivalent
                 List<String> llmTransformations = llmResponse.getTransformationSteps();

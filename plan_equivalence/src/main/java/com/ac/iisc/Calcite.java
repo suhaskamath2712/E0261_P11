@@ -1064,9 +1064,26 @@ public class Calcite {
         return cur;
     }
 
+    /**
+     * Convert a {@link RelNode} to a SQL string and retrieve its cleaned PostgreSQL
+     * execution plan as pretty‑printed JSON.
+     *
+     * Implementation details:
+     * - Uses Calcite's {@link RelToSqlConverter} with {@link PostgresqlSqlDialect}
+     *   to render a SQL statement from the relational plan.
+     * - Delegates to {@link GetQueryPlans#getCleanedQueryPlanJSONasString(String)}
+     *   to run EXPLAIN (FORMAT JSON, BUFFERS) and strip execution‑specific fields.
+     *
+     * Error handling:
+     * - Any exception during plan retrieval is caught; a brief message is written
+     *   to {@code System.err} and this method returns {@code null} so callers can
+     *   degrade gracefully.
+     *
+     * @param rel The relational plan to describe
+     * @return Cleaned, pretty‑printed JSON plan string, or {@code null} on failure
+     */
     public static String convertRelNodetoJSONQueryPlan(RelNode rel)
     {
-        // Convert a RelNode to a canonical digest string for comparison
         if (rel == null) return "null";
         RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
         RelToSqlConverter.Result res = converter.visitRoot(rel);
@@ -1075,7 +1092,7 @@ public class Calcite {
         // checked/unchecked exceptions into callers.
         try {
             return GetQueryPlans.getCleanedQueryPlanJSONasString(sql);
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Error while obtaining plan: " + e.getMessage());
             return null;
         }

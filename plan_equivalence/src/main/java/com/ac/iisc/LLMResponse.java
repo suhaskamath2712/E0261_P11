@@ -121,18 +121,22 @@ public class LLMResponse
     }
 
     //Setter methods
+    /** Set equivalence flag returned/decided by the LLM (or local logic). */
     public void setQueriesAreEquivalent(boolean queriesAreEquivalent){
         this.queriesAreEquivalent = queriesAreEquivalent;
     }
+    /** Replace transformation steps; null is treated as an empty, immutable list. */
     public void setTransformationSteps(List<String> transformationSteps) {
         this.transformationSteps = transformationSteps == null ? List.of() : List.copyOf(transformationSteps);
     }
 
     //Getter methods
+    /** True if queries are deemed equivalent by the response/contract. */
     public boolean areQueriesEquivalent(){
         return queriesAreEquivalent;
     }
 
+    /** Ordered list of transformation names (may be empty, never null). */
     public List<String> getTransformationSteps() {
         return transformationSteps;
     }

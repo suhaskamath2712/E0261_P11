@@ -11,16 +11,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Java migration of get_query_plans_cleaned.py
- * - Parses three SQL files (original/rewritten/mutated) for queries with "-- Query ID: <ID>" headers
- * - Connects once to PostgreSQL
- * - Runs EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for each query
- * - Cleans the JSON plan by removing execution-specific keys and lifting the root 'Plan' node
- * - Provides a helper to genericize implementation-specific details (node type/field names) if needed
- * - Writes cleaned JSON to matching output folders, skipping IDs already exported (both legacy and new names)
- * 
- * Utilities to obtain PostgreSQL EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) output and
+ * Utilities to obtain PostgreSQL EXPLAIN (FORMAT JSON) output and
  * strip execution-specific fields to enable stable plan comparison.
+ *
+ * Key features:
+ * - Runs EXPLAIN with options used by this project (FORMAT JSON, BUFFERS).
+ * - Cleans the JSON plan by removing execution-specific keys and lifting the root 'Plan' node.
+ * - Provides an optional genericization helper to normalize implementation-specific details.
  */
 public class GetQueryPlans {
 
@@ -59,10 +56,10 @@ public class GetQueryPlans {
         "Parent Relationship"
     );
 
-    // Run EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) for a given SQL query.
+    // Run EXPLAIN (FORMAT JSON, BUFFERS) for a given SQL query.
     // Returns the raw JSONArray text produced by PostgreSQL as org.json types.
     /**
-     * Execute an EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) against the provided SQL statement.
+    * Execute an EXPLAIN (FORMAT JSON, BUFFERS) against the provided SQL statement.
      *
      * Responsibilities:
      *  - Prefix the SQL with the EXPLAIN options (FORMAT JSON, ANALYZE, BUFFERS).
@@ -280,10 +277,8 @@ public class GetQueryPlans {
         String url = "jdbc:postgresql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME;
         try (Connection conn = DriverManager.getConnection(url, DB_USER, DB_PASS))
         {   
-            // WARNING: This runs EXPLAIN with ANALYZE which executes the SQL. Running
-            // this method repeatedly on large workloads will execute many queries and
-            // can be slow and resource-intensive. Use with care or switch to a
-            // non-ANALYZE EXPLAIN if you only need estimated plans.
+            // NOTE: This issues EXPLAIN (FORMAT JSON, BUFFERS). Adjust options if you
+            // require estimated (planner-only) plans or execution metrics via ANALYZE.
             JSONObject cleanedPlan = extractAndClean(explainPlan(conn, sql));
             return (cleanedPlan != null) ? cleanedPlan.toString(4) : null;
             // pretty-print with indent
