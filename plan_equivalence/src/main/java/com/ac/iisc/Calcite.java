@@ -318,7 +318,23 @@ public class Calcite {
             //if (rel1.equals(rel2))  return true;
             //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
             
-            return tree1.equalsIgnoreChildOrder(tree2);
+            if (tree1.equalsIgnoreChildOrder(tree2)) return true;
+
+            if (transformations != null && !transformations.isEmpty())
+            {
+                //transformed rel1
+                String LLMNormalisedRel1 = LLM.normaliseRelNodeLLM(rel1);
+                
+                //rel2
+                String LLMNormalisedRel2 = LLM.normaliseRelNodeLLM(rel2);
+
+                System.out.println("[Calcite.compareQueries] LLM Normalized Rel 1:\n" + LLMNormalisedRel1);
+                System.out.println("[Calcite.compareQueries] LLM Normalized Rel 2:\n" + LLMNormalisedRel2);
+
+                return LLMNormalisedRel1.equals(LLMNormalisedRel2);
+            }
+
+            return false;
         } catch (Exception e)
         {
             // Planning/parsing/validation error: treat as non-equivalent.

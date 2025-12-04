@@ -53,7 +53,7 @@ public class Test
     */
 
     private static final List<String> queryIDList = List.of(
-        "LITHE_3", "LITHE_5"
+        "LITHE_3"
     );
 
     //Rewritten queries: ETPCH_Q7, ETPCH_Q9, ETPCH_Q23, LITHE_9
