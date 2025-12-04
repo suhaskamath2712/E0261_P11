@@ -1,4 +1,4 @@
-// SankeyMATIC diagram inputs - Saved: 12/4/2025, 11:08:02 AM
+// SankeyMATIC diagram inputs - Saved: 12/4/2025, 5:06:04 PM
 // https://sankeymatic.com/build/
 
 // === Nodes and Flows ===
@@ -9,7 +9,8 @@ Total Equivalent TPCH Queries [4] False Negatives (LLM)
 Transformations Required [7] Transformations Provided
 Transformations Required [7] Transformations Not Provided
 
-Transformations Provided [7] Correct Transformations
+Transformations Provided [2] Correct Transformations
+Transformations Provided [5] Incorrect Transformations
 
 // === Settings ===
 
