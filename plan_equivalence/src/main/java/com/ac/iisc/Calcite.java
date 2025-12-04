@@ -80,7 +80,7 @@ import org.postgresql.ds.PGSimpleDataSource;
  *   expressions into relational correlates and then attempts to decorrelate them to joins
  *   and aggregates. This is done symmetrically for both sides prior to comparison.
  * - Because plan equivalence is heuristic, the comparison performs multiple fallbacks:
- *   structural digest → input-ref-normalized digest → canonical digest → tree canonical digest.
+ *   structural digest -> input-ref-normalized digest -> canonical digest -> tree canonical digest.
  */
 public class Calcite {
 
@@ -1015,7 +1015,7 @@ public class Calcite {
 
         // Build a composite Hep program containing all requested rules and
         // apply them together to reach a better fixpoint than one-by-one.
-        java.util.List<Consumer<HepProgramBuilder>> ruleAdders = new java.util.ArrayList<>();
+        List<Consumer<HepProgramBuilder>> ruleAdders = new ArrayList<>();
         for (String transform : transformations) {
             String key = transform == null ? "" : transform.trim().toLowerCase();
             Consumer<HepProgramBuilder> adder = RULE_MAP.get(key);
