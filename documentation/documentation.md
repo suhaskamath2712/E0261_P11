@@ -26,6 +26,13 @@ Utility class that integrates with Apache Calcite. Responsibilities:
 - Run a HepPlanner-based optimization pipeline (phased rules) for normalization.
 - Provide layered plan comparison utilities and normalization/canonicalization helpers.
 
+Glossary (Digests)
+------------------
+- Structural digest: order‑sensitive plan fingerprint (`RelOptUtil.toString(..., DIGEST_ATTRIBUTES)`).
+- Normalized digest: input refs `$N`→`$x` and spacing collapsed (`normalizeDigest`).
+- Canonical digest: inner‑join children flattened/sorted; predicates canonicalized; CASTs stripped; aggregates ordered; preserves projection and non‑INNER join order (`canonicalDigest`).
+- Tree canonical digest: order‑insensitive tree digest (`RelTreeNode.canonicalDigest`).
+
 Important public methods
 ------------------------
 All methods are static on `Calcite`.
@@ -93,6 +100,16 @@ All methods are static on `Calcite`.
     - UNION nodes flattened and child digests sorted
     - Sort keys are ignored (fetch/offset preserved)
   - Notes: Preserves projection output order; outer joins are NOT made order-insensitive.
+  - Step‑by‑step:
+    1) Traverse safely using a path‑set.
+    2) Project: list output expressions in order; recurse.
+    3) Filter: canonicalize predicate; recurse.
+    4) INNER Join: flatten; sort child digests; split/normalize/deduplicate/sort conjuncts; build order‑insensitive join string.
+    5) Non‑INNER Join: keep left/right order and normalized condition.
+    6) Union: flatten matching ALL/DISTINCT; sort children; build stable string.
+    7) Sort: ignore keys; include fetch/offset; recurse.
+    8) Aggregate: sort group keys; format/sort calls deterministically; recurse.
+    9) Other: emit normalized type plus canonicalized children.
 
 - private static String canonicalizeRex(RexNode node)
   - Input: `RexNode` expression
@@ -138,6 +155,8 @@ Behavioral and design notes
 ---------------------------
 - The canonicalization is intentionally conservative with respect to outer join semantics and does not collapse LEFT/RIGHT/FULL joins even if predicates appear symmetric. Doing so without schema constraints (FKs / NOT NULL) can produce false positives.
 - Laddered matching strategy reduces false negatives due to syntax/planner noise while preserving a conservative check for true semantic differences.
+ - EXPLAIN JSON retrieval is wrapped in try‑catch in `convertRelNodetoJSONQueryPlan` and returns `null` on failure.
+ - Deprecation: `RelDecorrelator.decorrelateQuery(RelNode)` is used in a best‑effort manner; migration planned when available.
 
 
 ---------------------------------------------------------------------

@@ -53,34 +53,20 @@ import org.postgresql.ds.PGSimpleDataSource;
  * Responsibilities:
  * - Build a Calcite {@link FrameworkConfig} backed by a PostgreSQL schema (via JDBC).
  * - Parse/validate SQL to {@link RelNode} and optionally optimize it using phased HepPlanner programs.
- * - Provide utilities to compare two queries for structural equivalence using multi-stage
- *   digests and a canonical formatter that is insensitive to inner-join child order,
- *   commutative/symmetric expressions, and harmless CASTs. The canonicalizer is
- *   DAG/cycle-safe so it can operate on shared-subgraph plans without causing
- *   uncontrolled recursion.
+ * - Compare queries via layered digests to judge equivalence:
+ *   - Structural digest: {@code RelOptUtil.toString(..., DIGEST_ATTRIBUTES)} — order‑sensitive.
+ *   - Normalized digest: {@link #normalizeDigest(String)} — replaces input refs like {@code $0}→{@code $x}, collapses spacing.
+ *   - Canonical digest: {@link #canonicalDigest(RelNode)} — inner‑join children flattened and sorted; expressions canonicalized; CASTs stripped; aggregates ordered.
+ *   - Tree canonical digest: {@link RelTreeNode#canonicalDigest()} — ignores child order across the tree.
  * - Apply specific {@link org.apache.calcite.rel.rules.CoreRules} by name to a {@link RelNode}
- *   using a registry-driven approach (`RULE_MAP`). Rules are looked up by lowercase keys
- *   and applied together as a composite Hep program (with a small number of fixpoint passes)
- *   to reduce oscillation and better converge when rules enable each other.
- * - Normalize scalar subqueries by converting them to correlates and invoking Calcite's
- *   decorrelator to produce equivalent join+aggregate forms where possible. This helps
- *   align plans that express the same logic as a SCALAR_QUERY on one side and as a
- *   join+aggregate on the other.
+ *   using a registry‑driven approach (`RULE_MAP`) and a composite Hep program to reduce oscillation.
+ * - Normalize scalar subqueries (convert to correlates) and decorrelate to join+aggregate forms where possible, symmetrically for both sides.
  *
  * Notes:
- * - Unquoted identifiers are folded to lower-case to align with PostgreSQL catalogs.
- * - Trailing semicolons are stripped before parsing for robustness.
- * - Canonical digest normalizes inner-join child ordering, commutative/symmetric expressions,
- *   and ignores harmless CASTs; projection order is preserved. The canonicalizer uses a
- *   recursion-path set to avoid StackOverflow when traversing DAGs.
- * - `applyTransformations` accepts a list of transformation names (case-insensitive keys into
- *   `RULE_MAP`) and builds a single HepProgram that is applied to the plan repeatedly until
- *   a small fixpoint is reached (or a pass limit is hit).
- * - `normalizeSubqueriesAndDecorrelate` performs a best-effort conversion of RexSubQuery
- *   expressions into relational correlates and then attempts to decorrelate them to joins
- *   and aggregates. This is done symmetrically for both sides prior to comparison.
- * - Because plan equivalence is heuristic, the comparison performs multiple fallbacks:
- *   structural digest -> input-ref-normalized digest -> canonical digest -> tree canonical digest.
+ * - Unquoted identifiers fold to lower‑case (PostgreSQL‑like).
+ * - Trailing semicolons are stripped; non‑standard {@code !=} is normalized to {@code <>}.
+ * - Canonical digest preserves meaningful order (projection, non‑INNER joins) but removes noise (commutativity, CASTs, input‑ref positions).
+ * - A recursion‑path set makes canonicalization safe on DAGs/shared subgraphs.
  */
 public class Calcite {
 
@@ -434,7 +420,19 @@ public class Calcite {
     * - Filter conditions and expression strings are normalized via {@link #normalizeDigest(String)}
     * - Aggregates are normalized: groupSet sorted and aggregate calls sorted
     *   deterministically (by function name + input index, with DISTINCT tagged)
-    * Projection order is preserved. This makes the digest insensitive to inner-join child order, commutative/symmetric expressions, and harmless CASTs, while keeping column order significant.
+    * Projection order is preserved.
+    *
+    * Step-by-step summary:
+    * 1) Safely traverse the plan using a path-set to avoid cycles.
+    * 2) For Project: list output expressions in order, then recurse.
+    * 3) For Filter: canonicalize the predicate, then recurse.
+    * 4) For INNER Join: flatten nested inner joins, sort child digests, split/normalize/deduplicate/sort conjuncts, then build an order-insensitive join string.
+    * 5) For non-INNER Join: keep left/right order and include normalized condition.
+    * 6) For Union: flatten matching ALL/DISTINCT unions, sort child digests, build a stable representation.
+    * 7) For Sort: ignore sort keys; include fetch/offset presence; then recurse.
+    * 8) For Aggregate: sort group keys; format/sort aggregate calls deterministically; then recurse.
+    * 9) For other nodes: emit normalized type plus canonicalized children.
+    * 10) Expressions are canonicalized by stripping CASTs, sorting operands for commutative ops, making equality symmetric, normalizing inequality orientation, and replacing input refs with placeholders.
     *
     * @param rel The input RelNode
     * @return Canonical digest string

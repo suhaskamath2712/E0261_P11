@@ -9,6 +9,13 @@ This document describes how the codebase uses Apache Calcite to parse, validate,
 - Aggregate normalization (sorted `groupSet` and deterministic aggregate call ordering)
 - Pretty‑printed, cleaned EXPLAIN (FORMAT JSON, BUFFERS) plans via JDBC with defensive error handling
 
+## Digest Glossary
+
+- Structural digest: `RelOptUtil.toString(rel, DIGEST_ATTRIBUTES)` — order‑sensitive textual fingerprint of the operator tree and attributes.
+- Normalized digest: `normalizeDigest(String)` — replaces input refs like `$0`→`$x`, collapses spaces; reduces sensitivity to child swaps and minor formatting.
+- Canonical digest: `canonicalDigest(RelNode)` — inner joins flattened/sorted; predicates canonicalized; CASTs stripped; aggregates ordered; preserves projection and non‑INNER join order.
+- Tree canonical digest: `RelTreeNode.canonicalDigest()` — order‑insensitive digest of the tree structure used for last‑resort comparisons.
+
 ## Components
 - `Calcite.getFrameworkConfig()`: Builds a Calcite environment backed by PostgreSQL (`PGSimpleDataSource`), adds a `JdbcSchema`, and configures the parser with `Lex.MYSQL` for lower‑case identifiers.
 - `Calcite.getOptimizedRelNode(planner, sql)`: Parses → validates → converts to `RelNode` → applies phased HepPlanner rules (`FILTER_REDUCE_EXPRESSIONS`, `PROJECT_MERGE`, `PROJECT_REMOVE`, `FILTER_INTO_JOIN`, `JOIN_ASSOCIATE`, `JOIN_COMMUTE`, `PROJECT_JOIN_TRANSPOSE`). Trailing semicolons are removed and `!=` is normalized to `<>`.
@@ -28,6 +35,18 @@ Comparison proceeds in layers:
   - Predicates: decompose conjuncts (ANDs), canonicalize, deduplicate, and sort.
   - Aggregates: sort `groupSet`; sort aggregate calls by function name + input index with DISTINCT tagging.
 4. Tree equality: compare `RelTreeNode` trees; order‑insensitive via canonical form when requested.
+
+### Canonical Digest (Step‑by‑Step)
+
+- Traverse safely using a path‑set to avoid cycles.
+- Project: list output expressions in order; recurse.
+- Filter: canonicalize predicate; recurse.
+- INNER Join: flatten nested inner joins into factors; canonicalize and sort factor digests; split predicate into conjuncts, canonicalize, deduplicate, sort; build an order‑insensitive join string.
+- Non‑INNER Join: keep left/right order; include canonicalized condition.
+- Union: flatten matching ALL/DISTINCT; sort child digests; build stable string.
+- Sort: ignore keys; include `fetch`/`offset`; recurse.
+- Aggregate: sort group keys; format calls as `func@firstArg[:DISTINCT]`; sort calls; recurse.
+- Other: emit normalized type plus canonicalized children.
 ### Ignored Differences
 
 - Inner‑join child order (commutativity)
@@ -41,7 +60,9 @@ Comparison proceeds in layers:
 - Presence of fetch/offset in Sort/Limit
 ## Subqueries and Decorrelation
 
-Subqueries are converted to correlates and decorrelated where applicable using Calcite rules and `RelDecorrelator`. This is best‑effort; if inapplicable, the original plan is retained. Note: `RelDecorrelator.decorrelateQuery` may be deprecated in some Calcite versions; current usage remains best‑effort and isolated.
+Subqueries are converted to correlates and decorrelated where applicable using Calcite rules and `RelDecorrelator`. This is best‑effort; if inapplicable, the original plan is retained.
+
+Deprecation note: `RelDecorrelator.decorrelateQuery(RelNode)` is deprecated in some Calcite versions; we keep it for behavior parity and will migrate when practical.
 ## EXPLAIN Plan Retrieval
 
 `convertRelNodetoJSONQueryPlan` renders SQL using `PostgresqlSqlDialect` and calls `GetQueryPlans` to obtain a cleaned JSON plan. Any `SQLException` is caught, a brief error is logged to `System.err`, and `null` is returned to allow graceful degradation.

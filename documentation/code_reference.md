@@ -34,6 +34,12 @@ Obtains PostgreSQL execution plans (`EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS)`) f
 ### Error Handling
 - External call wrapped in try-catch returning `null` on failure.
 
+### Digest Types (Glossary)
+- Structural digest: `RelOptUtil.toString(rel, DIGEST_ATTRIBUTES)` — order‑sensitive textual fingerprint of the operator tree and attributes.
+- Normalized digest: `normalizeDigest(String)` — replaces input refs like `$0`→`$x`, collapses spaces; reduces sensitivity to child swaps and minor formatting.
+- Canonical digest: `canonicalDigest(RelNode)` — inner joins flattened/sorted; predicates canonicalized; CASTs stripped; aggregates ordered; preserves projection and non‑INNER join order.
+- Tree canonical digest: `RelTreeNode.canonicalDigest()` — order‑insensitive digest of the tree structure used for last‑resort comparisons.
+
 ### Public API Methods (Detailed)
 ### Purpose (Updated)
 Ad-hoc runner for evaluating equivalence across selected queries and testing transformation + LLM-assisted alignment.
@@ -86,6 +92,16 @@ Produces a canonical string representation tolerant of:
 - Set operations: flattened unions (same ALL/DISTINCT) and sorted children.
 
 Projection order and non-inner join child order are preserved (semantic significance).
+Step‑by‑step summary:
+1) Traverse safely using a path‑set.
+2) Project: list output expressions in order; recurse.
+3) Filter: canonicalize predicate; recurse.
+4) INNER Join: flatten; sort child digests; split/normalize/deduplicate/sort conjuncts; build order‑insensitive join string.
+5) Non‑INNER Join: keep left/right order and normalized condition.
+6) Union: flatten matching ALL/DISTINCT; sort children; build stable string.
+7) Sort: ignore keys; include fetch/offset; recurse.
+8) Aggregate: sort group keys; format/sort calls deterministically; recurse.
+9) Other: emit normalized type plus canonicalized children.
 
 #### `public static RelTreeNode buildRelTree(RelNode rel)` / `public static String relTreeCanonicalDigest(RelNode rel)`
 Converts a `RelNode` DAG to a simple ordered tree (`RelTreeNode`) via `RelVisitor`. The canonical digest of that tree ignores per-node child order. Used as the final comparison fallback.
@@ -110,6 +126,7 @@ Convenience structural comparisons, optionally treating children as unordered se
 - Null inputs return explicit markers (`"null"` in digests) instead of throwing.
 - Cycle detection: `canonicalDigestInternal` returns `TypeName[...cycle...]` when revisiting a node.
 - Decorrelator failures are swallowed to avoid aborting comparison.
+ - `RelDecorrelator.decorrelateQuery(RelNode)` is deprecated in some versions; used best‑effort and isolated.
 
 ### Performance Considerations
 - Multiple planner instantiations per comparison; caching could reduce overhead but risks stale metadata.
