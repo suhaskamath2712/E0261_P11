@@ -44,10 +44,12 @@
 package com.ac.iisc;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,18 +59,30 @@ import java.util.regex.Pattern;
  */
 public class FileIO 
 {
-	// Absolute paths to the SQL collections (under the sql_queries/ folder)
-	private static final String ORIGINAL_SQL_PATH =
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql";
+    // Config handling
+    private static volatile Properties CONFIG;
+    private static final String DEFAULT_CONFIG_RESOURCE = "config.properties";
 
-	private static final String REWRITTEN_SQL_PATH =
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\rewritten_queries.sql";
+    // Absolute paths to the SQL collections (under the sql_queries/ folder)
+    private static final String ORIGINAL_SQL_PATH = getProperty(
+	    "original_sql_path",
+	    "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\original_queries.sql"
+    );
 
-	private static final String MUTATED_SQL_PATH =
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql";
+    private static final String REWRITTEN_SQL_PATH = getProperty(
+	    "rewritten_sql_path",
+	    "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\rewritten_queries.sql"
+    );
 
-	private static final String SCHEMA_SUMMARY_RESOURCE =
-			"C:\\Users\\suhas\\Downloads\\E0261_P11\\plan_equivalence\\src\\main\\resources\\tpch_schema_summary.json";
+    private static final String MUTATED_SQL_PATH = getProperty(
+	    "mutated_sql_path",
+	    "C:\\Users\\suhas\\Downloads\\E0261_P11\\sql_queries\\mutated_queries.sql"
+    );
+
+    private static final String SCHEMA_SUMMARY_RESOURCE = getProperty(
+	    "schema_summary_resource",
+	    "C:\\Users\\suhas\\Downloads\\E0261_P11\\plan_equivalence\\src\\main\\resources\\tpch_schema_summary.json"
+    );
 
 	// Read SQL files
 
@@ -243,4 +257,43 @@ public class FileIO
 		}
 		Files.writeString(p, content == null ? "" : content, StandardCharsets.UTF_8);
 	}
+
+	// --- Config helpers (new) ---
+
+	/** Load config from classpath resource `config.properties` under `src/main/resources`. */
+	private static Properties getConfig() {
+		if (CONFIG == null) {
+			synchronized (FileIO.class) {
+				if (CONFIG == null) {
+					Properties props = new Properties();
+					// Try to load from classpath
+					try (InputStream is = FileIO.class.getClassLoader().getResourceAsStream(DEFAULT_CONFIG_RESOURCE)) {
+						if (is != null) {
+							props.load(is);
+						}
+					} catch (IOException ignored) { }
+					CONFIG = props;
+				}
+			}
+		}
+		return CONFIG;
+	}
+
+	/** Get property by key with a default fallback. */
+	public static String getProperty(String key, String defaultValue) {
+		String v = getConfig().getProperty(key);
+		return (v == null || v.isBlank()) ? defaultValue : v.trim();
+	}
+
+	// Typed accessors
+	public static String getOriginalSqlPath() { return ORIGINAL_SQL_PATH; }
+	public static String getRewrittenSqlPath() { return REWRITTEN_SQL_PATH; }
+	public static String getMutatedSqlPath() { return MUTATED_SQL_PATH; }
+	public static String getSchemaSummaryResource() { return SCHEMA_SUMMARY_RESOURCE; }
+
+	// DB configuration accessors for consumers (e.g., Calcite)
+	public static String getPgUrl() { return getProperty("pg_url", "jdbc:postgresql://localhost:5432/tpch"); }
+	public static String getPgUser() { return getProperty("pg_user", "postgres"); }
+	public static String getPgPassword() { return getProperty("pg_password", "123"); }
+	public static String getPgSchema() { return getProperty("pg_schema", "public"); }
 }
