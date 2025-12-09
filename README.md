@@ -54,8 +54,8 @@ System.out.println(schema);
 ```
 
 ## Configuration
-- Update PostgreSQL connection constants in `GetQueryPlans.java` (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`).
-- Update Calcite framework connection constants in `Calcite.java` (`PG_URL`, `PG_USER`, `PG_PASSWORD`, `PG_SCHEMA`).
+- Runtime configuration: edit `src/main/resources/config.properties` to change database connection details, SQL file paths, and other runtime parameters. The project reads these values at runtime via the `com.ac.iisc.FileIO` helper; you do not need to modify Java sources to change connection settings.
+- Supported transformations (machine-readable): canonical transformation names are listed (one per line) in `src/main/resources/transformation_list.txt`. This file is consumed at runtime by `LLM`/helpers and should contain exact, canonical rule names when used programmatically.
 - Planner reuse: planners are recreated per query for reliability.
 
 ## Documentation

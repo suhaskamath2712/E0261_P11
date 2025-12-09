@@ -176,7 +176,7 @@ Key classes and methods
     - `source`: which consolidated SQL file to read from
     - `queryId`: the Query ID string to locate (e.g., "U1", "O2")
   - Returns: The SQL block text for the requested query, trimmed. Throws `IOException` if file cannot be read or queryId not found.
-  - Behavior: Reads the entire consolidated SQL file (absolute paths are configured as constants) and parses the block delimited by header separators containing `-- Query ID: <ID>`.
+  - Behavior: Reads the consolidated SQL file. File paths and other runtime parameters are configured in `src/main/resources/config.properties` and accessed at runtime via `com.ac.iisc.FileIO`; you do not need to modify Java sources to change these paths.
 
 - public static String readOriginalSqlQuery(String queryId) throws IOException
   - Convenience wrapper for `readSqlQuery(SqlSource.ORIGINAL, queryId)`.
@@ -210,7 +210,7 @@ Key classes and methods
 
 Notes and caveats
 -----------------
-- Paths are configured as absolute constants in the class. If you move the project, update these constants.
+ - Runtime paths and DB connection settings are read from `src/main/resources/config.properties` via `com.ac.iisc.FileIO`. Edit the properties file to adjust paths or database settings instead of changing the Java source.
 - The SQL extraction relies on consistent header separators and `-- Query ID:` lines in the consolidated SQL files.
 
 

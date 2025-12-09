@@ -68,7 +68,7 @@ Deprecation note: `RelDecorrelator.decorrelateQuery(RelNode)` is deprecated in s
 `convertRelNodetoJSONQueryPlan` renders SQL using `PostgresqlSqlDialect` and calls `GetQueryPlans` to obtain a cleaned JSON plan. Any `SQLException` is caught, a brief error is logged to `System.err`, and `null` is returned to allow graceful degradation.
 ## Configuration Notes
 
-- PostgreSQL JDBC: update `PG_URL`, `PG_USER`, `PG_PASSWORD`, and `PG_SCHEMA` in `Calcite.java`.
+- PostgreSQL JDBC and other runtime parameters: edit `src/main/resources/config.properties`. The runtime reads DB connection details, schema name, and SQL file paths via `com.ac.iisc.FileIO` so you do not need to modify Java source files to change these values.
 - Parser: `Lex.MYSQL` folds identifiers to lower‑case.
 - Planner: do not reuse `Planner` across parse/validate cycles; it is closed and recreated per query.
 # Calcite.java — API Documentation

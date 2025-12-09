@@ -21,12 +21,6 @@ public class Test
     
     /*
     private static final List<String> queryIDList = List.of(
-        "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
-        "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20",
-        "Q21", "Q22"
-    );
-    
-    private static final List<String> queryIDList = List.of(
         // U-Series
         "U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8", "U9",
         // O-Series
