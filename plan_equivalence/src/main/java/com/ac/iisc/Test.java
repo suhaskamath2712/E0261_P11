@@ -53,7 +53,23 @@ public class Test
     */
 
     private static final List<String> queryIDList = List.of(
-        "LITHE_3", "LITHE_5"
+        "A1", "A2", "A3", "A4",
+        // Nested/Misc
+        "N1", "Alaap", "Nested_Test", "paper_sample",
+        // F-Series
+        "F1",
+        // TPC-H Modified (MQ)
+        "MQ1", "MQ2", "MQ3", "MQ4", "MQ5", "MQ6", "MQ10", "MQ11", "MQ17", "MQ18", "MQ21",
+        // Standard TPC-H
+        "TPCH_Q9", "TPCH_Q13",
+        // Extended TPC-H (ETPCH)
+        "ETPCH_Q1", "ETPCH_Q4", "ETPCH_Q5", "ETPCH_Q6", "ETPCH_Q6_1", "ETPCH_Q6_2",
+        "ETPCH_Q7", "ETPCH_Q9", "ETPCH_Q10", "ETPCH_Q12", "ETPCH_Q14", "ETPCH_Q15", "ETPCH_Q21",
+        "ETPCH_Q23", "ETPCH_Q24",
+        // LITHE Series
+        "LITHE_1", "LITHE_2", "LITHE_3", "LITHE_4", "LITHE_5", "LITHE_6", "LITHE_7", "LITHE_8", "LITHE_9",
+        "LITHE_10", "LITHE_11", "LITHE_12", "LITHE_13", "LITHE_14", "LITHE_15", "LITHE_16", "LITHE_17",
+        "LITHE_18", "LITHE_19", "LITHE_20", "LITHE_21", "LITHE_22"
     );
 
     //Rewritten queries: ETPCH_Q7, ETPCH_Q9, ETPCH_Q23, LITHE_9
@@ -73,27 +89,30 @@ public class Test
             String sqlA = FileIO.readOriginalSqlQuery(id);
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
-            System.out.print("Query ID: " + id + "\t" + Calcite.compareQueries(sqlA, sqlB, null) + "\t");
+            System.out.println("Query ID: " + id);
 
-            // Try with transformations from LLM
-            // Get Query Plan Transformations from LLM
-            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
-            // llmResponse may be null if plan retrieval or LLM interaction was unavailable
-            boolean doesLLMThinkEquivalent = llmResponse != null && llmResponse.areQueriesEquivalent();
-            System.out.print(doesLLMThinkEquivalent + "\t");
+            boolean equivalence = Calcite.compareQueries(sqlA, sqlB, null);
+            System.out.println("Equivalence without transformations: " + equivalence);
 
-            if (doesLLMThinkEquivalent && llmResponse != null)
-            {
-                //extract transformations only if LLM says equivalent
-                List<String> llmTransformations = llmResponse.getTransformationSteps();
-                
-                System.out.print(llmTransformations + "\t");
+            //If RelNodes are equivalent, skip LLM call
+            if (equivalence)    continue;
 
-                if (!llmTransformations.isEmpty())
-                    System.out.print(Calcite.compareQueries(sqlA, sqlB, llmTransformations));
-            }
+            LLMResponse llmResponse1 = LLM.getLLMResponse(sqlA, sqlB);
+            System.out.println("LLM Equivalence 1: " + llmResponse1.areQueriesEquivalent());
+            if (!llmResponse1.areQueriesEquivalent()) continue;
 
-            System.out.println();
+            System.out.println("LLM Transformations 1: " + llmResponse1.getTransformationSteps());
+            System.out.println("Equivalence with transformations: " + Calcite.compareQueries(sqlA, sqlB, llmResponse1.getTransformationSteps()));
+
+            LLMResponse llmResponse2 = LLM.getLLMResponse(sqlA, sqlB, llmResponse1);
+            System.out.println("LLM Equivalence 2: " + llmResponse2.areQueriesEquivalent());
+
+            if (!llmResponse2.areQueriesEquivalent()) continue;
+
+            System.out.println("LLM Transformations 2: " + llmResponse2.getTransformationSteps());
+            System.out.println("Equivalence with transformations: " + Calcite.compareQueries(sqlA, sqlB, llmResponse2.getTransformationSteps()));
+
+            System.out.println("-----------------------------------------------------");
         } 
     }
 }

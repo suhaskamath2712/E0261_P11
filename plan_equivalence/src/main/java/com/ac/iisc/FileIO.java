@@ -304,4 +304,61 @@ public class FileIO
 	public static String getPgUser() { return getProperty("pg_user", "postgres"); }
 	public static String getPgPassword() { return getProperty("pg_password", "123"); }
 	public static String getPgSchema() { return getProperty("pg_schema", "public"); }
+
+	/**
+	 * Read a resource text file (one item per line) from classpath or fall back to
+	 * a filesystem path specified in config by `transformation_list_path`.
+	 * Returns an empty list on any error.
+	 */
+	public static java.util.List<String> readLinesResource(String resourceName) {
+		java.util.ArrayList<String> out = new java.util.ArrayList<>();
+		// try classpath resource first
+		try (InputStream is = FileIO.class.getClassLoader().getResourceAsStream(resourceName)) {
+			if (is != null) {
+				try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(is, StandardCharsets.UTF_8))) {
+					String line;
+					while ((line = r.readLine()) != null) {
+						line = line.trim();
+						if (!line.isEmpty()) out.add(line);
+					}
+					return out;
+				}
+			}
+		} catch (IOException ignored) { }
+
+		// fallback: check config for explicit path
+		String cfgPath = getProperty("transformation_list_path", "");
+		if (cfgPath != null && !cfgPath.isBlank()) {
+			try {
+				Path p = Paths.get(cfgPath);
+				if (Files.exists(p)) {
+					java.util.List<String> lines = Files.readAllLines(p, StandardCharsets.UTF_8);
+					for (String ln : lines) {
+						if (ln != null) {
+							String t = ln.trim();
+							if (!t.isEmpty()) out.add(t);
+						}
+					}
+					return out;
+				}
+			} catch (IOException ignored) { }
+		}
+
+		// last-resort: try absolute path next to default config resource
+		try {
+			Path sibling = Paths.get(DEFAULT_CONFIG_RESOURCE).getParent().resolve(resourceName);
+			if (Files.exists(sibling)) {
+				java.util.List<String> lines = Files.readAllLines(sibling, StandardCharsets.UTF_8);
+				for (String ln : lines) {
+					if (ln != null) {
+						String t = ln.trim();
+						if (!t.isEmpty()) out.add(t);
+					}
+				}
+				return out;
+			}
+		} catch (Exception ignored) { }
+
+		return out;
+	}
 }

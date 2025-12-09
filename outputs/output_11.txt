@@ -1,0 +1,217 @@
+Query ID: U1
+Equivalence without transformations: true
+Query ID: U2
+Equivalence without transformations: true
+Query ID: U3
+Equivalence without transformations: true
+Query ID: U4
+Equivalence without transformations: true
+Query ID: U5
+Equivalence without transformations: true
+Query ID: U6
+Equivalence without transformations: true
+Query ID: U7
+Equivalence without transformations: true
+Query ID: U8
+Equivalence without transformations: true
+Query ID: U9
+Equivalence without transformations: true
+Query ID: O1
+Equivalence without transformations: true
+Query ID: O2
+Equivalence without transformations: true
+Query ID: O3
+Equivalence without transformations: true
+Query ID: O4
+Equivalence without transformations: true
+Query ID: O5
+Equivalence without transformations: true
+Query ID: O6
+Equivalence without transformations: true
+Query ID: A1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: A2
+Equivalence without transformations: true
+Query ID: A3
+Equivalence without transformations: true
+Query ID: A4
+Equivalence without transformations: true
+Query ID: N1
+Equivalence without transformations: true
+Query ID: Alaap
+Equivalence without transformations: true
+Query ID: Nested_Test
+Equivalence without transformations: true
+Query ID: paper_sample
+Equivalence without transformations: true
+Query ID: F1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: MQ1
+Equivalence without transformations: true
+Query ID: MQ2
+Equivalence without transformations: true
+Query ID: MQ3
+Equivalence without transformations: true
+Query ID: MQ4
+Equivalence without transformations: true
+Query ID: MQ5
+Equivalence without transformations: true
+Query ID: MQ6
+Equivalence without transformations: true
+Query ID: MQ10
+Equivalence without transformations: true
+Query ID: MQ11
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: MQ17
+Equivalence without transformations: true
+Query ID: MQ18
+Equivalence without transformations: true
+Query ID: MQ21
+Equivalence without transformations: true
+Query ID: TPCH_Q9
+Equivalence without transformations: true
+Query ID: TPCH_Q13
+Equivalence without transformations: true
+Query ID: ETPCH_Q1
+Equivalence without transformations: true
+Query ID: ETPCH_Q4
+Equivalence without transformations: true
+Query ID: ETPCH_Q5
+Equivalence without transformations: true
+Query ID: ETPCH_Q6
+Equivalence without transformations: true
+Query ID: ETPCH_Q6_1
+Equivalence without transformations: true
+Query ID: ETPCH_Q6_2
+Equivalence without transformations: true
+Query ID: ETPCH_Q7
+Equivalence without transformations: true
+Query ID: ETPCH_Q9
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: ETPCH_Q10
+Equivalence without transformations: true
+Query ID: ETPCH_Q12
+Equivalence without transformations: true
+Query ID: ETPCH_Q14
+Equivalence without transformations: true
+Query ID: ETPCH_Q15
+Equivalence without transformations: true
+Query ID: ETPCH_Q21
+Equivalence without transformations: true
+Query ID: ETPCH_Q23
+Equivalence without transformations: true
+Query ID: ETPCH_Q24
+Equivalence without transformations: true
+Query ID: LITHE_1
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: [CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_2
+Equivalence without transformations: true
+Query ID: LITHE_3
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [AggregateJoinTransposeRule]
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: [AggregateJoinTransposeRule, AggregateRemoveRule]
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_4
+Equivalence without transformations: true
+Query ID: LITHE_5
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_6
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_7
+Equivalence without transformations: true
+Query ID: LITHE_8
+Equivalence without transformations: true
+Query ID: LITHE_9
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_10
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_11
+Equivalence without transformations: true
+Query ID: LITHE_12
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: [ReduceExpressionsRule.FilterReduceExpressionsRule]
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_13
+Equivalence without transformations: true
+Query ID: LITHE_14
+Equivalence without transformations: true
+Query ID: LITHE_15
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_16
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [SemiJoinRule.ProjectToSemiJoinRule, SemiJoinJoinTransposeRule]
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: [SemiJoinRule, SemiJoinJoinTransposeRule]
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_17
+Equivalence without transformations: true
+Query ID: LITHE_18
+Equivalence without transformations: true
+Query ID: LITHE_19
+Equivalence without transformations: true
+Query ID: LITHE_20
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_21
+Equivalence without transformations: true
+Query ID: LITHE_22
+Equivalence without transformations: false
+LLM Equivalence 1: false

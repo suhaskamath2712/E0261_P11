@@ -32,6 +32,13 @@ public class LLMResponse
         this.transformationSteps = transformationSteps == null ? List.of() : List.copyOf(transformationSteps);
     }
 
+    public String toString() {
+        JSONObject obj = new JSONObject();
+        obj.put("equivalent: ", this.queriesAreEquivalent);
+        obj.put("transformations: ", this.transformationSteps);
+        return obj.toString(2); // Pretty print with 2-space indentation
+    }
+
     /**
      * Construct and validate from raw LLM output. Accepts either JSON object or legacy line format.
      * Throws IllegalArgumentException for malformed input or for unsupported transformation names.

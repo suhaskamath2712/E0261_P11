@@ -31,7 +31,7 @@ import com.openai.models.responses.ResponseCreateParams;
  */
 public class LLM
 {
-    private static final String BASE_PROMPT = """
+    private static final String PROMPT_1 = """
             System Message:
             You are an expert in relational query optimization and Apache Calcite transformations.
             Always respond with exactly one JSON object matching the schema requested. Do not
@@ -105,104 +105,16 @@ public class LLM
      * The list is now always sourced from transformation_list.txt and may change as that file changes.
      * Keep the canonical names; unknown or misspelled names will be rejected.
      */
-    private static final List<String> SUPPORTED_TRANSFORMATIONS = List.of(
-        "AggregateExpandDistinctAggregatesRule",
-        "AggregateExtractProjectRule",
-        "AggregateFilterToCaseRule",
-        "AggregateFilterTransposeRule",
-        "AggregateJoinJoinRemoveRule",
-        "AggregateJoinRemoveRule",
-        "AggregateJoinTransposeRule",
-        "AggregateMergeRule",
-        "AggregateProjectMergeRule",
-        "AggregateProjectPullUpConstantsRule",
-        "AggregateProjectStarTableRule",
-        "AggregateReduceFunctionsRule",
-        "AggregateRemoveRule",
-        "AggregateStarTableRule",
-        "AggregateUnionAggregateRule",
-        "AggregateUnionTransposeRule",
-        "AggregateValuesRule",
-        "CalcMergeRule",
-        "CalcRemoveRule",
-        "CalcSplitRule",
-        "CoerceInputsRule",
-        "ExchangeRemoveConstantKeysRule",
-        "FilterAggregateTransposeRule",
-        "FilterCalcMergeRule",
-        "FilterCorrelateRule",
-        "FilterJoinRule.FilterIntoJoinRule",
-        "FilterJoinRule.JoinConditionPushRule",
-        "FilterMergeRule",
-        "FilterMultiJoinMergeRule",
-        "FilterProjectTransposeRule",
-        "FilterSampleTransposeRule",
-        "FilterSetOpTransposeRule",
-        "FilterTableFunctionTransposeRule",
-        "FilterToCalcRule",
-        "FilterWindowTransposeRule",
-        "IntersectToDistinctRule",
-        "JoinAddRedundantSemiJoinRule",
-        "JoinAssociateRule",
-        "JoinDeriveIsNotNullFilterRule",
-        "JoinExtractFilterRule",
-        "JoinProjectBothTransposeRule",
-        "JoinProjectLeftTransposeRule",
-        "JoinProjectRightTransposeRule",
-        "JoinPushExpressionsRule",
-        "JoinPushTransitivePredicatesRule",
-        "JoinToCorrelateRule",
-        "JoinToMultiJoinRule",
-        "JoinLeftUnionTransposeRule",
-        "JoinRightUnionTransposeRule",
-        "MatchRule",
-        "MinusToAntiJoinRule",
-        "MinusToDistinctRule",
-        "MinusMergeRule",
-        "MultiJoinOptimizeBushyRule",
-        "ProjectAggregateMergeRule",
-        "ProjectCalcMergeRule",
-        "ProjectCorrelateTransposeRule",
-        "ProjectFilterTransposeRule",
-        "ProjectJoinJoinRemoveRule",
-        "ProjectJoinRemoveRule",
-        "ProjectJoinTransposeRule",
-        "ProjectMergeRule",
-        "ProjectMultiJoinMergeRule",
-        "ProjectRemoveRule",
-        "ProjectSetOpTransposeRule",
-        "ProjectToCalcRule",
-        "ProjectToWindowRule",
-        "ProjectToWindowRule.CalcToWindowRule",
-        "ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule",
-        "ProjectWindowTransposeRule",
-        "ReduceDecimalsRule",
-        "ReduceExpressionsRule.CalcReduceExpressionsRule",
-        "ReduceExpressionsRule.FilterReduceExpressionsRule",
-        "ReduceExpressionsRule.JoinReduceExpressionsRule",
-        "ReduceExpressionsRule.ProjectReduceExpressionsRule",
-        "ReduceExpressionsRule.WindowReduceExpressionsRule",
-        "SampleToFilterRule",
-        "SemiJoinFilterTransposeRule",
-        "SemiJoinJoinTransposeRule",
-        "SemiJoinProjectTransposeRule",
-        "SemiJoinRemoveRule",
-        "SemiJoinRule",
-        "SemiJoinRule.JoinOnUniqueToSemiJoinRule",
-        "SemiJoinRule.JoinToSemiJoinRule",
-        "SemiJoinRule.ProjectToSemiJoinRule",
-        "SortJoinCopyRule",
-        "SortJoinTransposeRule",
-        "SortProjectTransposeRule",
-        "SortRemoveConstantKeysRule",
-        "SortRemoveRedundantRule",
-        "SortRemoveRule",
-        "SortUnionTransposeRule",
-        "TableScanRule",
-        "UnionMergeRule",
-        "UnionPullUpConstantsRule",
-        "UnionToDistinctRule"
-    );
+    private static final List<String> SUPPORTED_TRANSFORMATIONS;
+
+    static {
+        java.util.List<String> loaded = FileIO.readLinesResource("transformation_list.txt");
+        if (loaded == null || loaded.isEmpty()) {
+            SUPPORTED_TRANSFORMATIONS = List.of();
+        } else {
+            SUPPORTED_TRANSFORMATIONS = java.util.List.copyOf(loaded);
+        }
+    }
     
 
     /**
@@ -234,7 +146,7 @@ public class LLM
 
         // Build strict prompt including both plans and the allowed rule list
         StringBuilder sb = new StringBuilder();
-        sb.append(BASE_PROMPT);
+        sb.append(PROMPT_1);
         for (String t : SUPPORTED_TRANSFORMATIONS) sb.append(t).append('\n');
         sb.append(PROMPT_2);
 
@@ -256,7 +168,62 @@ public class LLM
 
         Response resp = client.responses().create(params);
 
-        System.out.println("[LLM] Received response from LLM: " + resp);
+        //System.out.println("[LLM] Received response from LLM: " + resp);
+
+        // Best-effort extraction of assistant text content from the response.
+        // If SDK accessors are unavailable, fall back to parsing the toString() output.
+        String raw = resp.toString();
+        String contentText = extractAssistantText(raw);
+
+        if (contentText == null || contentText.isBlank()) {
+            System.err.println("[LLM] Unable to extract assistant text from response; returning not equivalent.");
+            return "false\nNo transformations found";
+        }
+
+        //DEBUG: Print reduced LLM output text
+        //System.out.println("LLM Assistant Text: " + contentText);
+
+        return contentText.trim();
+    }
+
+    public static String contactLLM(String sqlAJSON, String sqlBJSON, LLMResponse previousResponse)
+    {
+        // Fail fast if API key is not present in the environment
+        String apiKey = System.getenv("OPENAI_API_KEY");
+        if (apiKey == null || apiKey.isBlank()) {
+            System.err.println("[LLM] OPENAI_API_KEY is not set in the environment; skipping LLM call.");
+            // Return a minimal, valid contract string to avoid crashing callers
+            return "false\nNo transformations found";
+        }
+
+        // Build strict prompt including both plans and the allowed rule list
+        StringBuilder sb = new StringBuilder();
+        sb.append(PROMPT_1);
+        for (String t : SUPPORTED_TRANSFORMATIONS) sb.append(t).append('\n');
+        sb.append(PROMPT_2);
+
+        //Get database schemas
+        sb.append("\n\nSCHEMA_SUMMARY:\n");
+        sb.append(FileIO.readSchemaSummary());
+
+        sb.append("\nORIGINAL_PLAN_JSON:\n").append(sqlAJSON == null ? "(null)" : sqlAJSON);
+        sb.append("\n\nTARGET_PLAN_JSON:\n").append(sqlBJSON == null ? "(null)" : sqlBJSON);
+
+        sb.append("\nYou gave this reponse the first time. The answer is incorrect. Please try again and provide a different answer.\n");
+        sb.append(previousResponse.toString());
+
+        String prompt = sb.toString();
+
+        // Contact the OpenAI Responses API using env configuration
+        OpenAIClient client = OpenAIOkHttpClient.fromEnv();
+        ResponseCreateParams params = ResponseCreateParams.builder()
+            .input(prompt)
+            .model("gpt-5")
+            .build();
+
+        Response resp = client.responses().create(params);
+
+        //System.out.println("[LLM] Received response from LLM: " + resp);
 
         // Best-effort extraction of assistant text content from the response.
         // If SDK accessors are unavailable, fall back to parsing the toString() output.
@@ -292,6 +259,32 @@ public class LLM
         }
 
         String raw = contactLLM(sqlAJSON, sqlBJSON);
+        try {
+            return new LLMResponse(raw);
+        } catch (IllegalArgumentException iae) {
+            System.err.println("[LLM] Unexpected LLM output format; treating as not equivalent. " + iae.getMessage());
+            return new LLMResponse(false, List.of());
+        }
+    }
+
+    public static LLMResponse getLLMResponse(String sqlA, String sqlB, LLMResponse previousResponse)
+    {
+        // Build cleaned plan JSON for both inputs and contact the LLM.
+        // On plan retrieval failure, returns null so callers can skip LLM usage.
+        String sqlAJSON;
+        String sqlBJSON;
+        try
+        {
+            sqlAJSON = GetQueryPlans.getCleanedQueryPlanJSONasString(sqlA);
+            sqlBJSON = GetQueryPlans.getCleanedQueryPlanJSONasString(sqlB);
+        }
+        catch (SQLException ex)
+        {
+            System.err.println("Error obtaining query plans: " + ex.getMessage());
+            return null;
+        }
+
+        String raw = contactLLM(sqlAJSON, sqlBJSON, previousResponse);
         try {
             return new LLMResponse(raw);
         } catch (IllegalArgumentException iae) {
