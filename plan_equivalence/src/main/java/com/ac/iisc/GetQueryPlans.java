@@ -21,12 +21,38 @@ import org.json.JSONObject;
  */
 public class GetQueryPlans {
 
-    // DB settings - keep consistent with Python script defaults
-    private static final String DB_NAME = "tpch";
-    private static final String DB_USER = "postgres";
-    private static final String DB_PASS = "123";
-    private static final String DB_HOST = "localhost";
-    private static final String DB_PORT = "5432";
+    // DB settings - now read from config via FileIO
+    private static final String DB_USER = FileIO.getPgUser();
+    private static final String DB_PASS = FileIO.getPgPassword();
+    private static final String DB_HOST = parsePgUrlComponent(FileIO.getPgUrl(), PgPart.HOST);
+    private static final String DB_PORT = parsePgUrlComponent(FileIO.getPgUrl(), PgPart.PORT);
+    private static final String DB_NAME = parsePgUrlComponent(FileIO.getPgUrl(), PgPart.DBNAME);
+
+    // Helper to parse parts of a JDBC Postgres URL: jdbc:postgresql://host:port/dbname
+    private enum PgPart { HOST, PORT, DBNAME }
+    private static String parsePgUrlComponent(String url, PgPart part) {
+        if (url == null || url.isBlank()) return "";
+        // Expecting format jdbc:postgresql://host:port/dbname?params
+        try {
+            String u = url.trim();
+            int schemeIdx = u.indexOf("jdbc:postgresql://");
+            String rest = schemeIdx >= 0 ? u.substring(schemeIdx + "jdbc:postgresql://".length()) : u;
+            String withoutParams = rest.split("\\?")[0];
+            String[] hostPortAndDb = withoutParams.split("/");
+            String hostPort = hostPortAndDb.length > 0 ? hostPortAndDb[0] : "";
+            String db = hostPortAndDb.length > 1 ? hostPortAndDb[1] : "";
+            String[] hp = hostPort.split(":");
+            String host = hp.length > 0 ? hp[0] : "";
+            String port = hp.length > 1 ? hp[1] : "5432";
+            return switch (part) {
+                case HOST -> host;
+                case PORT -> port;
+                case DBNAME -> db;
+            };
+        } catch (Exception e) {
+            return "";
+        }
+    }
 
     // Keys to drop from the JSON plan tree (implementation/executor-specific)
     private static final Set<String> KEYS_TO_REMOVE = Set.of(

@@ -60,8 +60,8 @@ import java.util.regex.Pattern;
 public class FileIO 
 {
     // Config handling
-    private static volatile Properties CONFIG;
-    private static final String DEFAULT_CONFIG_RESOURCE = "config.properties";
+	private static volatile Properties CONFIG;
+	private static final String DEFAULT_CONFIG_RESOURCE = "/home/suhas/Desktop/E0261_P11/plan_equivalence/src/main/resources/config.properties";
 
     // Absolute paths to the SQL collections (under the sql_queries/ folder)
     private static final String ORIGINAL_SQL_PATH = getProperty(
@@ -260,16 +260,24 @@ public class FileIO
 
 	// --- Config helpers (new) ---
 
-	/** Load config from classpath resource `config.properties` under `src/main/resources`. */
+	/** Load config from classpath resource `config.properties` or fallback to filesystem path. */
 	private static Properties getConfig() {
 		if (CONFIG == null) {
 			synchronized (FileIO.class) {
 				if (CONFIG == null) {
 					Properties props = new Properties();
-					// Try to load from classpath
-					try (InputStream is = FileIO.class.getClassLoader().getResourceAsStream(DEFAULT_CONFIG_RESOURCE)) {
+					// Try to load from classpath first (resource name without absolute path)
+					try (InputStream is = FileIO.class.getClassLoader().getResourceAsStream("config.properties")) {
 						if (is != null) {
 							props.load(is);
+						} else {
+							// Fallback: load from absolute filesystem path provided
+							Path cfgPath = Paths.get(DEFAULT_CONFIG_RESOURCE);
+							if (Files.exists(cfgPath)) {
+								try (InputStream fis = Files.newInputStream(cfgPath)) {
+									props.load(fis);
+								}
+							}
 						}
 					} catch (IOException ignored) { }
 					CONFIG = props;

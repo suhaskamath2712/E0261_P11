@@ -256,6 +256,8 @@ public class LLM
 
         Response resp = client.responses().create(params);
 
+        System.out.println("[LLM] Received response from LLM: " + resp);
+
         // Best-effort extraction of assistant text content from the response.
         // If SDK accessors are unavailable, fall back to parsing the toString() output.
         String raw = resp.toString();
