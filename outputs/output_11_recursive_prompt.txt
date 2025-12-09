@@ -70,7 +70,6 @@ Equivalence with transformations: false
 LLM Equivalence 2: true
 LLM Transformations 2: []
 Equivalence with transformations: false
------------------------------------------------------
 Query ID: MQ17
 Equivalence without transformations: true
 Query ID: MQ18

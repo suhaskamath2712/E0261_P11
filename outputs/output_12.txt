@@ -1,0 +1,74 @@
+Query ID: A1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: F1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: MQ11
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: ETPCH_Q9
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_3
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_4
+Equivalence without transformations: true
+Query ID: LITHE_5
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_6
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_9
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_10
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_15
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_16
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_20
+Equivalence without transformations: false
+LLM Equivalence 1: false
+Query ID: LITHE_22
+Equivalence without transformations: false
+LLM Equivalence 1: false
