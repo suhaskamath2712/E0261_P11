@@ -1,0 +1,6 @@
+-----------------------------------------------------
+Query ID: A1
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [FilterJoinRule.JoinConditionPushRule, ReduceExpressionsRule.JoinReduceExpressionsRule]
+Equivalence with transformations: false

@@ -317,8 +317,15 @@ public class Calcite {
             //these lines will cause a stackoverflow error for god knows what reason
             //if (rel1.equals(rel2))  return true;
             //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
-            
-            return tree1.equalsIgnoreChildOrder(tree2);
+            if (tree1.equalsIgnoreChildOrder(tree2))  return true;
+
+            if (transformations != null)
+            {
+                System.out.println("\n[Calcite.compareQueries] NOT EQUIVALENT\n\n");
+                System.out.println("Transformed Rel1: \n" + rel1 + "\n");
+                System.out.println("Rel2: \n" + rel2 + "\n");
+            }
+            return false;
         } catch (Exception e)
         {
             // Planning/parsing/validation error: treat as non-equivalent.

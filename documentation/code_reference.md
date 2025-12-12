@@ -259,15 +259,25 @@ Workflow:
 5. Trim and return content.
 
 Return Contract (JSON object):
-- The LLM is instructed to return a single JSON object with two fields:
-   - `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
-   - `transformations`: array — an ordered list of transformation names (may be empty).
+- The LLM is instructed to return a single JSON object with the following fields:
+    - `reasoning`: string — free-form, step-by-step analysis of how the plans compare.
+    - `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
+    - `transformations`: array — an ordered list of transformation names (may be empty).
+    - `preconditions`: array — objects describing minimal preconditions for each
+       transformation (same order as `transformations`).
+
+Only `equivalent` and `transformations` are consumed by `LLMResponse`; the
+other fields are included for interpretability and retry guidance.
 
 Example:
 ```json
 {
+   "reasoning": "The only difference is a redundant Project node above an Aggregate on the left input, which can be merged without changing semantics.",
    "equivalent": "true",
-   "transformations": ["ProjectRemoveRule", "JoinToMultiJoinRule"]
+   "transformations": ["AggregateProjectMergeRule"],
+   "preconditions": [
+      { "requires": "Project directly on top of Aggregate with no column reordering or expression changes" }
+   ]
 }
 ```
 
@@ -295,8 +305,11 @@ Represents and validates the structured contract returned by the LLM.
 ### Contract
 The preferred contract is a JSON object with the following shape:
 
+- `reasoning`: optional string — free-form explanation (ignored by this class).
 - `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
 - `transformations`: array of strings — an ordered list of allowed transformation names; may be empty.
+- `preconditions`: optional array — objects describing preconditions for each
+   transformation (ignored by this class).
 
 For backwards compatibility the class also accepts the legacy line-oriented format where the first line
 is `true`/`false` and subsequent lines are transformation names or a single sentinel like `No transformations needed`.

@@ -44,12 +44,16 @@ public class Test
         "LITHE_10", "LITHE_11", "LITHE_12", "LITHE_13", "LITHE_14", "LITHE_15", "LITHE_16", "LITHE_17",
         "LITHE_18", "LITHE_19", "LITHE_20", "LITHE_21", "LITHE_22"
     );
-    */
 
     private static final List<String> queryIDList = List.of(
         "A1", "F1", "MQ11", "ETPCH_Q9", "LITHE_1", "LITHE_3", "LITHE_4",
         "LITHE_5", "LITHE_6", "LITHE_9", "LITHE_10", "LITHE_15", "LITHE_16",
         "LITHE_20", "LITHE_22"
+    );
+    */
+
+    private static final List<String> queryIDList = List.of(
+        "A1"
     );
 
     //Rewritten queries: ETPCH_Q7, ETPCH_Q9, ETPCH_Q23, LITHE_9
@@ -64,13 +68,12 @@ public class Test
      */
     public static void main(String[] args) throws Exception
     {
-
-        System.out.println("-----------------------------------------------------");
         for (String id : queryIDList)
         {
             String sqlA = FileIO.readOriginalSqlQuery(id);
             String sqlB = FileIO.readRewrittenSqlQuery(id);
 
+            System.out.println("-----------------------------------------------------");
             System.out.println("Query ID: " + id);
 
             boolean equivalence = Calcite.compareQueries(sqlA, sqlB, null);

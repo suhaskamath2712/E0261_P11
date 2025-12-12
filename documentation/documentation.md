@@ -267,8 +267,10 @@ Lightweight wrapper around an LLM client to ask whether two plans are equivalent
 
 Important fields & methods
 --------------------------
-- private static final String BASE_PROMPT
-  - The instruction given to the LLM describing the strict output contract (only lists of transformations or special tokens), used by `contactLLM`.
+- private static final String PROMPT_1 / PROMPT_2
+  - Text blocks that describe the strict JSON response contract (including
+    `reasoning`, `equivalent`, `transformations`, and `preconditions`) and
+    embed the schema summary, supported transformations, and sample plans.
 
 - private static final List<String> SUPPORTED_TRANSFORMATIONS
   - Immutable allow-list of transformation names that the LLM may return. These correspond to rules validated by `Calcite.applyTransformations`.
@@ -284,7 +286,13 @@ Important fields & methods
   - Notes: Behavior details:
     - The method checks `OPENAI_API_KEY` in the environment and returns a safe "not equivalent" contract string if missing (avoid interactive prompts).
     - It uses the Responses API and performs best-effort extraction of the assistant's output text from the SDK `Response` object (falls back to a conservative non-equivalent value if extraction fails).
-    - The prompt requests a strict JSON contract: a single JSON object with two fields: `equivalent` (string; `"true"`, `"false"`, or `"dont_know"`) and `transformations` (array of transformation names, may be empty). The code continues to accept the legacy line-oriented format for backward compatibility.
+    - The prompt requests a strict JSON contract: a single JSON object with fields
+      `reasoning` (free-form analysis), `equivalent` (string; `"true"`, `"false"`, or
+      `"dont_know"`), `transformations` (array of transformation names, may be
+      empty), and `preconditions` (array of per-transformation precondition
+      objects). The code continues to accept the legacy line-oriented format for
+      backward compatibility and currently only consumes `equivalent` and
+      `transformations`.
 
 - public static LLMResponse getLLMResponse(String sqlA, String sqlB)
   - Parameters: `sqlA` and `sqlB` are SQL strings (not precomputed JSON). The method obtains cleaned JSON plans via `GetQueryPlans.getCleanedQueryPlanJSONasString` and then contacts the LLM via `contactLLM`.
@@ -301,10 +309,14 @@ LLMResponse.java
 ---------------------------------------------------------------------
 Purpose
 -------
-Parses the LLM output contract. The preferred contract is a JSON object with two keys:
+Parses the LLM output contract. The preferred contract is a JSON object with the
+following keys:
 
+- `reasoning`: optional string — free-form explanation (ignored by this class).
 - `equivalent`: string — one of `"true"`, `"false"`, or `"dont_know"`.
 - `transformations`: array — ordered list of transformation names (may be empty).
+- `preconditions`: optional array — objects describing preconditions for each
+  transformation (ignored by this class).
 
 For backward compatibility, the parser also accepts the legacy line-oriented format where the first line is `true`/`false` and subsequent lines list transformation names (or a single sentinel like `No transformations needed`).
 
