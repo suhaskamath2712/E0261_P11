@@ -1,7 +1,5 @@
 package com.ac.iisc;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,13 +7,9 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import org.apache.calcite.adapter.jdbc.JdbcSchema;
-import org.apache.calcite.config.Lex;
-import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
@@ -35,20 +29,14 @@ import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect;
-import org.apache.calcite.sql.fun.SqlLibrary;
-import org.apache.calcite.sql.fun.SqlLibraryOperatorTableFactory;
-import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
-import org.postgresql.ds.PGSimpleDataSource;
 
 /**
  * Calcite parsing and transformation helper.
@@ -72,93 +60,18 @@ import org.postgresql.ds.PGSimpleDataSource;
  * - A recursion‑path set makes canonicalization safe on DAGs/shared subgraphs.
  */
 public class Calcite {
-
-    // --- 1. PostgreSQL Connection Configuration (UPDATE THESE) ---
-    // Driver and JDBC settings for connecting Calcite's JdbcSchema to PostgreSQL.
-    // These are used only to expose the Postgres catalog (tables/columns) to Calcite's planner.
-    private static final String PG_DRIVER = "org.postgresql.Driver";
-    private static final String PG_URL = FileIO.getPgUrl(); 
-    private static final String PG_USER = FileIO.getPgUser();
-    private static final String PG_PASSWORD = FileIO.getPgPassword();
-    // Schema in PostgreSQL containing the TPC-H tables (e.g., 'public')
-    private static final String PG_SCHEMA = FileIO.getPgSchema();
-
-
-    // --- 2. Setup Framework and Planner ---
-
     /**
-    * Build a Calcite {@link FrameworkConfig} that exposes a PostgreSQL schema via JDBC.
-    *
-    * Implementation details:
-    * - Creates an in-memory Calcite connection to obtain the root schema container.
-    * - Wraps a {@link PGSimpleDataSource} in a Calcite {@link JdbcSchema} named {@code PG_SCHEMA}.
-    * - Configures the parser with {@link Lex.MYSQL} so unquoted identifiers fold to
-    *   lower-case, matching PostgreSQL default behavior and easing name resolution.
-    *
-    * @return FrameworkConfig for Calcite planners using the PostgreSQL schema
-    * @throws RuntimeException if the driver or connection fails
-    */
+     * Build a Calcite {@link FrameworkConfig} backed by the configured
+     * PostgreSQL schema. This is a convenience delegator that forwards to
+     * {@link CalciteUtil#getFrameworkConfig()} so callers can continue to use
+     * the historical {@code Calcite.getFrameworkConfig()} entry point while
+     * the implementation lives in {@code CalciteUtil}.
+     *
+     * @return FrameworkConfig bound to the PostgreSQL schema configured via {@link FileIO}
+     * @throws RuntimeException if the PostgreSQL driver or JDBC connection cannot be initialized
+     */
     public static FrameworkConfig getFrameworkConfig() {
-        try {
-            // 1. Ensure the PostgreSQL Driver is loaded so DataSource/DriverManager can find it
-            Class.forName(PG_DRIVER);
-
-            // 2. Establish a Calcite-managed connection (used to get the Calcite root schema container)
-            Properties info = new Properties();
-
-            // parsing behavior of the Calcite connection itself; use JAVA
-            // here (Calcite 1.36 does not define a POSTGRESQL lex enum).
-            info.setProperty("lex", "JAVA");
-            // Expose extended SQL function libraries so Calcite understands
-            // dialect-specific operators such as LEAST / GREATEST that appear
-            // in our TPC-H style queries. We include STANDARD plus
-            // PostgreSQL and MySQL libraries since LEAST/GREATEST are
-            // provided via these dialect packs.
-            info.setProperty("fun", "standard,postgresql,mysql");
-
-            // open Calcite
-            Connection calciteConnection = DriverManager.getConnection("jdbc:calcite:", info);
-
-            // get Calcite API
-            CalciteConnection unwrapCalciteConnection = calciteConnection.unwrap(CalciteConnection.class);
-
-            // 3. Create a DataSource for PostgreSQL (Calcite will use this for metadata)
-            PGSimpleDataSource dataSource = new PGSimpleDataSource();
-            dataSource.setUrl(PG_URL);
-            dataSource.setUser(PG_USER);
-            dataSource.setPassword(PG_PASSWORD);
-
-            // 4. Wrap the PostgreSQL connection details into a Calcite schema (JdbcSchema)
-            SchemaPlus rootSchema = unwrapCalciteConnection.getRootSchema();
-
-            // Use the standard factory method with the DataSource
-            JdbcSchema pgJdbcSchema = JdbcSchema.create(rootSchema, PG_SCHEMA, dataSource, PG_SCHEMA, null);
-            rootSchema.add(PG_SCHEMA, pgJdbcSchema);
-
-            // Parser config: use MySQL lex, which is close to PostgreSQL for
-            // identifier folding and quoting in this workload.
-            SqlParser.Config parserConfig = SqlParser.config().withLex(Lex.MYSQL);
-
-            // Operator table: include standard SQL operators plus PostgreSQL- and
-            // MySQL-specific functions such as LEAST/GREATEST so that validation
-            // matches PostgreSQL behavior more closely.
-            SqlOperatorTable operatorTable = SqlLibraryOperatorTableFactory.INSTANCE
-                .getOperatorTable(SqlLibrary.STANDARD, SqlLibrary.POSTGRESQL, SqlLibrary.MYSQL);
-
-            // 5. Build the Calcite Framework configuration
-            return Frameworks.newConfigBuilder()
-                // Use the Postgres schema as default
-                .defaultSchema(rootSchema.getSubSchema(PG_SCHEMA))
-                // Use the PostgreSQL-aware parser config
-                .parserConfig(parserConfig)
-                // Enable PostgreSQL function/operator library (e.g., LEAST, GREATEST)
-                .operatorTable(operatorTable)
-                .build();
-
-        }
-        catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException("Failed to initialize Calcite framework with PostgreSQL connection. Check driver and connection details.", e);
-        }
+        return CalciteUtil.getFrameworkConfig();
     }
 
     /**
@@ -197,7 +110,7 @@ public class Calcite {
             // that use these functions can still be planned even if the
             // operator table configuration for a given Calcite version does
             // not register them as built-ins.
-            sqlForParse = rewriteLeastGreatest(sqlForParse);
+            sqlForParse = CalciteUtil.rewriteLeastGreatest(sqlForParse);
         }
 
         // 2. Parse the SQL string into an AST (SqlNode)
@@ -258,138 +171,12 @@ public class Calcite {
     }
 
     /**
-     * Rewrite dialect-specific LEAST/GREATEST function calls into standard SQL
-     * CASE expressions. This is used as a defensive pre-processing step before
-     * handing SQL to Calcite's parser so that queries continue to work even if
-     * a particular Calcite version does not expose these functions via the
-     * configured operator table.
+     * Construct a {@link RelNode} from a JSON query plan by delegating to
+     * {@link CalciteUtil#jsonPlanToRelNode(String)}.
      */
-    private static String rewriteLeastGreatest(String sql) {
-        if (sql == null) {
-            return null;
-        }
-        String rewritten = rewriteTwoArgExtremaFunction(sql, "LEAST", "<=");
-        rewritten = rewriteTwoArgExtremaFunction(rewritten, "GREATEST", ">=");
-        return rewritten;
+    public static RelNode jsonPlanToRelNode(String jsonPlan) {
+        return CalciteUtil.jsonPlanToRelNode(jsonPlan);
     }
-
-    /**
-     * Generic helper that rewrites calls of the form
-     *   FUNCTION(arg1, arg2)
-     * into
-     *   (CASE WHEN arg1 comparator arg2 THEN arg1 ELSE arg2 END)
-     * where {@code comparator} is "<=" for LEAST and ">=" for GREATEST.
-     *
-     * The implementation is conservative: it only rewrites when it can find a
-     * well-formed parenthesized argument list that splits cleanly into exactly
-     * two top-level arguments. Otherwise it leaves the original text intact.
-     */
-    private static String rewriteTwoArgExtremaFunction(String sql, String functionName, String comparator) {
-        String upperSql = sql.toUpperCase();
-        String fnUpper = functionName.toUpperCase();
-
-        StringBuilder out = new StringBuilder(sql.length());
-        int idx = 0;
-
-        while (true) {
-            int pos = upperSql.indexOf(fnUpper, idx);
-            if (pos < 0) {
-                // no more occurrences
-                out.append(sql.substring(idx));
-                break;
-            }
-
-            // Ensure we matched a standalone function name, not a suffix of
-            // a longer identifier.
-            if (pos > 0) {
-                char prev = upperSql.charAt(pos - 1);
-                if (Character.isLetterOrDigit(prev) || prev == '_') {
-                    out.append(sql, idx, pos + fnUpper.length());
-                    idx = pos + fnUpper.length();
-                    continue;
-                }
-            }
-
-            int parenStart = pos + fnUpper.length();
-            // Skip whitespace between the function name and '('
-            while (parenStart < sql.length() && Character.isWhitespace(sql.charAt(parenStart))) {
-                parenStart++;
-            }
-            if (parenStart >= sql.length() || sql.charAt(parenStart) != '(') {
-                // Not a function call we understand; copy text and continue.
-                out.append(sql, idx, pos + fnUpper.length());
-                idx = pos + fnUpper.length();
-                continue;
-            }
-
-            // Find the matching closing parenthesis, tracking nested parens to
-            // be robust against arguments like f(LEAST(a, b), c).
-            int level = 0;
-            int i = parenStart;
-            for (; i < sql.length(); i++) {
-                char c = sql.charAt(i);
-                if (c == '(') {
-                    level++;
-                } else if (c == ')') {
-                    level--;
-                    if (level == 0) {
-                        break;
-                    }
-                }
-            }
-            if (level != 0) {
-                // Unbalanced parentheses; give up and copy the rest verbatim.
-                out.append(sql.substring(idx));
-                break;
-            }
-
-            String argsRegion = sql.substring(parenStart + 1, i);
-            List<String> args = splitTopLevelArgs(argsRegion);
-            if (args.size() != 2) {
-                // Only handle the common 2-argument case; copy text as-is.
-                out.append(sql, idx, i + 1);
-                idx = i + 1;
-                continue;
-            }
-
-            String a1 = args.get(0).trim();
-            String a2 = args.get(1).trim();
-            String caseExpr = "(CASE WHEN " + a1 + " " + comparator + " " + a2
-                    + " THEN " + a1 + " ELSE " + a2 + " END)";
-
-            // Append everything before the function name, then our rewritten CASE.
-            out.append(sql, idx, pos);
-            out.append(caseExpr);
-            idx = i + 1;
-        }
-
-        return out.toString();
-    }
-
-    /**
-     * Split a comma-separated argument list into top-level arguments, ignoring
-     * commas that occur inside nested parentheses. This is sufficient for the
-     * simple scalar expressions that appear in our TPC-H queries.
-     */
-    private static List<String> splitTopLevelArgs(String region) {
-        List<String> parts = new ArrayList<>();
-        int level = 0;
-        int start = 0;
-        for (int i = 0; i < region.length(); i++) {
-            char c = region.charAt(i);
-            if (c == '(') {
-                level++;
-            } else if (c == ')') {
-                level--;
-            } else if (c == ',' && level == 0) {
-                parts.add(region.substring(start, i));
-                start = i + 1;
-            }
-        }
-        parts.add(region.substring(start));
-        return parts;
-    }
-
     /**
      * Compare two SQL queries for semantic equivalence, optionally applying transformations
      * to the first query's RelNode before comparison.
@@ -426,13 +213,6 @@ public class Calcite {
             // Get the optimized RelNode for the first query
             RelNode rel1 = getOptimizedRelNode(planner, sql1);
 
-            // apply rules as given by LLM
-            if (transformations != null && !transformations.isEmpty()) 
-                rel1 = applyTransformations(rel1, transformations); 
-
-            // Normalize sub-queries and decorrelate to align scalar subquery vs join forms
-            rel1 = normalizeSubqueriesAndDecorrelate(rel1);
-
             // planner cannot be reused across parse/validate cycles reliably
             planner.close();
             
@@ -442,9 +222,48 @@ public class Calcite {
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
 
-            if (transformations != null && !transformations.isEmpty()) 
-                rel2 = applyTransformations(rel2, transformations); 
+            // Delegate to the RelNode-based equivalence checker so the core
+            // comparison logic is shared between SQL-string and RelNode APIs.
+            return compareRelNodesForEquivalence(rel1, rel2, transformations);
+        } catch (Exception e)
+        {
+            // Planning/parsing/validation error: treat as non-equivalent.
+            System.err.println("[Calcite.compareQueries] Planning error: " + e.getMessage());
+            return false;
+        } finally {
+            // ensure planner resources are released
+            planner.close();
+        }
+    }
 
+    /**
+     * Compare two pre-built RelNodes for semantic equivalence using the same
+     * strategy as {@link #compareQueries(String, String, List)}.
+     *
+     * This is useful when callers already have RelNodes (for example, obtained
+     * from a planner elsewhere) and want to re-use the equivalence engine
+     * without re-parsing SQL strings.
+     */
+    public static boolean compareQueries(RelNode rel1, RelNode rel2, List<String> transformations) {
+        return compareRelNodesForEquivalence(rel1, rel2, transformations);
+    }
+
+    /**
+     * Core equivalence logic over RelNodes shared by both compareQueries
+     * overloads.
+     */
+    private static boolean compareRelNodesForEquivalence(RelNode rel1, RelNode rel2, List<String> transformations) {
+        if (rel1 == null || rel2 == null) {
+            return false;
+        }
+        try {
+            // apply rules as given by LLM to the first plan
+            if (transformations != null && !transformations.isEmpty()) {
+                rel1 = applyTransformations(rel1, transformations);
+            }
+
+            // Normalize sub-queries and decorrelate to align scalar subquery vs join forms
+            rel1 = normalizeSubqueriesAndDecorrelate(rel1);
             // Normalize sub-queries and decorrelate symmetrically for the second plan as well
             rel2 = normalizeSubqueriesAndDecorrelate(rel2);
 
@@ -473,112 +292,25 @@ public class Calcite {
             RelTreeNode tree2 = buildRelTree(rel2);
             // equalsIgnoreChildOrder also compares via a canonical form that ignores
             // child ordering, further neutralizing INNER-join commutativity.
-            
-            //these lines will cause a stackoverflow error for god knows what reason
-            //if (rel1.equals(rel2))  return true;
-            //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
             if (tree1.equalsIgnoreChildOrder(tree2))  return true;
 
             // Fallback 4: compare cleaned PostgreSQL execution plans as a last resort.
             // If both queries yield the same physical plan on the target database,
             // treat them as equivalent even if Calcite's logical digests differ.
-            try {
-                String p1 = convertRelNodetoJSONQueryPlan(rel1);
-                String p2 = convertRelNodetoJSONQueryPlan(rel2);
-                if (p1 != null && p1.equals(p2)) return true;
-            } catch (Exception ex) {
-                System.err.println("[Calcite.compareQueries] Plan comparison fallback failed: " + ex.getMessage());
-            }
+            String p1 = convertRelNodetoJSONQueryPlan(rel1);
+            String p2 = convertRelNodetoJSONQueryPlan(rel2);
+            if (p1 != null && p1.equals(p2)) return true;
 
-            if (transformations != null)
-            {
+            if (transformations != null) {
                 System.out.println("\n[Calcite.compareQueries] NOT EQUIVALENT\n\n");
                 System.out.println("Transformed Rel1: \n" + RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
                 System.out.println("Rel2: \n" + RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
             }
+
             return false;
-        } catch (Exception e)
-        {
-            // Planning/parsing/validation error: treat as non-equivalent.
-            System.err.println("[Calcite.compareQueries] Planning error: " + e.getMessage());
-            return false;
-        } finally {
-            // ensure planner resources are released
-            planner.close();
-        }
-    }
-
-    /**
-     * Debug version of compareQueries that prints intermediate digests when queries are not deemed equivalent.
-     * Tag can be a query id to aid tracing.
-     */
-    public static boolean compareQueriesDebug(String sql1, String sql2, List<String> transformations, String tag)
-    {
-        if (sql1.equals(sql2)) return true;
-
-        FrameworkConfig config = getFrameworkConfig();
-        Planner planner = Frameworks.getPlanner(config);
-        try {
-            RelNode rel1 = getOptimizedRelNode(planner, sql1);
-            if (transformations != null && !transformations.isEmpty()) {
-                rel1 = applyTransformations(rel1, transformations);
-            }
-            rel1 = normalizeSubqueriesAndDecorrelate(rel1);
-            planner.close();
-            planner = Frameworks.getPlanner(config);
-            RelNode rel2 = getOptimizedRelNode(planner, sql2);
-            if (transformations != null && !transformations.isEmpty()) {
-                rel2 = applyTransformations(rel2, transformations);
-            }
-            rel2 = normalizeSubqueriesAndDecorrelate(rel2);
-
-            String d1 = RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES);
-            String d2 = RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES);
-            if (d1.equals(d2)) return true;
-
-            String nd1 = normalizeDigest(d1);
-            String nd2 = normalizeDigest(d2);
-            if (nd1.equals(nd2)) return true;
-
-            String c1 = canonicalDigest(rel1);
-            String c2 = canonicalDigest(rel2);
-            if (c1.equals(c2)) return true;
-
-            RelTreeNode t1 = buildRelTree(rel1);
-            RelTreeNode t2 = buildRelTree(rel2);
-            // Tree canonical digest ignores child order, normalizing INNER-join commutativity
-            String ct1 = t1 == null ? "null" : t1.canonicalDigest();
-            String ct2 = t2 == null ? "null" : t2.canonicalDigest();
-            if (ct1.equals(ct2)) return true;
-
-            // Fallback: compare cleaned PostgreSQL execution plans as a last resort
-            try {
-                String p1 = convertRelNodetoJSONQueryPlan(rel1);
-                String p2 = convertRelNodetoJSONQueryPlan(rel2);
-                if (p1 != null && p1.equals(p2)) return true;
-            } catch (Exception ex) {
-                System.out.println("[DEBUG compareQueries tag=" + tag + "] Plan comparison fallback failed: " + ex.getMessage());
-            }
-
-            // Final object equality fallback removed to avoid deep recursion and cycles
-            boolean eq = false;
-            if (!eq) {
-                System.out.println("[DEBUG compareQueries tag=" + tag + "] NOT EQUAL");
-                System.out.println("  Structural digest A:\n" + d1);
-                System.out.println("  Structural digest B:\n" + d2);
-                System.out.println("  Normalized digest A:\n" + nd1);
-                System.out.println("  Normalized digest B:\n" + nd2);
-                System.out.println("  Canonical digest A:\n" + c1);
-                System.out.println("  Canonical digest B:\n" + c2);
-                System.out.println("  Tree canonical A:\n" + ct1);
-                System.out.println("  Tree canonical B:\n" + ct2);
-            }
-            return eq;
         } catch (Exception e) {
-            System.out.println("[DEBUG compareQueries tag=" + tag + "] Planning error: " + e.getMessage());
+            System.err.println("[Calcite.compareRelNodesForEquivalence] Error: " + e.getMessage());
             return false;
-        } finally {
-            planner.close();
         }
     }
 
@@ -935,14 +667,8 @@ public class Calcite {
      * @param sql1 The SQL query string
      * @param sql2 (Unused) Second SQL query string (for future extension)
      */
-    public static void printRelTrees (String sql1, String sql2) {
-        RelNode rel;
-        try {
-            rel = getOptimizedRelNode(Frameworks.getPlanner(getFrameworkConfig()), sql1);
-            System.out.println("RelTreeNode tree1: \n" + buildRelTree(rel).toString());
-        } catch (Exception e) {
-            System.err.println("[Calcite.printRelTrees] Planning error: " + e.getMessage());
-        }
+    public static void printRelTrees(String sql1, String sql2) {
+        CalciteUtil.printRelTrees(sql1, sql2);
     }
 
     /**
@@ -1195,8 +921,6 @@ public class Calcite {
     public static RelNode applyTransformations(RelNode rel, List<String> transformations)
     {
         RelNode newRel = rel;
-
-    //System.out.println("RelTree before transformations: \n" + buildRelTree(newRel).toString());
 
         // Build a composite Hep program containing all requested rules and
         // apply them together to reach a better fixpoint than one-by-one.

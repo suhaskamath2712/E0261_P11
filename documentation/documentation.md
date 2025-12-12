@@ -6,6 +6,7 @@ This document describes the Java classes in the `plan_equivalence` module and do
 Table of contents
 -----------------
 - Calcite.java
+- CalciteUtil.java
 - FileIO.java
 - GetQueryPlans.java
 - LLM.java
@@ -157,6 +158,36 @@ Behavioral and design notes
 - Laddered matching strategy reduces false negatives due to syntax/planner noise while preserving a conservative check for true semantic differences.
  - EXPLAIN JSON retrieval is wrapped in try‑catch in `convertRelNodetoJSONQueryPlan` and returns `null` on failure.
  - Deprecation: `RelDecorrelator.decorrelateQuery(RelNode)` is used in a best‑effort manner; migration planned when available.
+
+
+---------------------------------------------------------------------
+CalciteUtil.java
+---------------------------------------------------------------------
+Purpose
+-------
+Utility companion to `Calcite` that hosts shared helpers not directly tied to comparison logic.
+- Builds a Calcite `FrameworkConfig` backed by a PostgreSQL JDBC schema.
+- Performs lightweight SQL text rewrites (e.g., LEAST/GREATEST → CASE) as a defensive preprocessing step before parsing.
+- Maps cleaned PostgreSQL EXPLAIN JSON plans into coarse structural `RelNode` trees for fallback comparison.
+- Provides small debug helpers such as `printRelTrees`.
+
+Important public methods
+------------------------
+All methods are static on `CalciteUtil`.
+
+- `public static FrameworkConfig getFrameworkConfig()`
+  - Returns: `FrameworkConfig` bound to the configured PostgreSQL schema, using `PGSimpleDataSource` and `JdbcSchema`.
+  - Notes: This is the implementation behind `Calcite.getFrameworkConfig()`; the latter is retained as a thin wrapper for compatibility.
+
+- `public static String rewriteLeastGreatest(String sql)`
+  - Rewrites two-argument `LEAST(a,b)` / `GREATEST(a,b)` calls into CASE expressions where safely detectable.
+  - Used by `Calcite.getOptimizedRelNode` before parsing.
+
+- `public static RelNode jsonPlanToRelNode(String jsonPlan)`
+  - Builds a structural `RelNode` from a cleaned PostgreSQL EXPLAIN JSON plan (scan and join tree only, predicates ignored).
+
+- `public static void printRelTrees(String sql1, String sql2)`
+  - Convenience debug method that prints the `RelTreeNode` for a planned query using the shared framework configuration.
 
 
 ---------------------------------------------------------------------

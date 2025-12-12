@@ -17,12 +17,13 @@ This document describes how the codebase uses Apache Calcite to parse, validate,
 - Tree canonical digest: `RelTreeNode.canonicalDigest()` — order‑insensitive digest of the tree structure used for last‑resort comparisons.
 
 ## Components
-- `Calcite.getFrameworkConfig()`: Builds a Calcite environment backed by PostgreSQL (`PGSimpleDataSource`), adds a `JdbcSchema`, and configures the parser with `Lex.MYSQL` for lower‑case identifiers.
+- `Calcite.getFrameworkConfig()`: Builds a Calcite environment backed by PostgreSQL (`PGSimpleDataSource`), adds a `JdbcSchema`, and configures the parser with `Lex.MYSQL` for lower‑case identifiers. This is a thin delegator over `CalciteUtil.getFrameworkConfig()`.
 - `Calcite.getOptimizedRelNode(planner, sql)`: Parses → validates → converts to `RelNode` → applies phased HepPlanner rules (`FILTER_REDUCE_EXPRESSIONS`, `PROJECT_MERGE`, `PROJECT_REMOVE`, `FILTER_INTO_JOIN`, `JOIN_ASSOCIATE`, `JOIN_COMMUTE`, `PROJECT_JOIN_TRANSPOSE`). Trailing semicolons are removed and `!=` is normalized to `<>`.
 - `Calcite.compareQueries(sql1, sql2, transformations)`: Multi‑stage equivalence using structural digest, normalized digest (input refs collapsed), canonical digest (join/predicate normalization), and tree comparison (`equalsIgnoreChildOrder`).
 - `Calcite.canonicalDigest(rel)`: Canonicalizes inner joins (flattens and sorts children), strips CASTs, sorts commutative/symmetric expressions (AND/OR/EQUALS), normalizes predicates and field refs, and now normalizes aggregates (groupSet + aggCalls ordering). Projection output order is preserved.
 - `Calcite.buildRelTree(rel)` + `RelTreeNode`: Builds an order‑preserving tree with canonical digest for order‑insensitive equality.
 - `Calcite.convertRelNodetoJSONQueryPlan(rel)`: Converts a `RelNode` to PostgreSQL SQL via `RelToSqlConverter` and retrieves a cleaned EXPLAIN JSON. External call is wrapped in try‑catch and returns `null` on failure.
+- `CalciteUtil.jsonPlanToRelNode(json)`: Constructs a coarse structural `RelNode` from a cleaned PostgreSQL EXPLAIN JSON plan, focusing on scan and join tree shape for fallback comparisons.
 - `GetQueryPlans.getCleanedQueryPlanJSONasString(sql)`: Runs EXPLAIN (FORMAT JSON, BUFFERS); lifts the root `Plan` node and strips executor‑specific keys; returns pretty‑printed JSON.
 ## Equivalence Normalization
 
@@ -66,6 +67,8 @@ Deprecation note: `RelDecorrelator.decorrelateQuery(RelNode)` is deprecated in s
 ## EXPLAIN Plan Retrieval
 
 `convertRelNodetoJSONQueryPlan` renders SQL using `PostgresqlSqlDialect` and calls `GetQueryPlans` to obtain a cleaned JSON plan. Any `SQLException` is caught, a brief error is logged to `System.err`, and `null` is returned to allow graceful degradation.
+
+`CalciteUtil.jsonPlanToRelNode` performs the inverse direction for comparison purposes: given a cleaned PostgreSQL EXPLAIN JSON plan (as produced by `GetQueryPlans`), it builds an approximate logical `RelNode` that captures scan and join structure while intentionally ignoring predicates and physical details.
 ## Configuration Notes
 
 - PostgreSQL JDBC and other runtime parameters: edit `src/main/resources/config.properties`. The runtime reads DB connection details, schema name, and SQL file paths via `com.ac.iisc.FileIO` so you do not need to modify Java source files to change these values.

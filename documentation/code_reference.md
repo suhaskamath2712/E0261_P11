@@ -5,13 +5,14 @@ This document replaces the earlier LaTeX attempt. It provides a detailed, prose-
 ---
 ## Table of Contents
 1. [Calcite](#calcite)
-2. [FileIO](#fileio)
-3. [GetQueryPlans](#getqueryplans)
-4. [LLM](#llm)
-5. [LLMResponse](#llmresponse)
-6. [RelTreeNode](#reltreenode)
-7. [TransformationProbe](#transformationprobe)
-8. [Test](#test)
+2. [CalciteUtil](#calciteutil)
+3. [FileIO](#fileio)
+4. [GetQueryPlans](#getqueryplans)
+5. [LLM](#llm)
+6. [LLMResponse](#llmresponse)
+7. [RelTreeNode](#reltreenode)
+8. [TransformationProbe](#transformationprobe)
+9. [Test](#test)
 
 ---
 ## Calcite
@@ -29,6 +30,8 @@ Central integration point with Apache Calcite. It:
 - Performs subquery removal and decorrelation to align scalar-subquery forms with equivalent join+aggregate forms.
 - Planner reuse: Calcite planners are not reliably reusable across multiple parse/validate cycles; a new planner is created for each query.
 - Canonicalization: Uses a DAG-safe traversal (IdentityHashMap path set) to avoid infinite recursion when a plan has shared subgraphs.
+
+Note: Low-level framework and utility helpers that are not directly tied to comparison logic have been factored into `CalciteUtil`. Public entry points such as `Calcite.getFrameworkConfig()` remain available as thin delegators.
 ### Purpose (Updated)
 Obtains PostgreSQL execution plans (`EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS)`) for supplied SQL and returns a cleaned JSON representation with execution-specific metrics removed, leaving only logical plan structure.
 ### Error Handling
@@ -127,6 +130,58 @@ Convenience structural comparisons, optionally treating children as unordered se
 - Cycle detection: `canonicalDigestInternal` returns `TypeName[...cycle...]` when revisiting a node.
 - Decorrelator failures are swallowed to avoid aborting comparison.
  - `RelDecorrelator.decorrelateQuery(RelNode)` is deprecated in some versions; used best‑effort and isolated.
+
+---
+## CalciteUtil
+**Location:** `plan_equivalence/src/main/java/com/ac/iisc/CalciteUtil.java`
+
+### Purpose
+Utility companion to `Calcite` that hosts helpers not directly tied to comparison logic:
+- Building a JDBC-backed Calcite `FrameworkConfig` against PostgreSQL.
+- Lightweight SQL text rewrites (e.g., LEAST/GREATEST → CASE expressions) used as defensive preprocessing.
+- Mapping cleaned PostgreSQL EXPLAIN JSON plans into coarse structural `RelNode` trees.
+- Small debug helpers such as `printRelTrees`.
+
+### Public API Methods
+
+#### `public static FrameworkConfig getFrameworkConfig()`
+Builds a Calcite environment backed by PostgreSQL using `PGSimpleDataSource` and `JdbcSchema`.
+- Loads the PostgreSQL JDBC driver.
+- Opens a Calcite connection and obtains the root schema.
+- Registers a JDBC schema for the configured PostgreSQL schema name.
+- Configures parser with `Lex.MYSQL` and enables STANDARD, POSTGRESQL, and MYSQL function libraries.
+- Uses `SqlConformanceEnum.BABEL` to align validation with PostgreSQL-friendly semantics.
+
+Errors: Throws `RuntimeException` wrapping `SQLException` or `ClassNotFoundException` if driver or JDBC connection fails.
+
+Note: `Calcite.getFrameworkConfig()` is a thin wrapper over this method to preserve the historical API surface.
+
+#### `public static String rewriteLeastGreatest(String sql)`
+Defensive SQL preprocessor that rewrites two-argument `LEAST(a,b)` / `GREATEST(a,b)` calls into equivalent CASE expressions:
+
+`LEAST(a,b)` → `(CASE WHEN a <= b THEN a ELSE b END)`
+
+`GREATEST(a,b)` → `(CASE WHEN a >= b THEN a ELSE b END)`
+
+The implementation is conservative: it only rewrites when it can parse a well-formed, two-argument top-level call, leaving all other occurrences untouched.
+
+Used by `Calcite.getOptimizedRelNode` before parsing to keep queries robust across Calcite versions and operator table configurations.
+
+#### `public static RelNode jsonPlanToRelNode(String jsonPlan)`
+Constructs a best-effort `RelNode` from a cleaned PostgreSQL EXPLAIN JSON plan (as produced by `GetQueryPlans`).
+- Scan-like nodes (`Seq Scan`, `Index Scan`, etc.) → table scans on `Relation Name`.
+- Join-like nodes (`Hash Join`, `Merge Join`, `Nested Loop`, etc.) → logical joins with an appropriate `JoinRelType` and a TRUE condition (predicates intentionally ignored).
+- Unary structural nodes (Sort/Aggregate/Limit) → collapsed to their child plan.
+
+This mapping focuses on coarse scan/join tree structure suitable for structural fallback comparisons.
+
+#### `public static void printRelTrees(String sql1, String sql2)`
+Debug helper that:
+- Builds a planner using `getFrameworkConfig()`.
+- Optimizes `sql1` via `Calcite.getOptimizedRelNode`.
+- Prints the `RelTreeNode` representation for inspection.
+
+Note: The current implementation only uses the first SQL argument; the second is reserved for potential future extensions.
 
 ### Performance Considerations
 - Multiple planner instantiations per comparison; caching could reduce overhead but risks stale metadata.

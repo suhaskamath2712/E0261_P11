@@ -35,7 +35,8 @@ This project detects semantic equivalence between an original SQL query and its 
 
 ## Architecture
 - `plan_equivalence/src/main/java/com/ac/iisc/`
-  - `Calcite.java` — Core parsing, optimization, canonicalization, and comparison utilities.
+  - `Calcite.java` — Core parsing, optimization, canonicalization, and comparison utilities. Public API entry point for building planners, optimizing queries, and running equivalence checks.
+  - `CalciteUtil.java` — Shared Calcite utilities that are not directly tied to comparison logic (framework configuration, LEAST/GREATEST SQL rewrites, JSON plan → RelNode mapping, and small debug helpers).
   - `FileIO.java` — SQL and plan file read/write helpers.
   - `GetQueryPlans.java` — Capture EXPLAIN JSON and clean it for comparison.
   - `LLM.java` / `LLMResponse.java` — Optional LLM integration helpers.
