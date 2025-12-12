@@ -1,0 +1,123 @@
+Query ID: LITHE_3
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [AggregateStarTableRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$3, $1, $2]])
+    LogicalAggregate(group=[{0, 1, 2}], revenue=[SUM($3)])
+      LogicalProject(exprs=[[$19, $13, $16, *($24, -(1, $25))]])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          LogicalFilter(condition=[=($6, 'FURNITURE ')])
+            JdbcTableScan(table=[[public, customer]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[>($10, 1995-01-01)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$4, $1, $2]])
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $3, $4]])
+        LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[=($6, 'FURNITURE ')])
+              JdbcTableScan(table=[[public, customer]])
+          LogicalProject(inputs=[0..1], exprs=[[$4, $7]])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+      LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+        LogicalProject(inputs=[0], exprs=[[*($5, -(1, $6))]])
+          LogicalFilter(condition=[>($10, 1995-01-01)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: [AggregateJoinTransposeRule, AggregateRemoveRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$3, $1, $2]])
+    LogicalAggregate(group=[{0, 1, 2}], revenue=[SUM($3)])
+      LogicalProject(exprs=[[$19, $13, $16, *($24, -(1, $25))]])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          LogicalFilter(condition=[=($6, 'FURNITURE ')])
+            JdbcTableScan(table=[[public, customer]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[>($10, 1995-01-01)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$4, $1, $2]])
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $3, $4]])
+        LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[=($6, 'FURNITURE ')])
+              JdbcTableScan(table=[[public, customer]])
+          LogicalProject(inputs=[0..1], exprs=[[$4, $7]])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+      LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+        LogicalProject(inputs=[0], exprs=[[*($5, -(1, $6))]])
+          LogicalFilter(condition=[>($10, 1995-01-01)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 1 (B to A): true
+LLM Transformations 1 (B to A): [AggregateJoinTransposeRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$3, $1, $2]])
+    LogicalAggregate(group=[{0, 1, 2}], revenue=[SUM($3)])
+      LogicalProject(exprs=[[$19, $13, $16, *($24, -(1, $25))]])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          LogicalFilter(condition=[=($6, 'FURNITURE ')])
+            JdbcTableScan(table=[[public, customer]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[>($10, 1995-01-01)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$4, $1, $2]])
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $3, $4]])
+        LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[=($6, 'FURNITURE ')])
+              JdbcTableScan(table=[[public, customer]])
+          LogicalProject(inputs=[0..1], exprs=[[$4, $7]])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+      LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+        LogicalProject(inputs=[0], exprs=[[*($5, -(1, $6))]])
+          LogicalFilter(condition=[>($10, 1995-01-01)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations (B to A) false
+LLM Equivalence 2 (B to A): false

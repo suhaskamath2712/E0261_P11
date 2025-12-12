@@ -319,13 +319,13 @@ LIMIT 20;
 -- Description: Important Stock Identification Query. Finds the most important stock in a given nation.
 -- =================================================================
 SELECT ps_comment,
-       SUM(ps_supplycost * ps_availqty) AS value
+       SUM(ps_supplycost * ps_availqty) AS total_value
 FROM partsupp, supplier, nation
 WHERE ps_suppkey = s_suppkey
   AND s_nationkey = n_nationkey
   AND n_name = 'ARGENTINA'
 GROUP BY ps_comment
-ORDER BY value DESC
+ORDER BY total_value DESC
 LIMIT 100;
 
 -- =================================================================
@@ -669,7 +669,7 @@ FROM (
         AND part.p_name LIKE '%co%'
 ) AS combined
 GROUP BY
-    nation, o_year
+    nation, EXTRACT(YEAR FROM o_orderdate)
 ORDER BY
     nation ASC, o_year DESC;
 

@@ -206,7 +206,7 @@ SELECT c_name, SUM(l_extendedprice * (1 - l_discount)) AS revenue, c_acctbal, n_
 -- Query ID: MQ11 (Rewritten)
 -- Description: Important Stock Identification Query. Finds the most important stock in a given nation.
 -- =================================================================
-SELECT ps_comment, SUM(ps_supplycost * ps_availqty) AS value FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'ARGENTINA' GROUP BY ps_comment ORDER BY value DESC LIMIT 100;
+SELECT ps_comment, SUM(ps_supplycost * ps_availqty) AS total_value FROM partsupp, supplier, nation WHERE ps_suppkey = s_suppkey AND s_nationkey = n_nationkey AND n_name = 'ARGENTINA' GROUP BY ps_comment ORDER BY total_value DESC LIMIT 100;
 
 -- =================================================================
 -- Query ID: MQ17 (Rewritten)
@@ -314,7 +314,7 @@ SELECT n1.n_name AS supp_nation, n2.n_name AS cust_nation, EXTRACT(YEAR FROM l_s
 -- Query ID: ETPCH_Q9 (Rewritten)
 -- Description: Simplified version of ETPCH Q9, calculating profit by nation and year using standard tables.
 -- =================================================================
-SELECT nation, EXTRACT(YEAR FROM o_orderdate) AS o_year, SUM(profit) AS sum_profit FROM ( SELECT n_name AS nation, o_orderdate, (l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS profit FROM nation, orders, part, partsupp, supplier, lineitem WHERE orders.o_orderkey = lineitem.l_orderkey AND part.p_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = lineitem.l_partkey AND partsupp.ps_suppkey = supplier.s_suppkey AND supplier.s_suppkey = lineitem.l_suppkey AND nation.n_nationkey = supplier.s_nationkey AND part.p_name LIKE '%co%' ) AS combined GROUP BY nation, o_year ORDER BY nation ASC, o_year DESC;
+SELECT nation, EXTRACT(YEAR FROM o_orderdate) AS o_year, SUM(profit) AS sum_profit FROM ( SELECT n_name AS nation, o_orderdate, (l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS profit FROM nation, orders, part, partsupp, supplier, lineitem WHERE orders.o_orderkey = lineitem.l_orderkey AND part.p_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = lineitem.l_partkey AND partsupp.ps_suppkey = supplier.s_suppkey AND supplier.s_suppkey = lineitem.l_suppkey AND nation.n_nationkey = supplier.s_nationkey AND part.p_name LIKE '%co%' ) AS combined GROUP BY nation, EXTRACT(YEAR FROM o_orderdate) ORDER BY nation ASC, o_year DESC;
 
 -- =================================================================
 -- Query ID: ETPCH_Q10 (Rewritten)

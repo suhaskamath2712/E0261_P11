@@ -259,6 +259,35 @@ ORDER BY s_acctbal ASC, n_name, s_name, p_partkey
 LIMIT 80;
 
 -- =================================================================
+-- Query ID: ETPCH_Q9 (Mutated)
+-- Semantics: Variant of ETPCH_Q9 with modified profit filter but same grouping semantics.
+-- =================================================================
+SELECT
+  nation,
+  EXTRACT(YEAR FROM o_orderdate) AS o_year,
+  SUM(profit) AS sum_profit
+FROM (
+  SELECT
+    n_name AS nation,
+    o_orderdate,
+    (l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS profit
+  FROM
+    nation, orders, part, partsupp, supplier, lineitem
+  WHERE
+    orders.o_orderkey = lineitem.l_orderkey
+    AND part.p_partkey = partsupp.ps_partkey
+    AND partsupp.ps_partkey = lineitem.l_partkey
+    AND partsupp.ps_suppkey = supplier.s_suppkey
+    AND supplier.s_suppkey = lineitem.l_suppkey
+    AND nation.n_nationkey = supplier.s_nationkey
+    AND part.p_name LIKE '%co%'
+) AS combined
+GROUP BY
+  nation, EXTRACT(YEAR FROM o_orderdate)
+ORDER BY
+  nation ASC, o_year DESC;
+
+-- =================================================================
 -- Query ID: MQ3 (Mutated)
 -- Semantics: Different segment and date directions
 -- =================================================================

@@ -39,7 +39,10 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect;
+import org.apache.calcite.sql.fun.SqlLibrary;
+import org.apache.calcite.sql.fun.SqlLibraryOperatorTableFactory;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -103,8 +106,15 @@ public class Calcite {
             // 2. Establish a Calcite-managed connection (used to get the Calcite root schema container)
             Properties info = new Properties();
 
-            // parsing behavior of the Calcite connection itself
+            // parsing behavior of the Calcite connection itself; use JAVA
+            // here (Calcite 1.36 does not define a POSTGRESQL lex enum).
             info.setProperty("lex", "JAVA");
+            // Expose extended SQL function libraries so Calcite understands
+            // dialect-specific operators such as LEAST / GREATEST that appear
+            // in our TPC-H style queries. We include STANDARD plus
+            // PostgreSQL and MySQL libraries since LEAST/GREATEST are
+            // provided via these dialect packs.
+            info.setProperty("fun", "standard,postgresql,mysql");
 
             // open Calcite
             Connection calciteConnection = DriverManager.getConnection("jdbc:calcite:", info);
@@ -125,9 +135,15 @@ public class Calcite {
             JdbcSchema pgJdbcSchema = JdbcSchema.create(rootSchema, PG_SCHEMA, dataSource, PG_SCHEMA, null);
             rootSchema.add(PG_SCHEMA, pgJdbcSchema);
 
-            // Parser config: fold unquoted identifiers to lower-case, case-insensitive.
-            // Using Lex.MYSQL yields a behavior similar to PostgreSQL name resolution.
+            // Parser config: use MySQL lex, which is close to PostgreSQL for
+            // identifier folding and quoting in this workload.
             SqlParser.Config parserConfig = SqlParser.config().withLex(Lex.MYSQL);
+
+            // Operator table: include standard SQL operators plus PostgreSQL- and
+            // MySQL-specific functions such as LEAST/GREATEST so that validation
+            // matches PostgreSQL behavior more closely.
+            SqlOperatorTable operatorTable = SqlLibraryOperatorTableFactory.INSTANCE
+                .getOperatorTable(SqlLibrary.STANDARD, SqlLibrary.POSTGRESQL, SqlLibrary.MYSQL);
 
             // 5. Build the Calcite Framework configuration
             return Frameworks.newConfigBuilder()
@@ -135,6 +151,8 @@ public class Calcite {
                 .defaultSchema(rootSchema.getSubSchema(PG_SCHEMA))
                 // Use the PostgreSQL-aware parser config
                 .parserConfig(parserConfig)
+                // Enable PostgreSQL function/operator library (e.g., LEAST, GREATEST)
+                .operatorTable(operatorTable)
                 .build();
 
         }
@@ -173,6 +191,13 @@ public class Calcite {
             
             // Normalize non-standard inequality operator '!=' to standard '<>' for Calcite parser
             sqlForParse = sqlForParse.replace("!=", "<>");
+
+            // Rewrite dialect-specific LEAST/GREATEST calls into standard SQL
+            // CASE expressions as a defensive fallback. This ensures queries
+            // that use these functions can still be planned even if the
+            // operator table configuration for a given Calcite version does
+            // not register them as built-ins.
+            sqlForParse = rewriteLeastGreatest(sqlForParse);
         }
 
         // 2. Parse the SQL string into an AST (SqlNode)
@@ -233,6 +258,139 @@ public class Calcite {
     }
 
     /**
+     * Rewrite dialect-specific LEAST/GREATEST function calls into standard SQL
+     * CASE expressions. This is used as a defensive pre-processing step before
+     * handing SQL to Calcite's parser so that queries continue to work even if
+     * a particular Calcite version does not expose these functions via the
+     * configured operator table.
+     */
+    private static String rewriteLeastGreatest(String sql) {
+        if (sql == null) {
+            return null;
+        }
+        String rewritten = rewriteTwoArgExtremaFunction(sql, "LEAST", "<=");
+        rewritten = rewriteTwoArgExtremaFunction(rewritten, "GREATEST", ">=");
+        return rewritten;
+    }
+
+    /**
+     * Generic helper that rewrites calls of the form
+     *   FUNCTION(arg1, arg2)
+     * into
+     *   (CASE WHEN arg1 comparator arg2 THEN arg1 ELSE arg2 END)
+     * where {@code comparator} is "<=" for LEAST and ">=" for GREATEST.
+     *
+     * The implementation is conservative: it only rewrites when it can find a
+     * well-formed parenthesized argument list that splits cleanly into exactly
+     * two top-level arguments. Otherwise it leaves the original text intact.
+     */
+    private static String rewriteTwoArgExtremaFunction(String sql, String functionName, String comparator) {
+        String upperSql = sql.toUpperCase();
+        String fnUpper = functionName.toUpperCase();
+
+        StringBuilder out = new StringBuilder(sql.length());
+        int idx = 0;
+
+        while (true) {
+            int pos = upperSql.indexOf(fnUpper, idx);
+            if (pos < 0) {
+                // no more occurrences
+                out.append(sql.substring(idx));
+                break;
+            }
+
+            // Ensure we matched a standalone function name, not a suffix of
+            // a longer identifier.
+            if (pos > 0) {
+                char prev = upperSql.charAt(pos - 1);
+                if (Character.isLetterOrDigit(prev) || prev == '_') {
+                    out.append(sql, idx, pos + fnUpper.length());
+                    idx = pos + fnUpper.length();
+                    continue;
+                }
+            }
+
+            int parenStart = pos + fnUpper.length();
+            // Skip whitespace between the function name and '('
+            while (parenStart < sql.length() && Character.isWhitespace(sql.charAt(parenStart))) {
+                parenStart++;
+            }
+            if (parenStart >= sql.length() || sql.charAt(parenStart) != '(') {
+                // Not a function call we understand; copy text and continue.
+                out.append(sql, idx, pos + fnUpper.length());
+                idx = pos + fnUpper.length();
+                continue;
+            }
+
+            // Find the matching closing parenthesis, tracking nested parens to
+            // be robust against arguments like f(LEAST(a, b), c).
+            int level = 0;
+            int i = parenStart;
+            for (; i < sql.length(); i++) {
+                char c = sql.charAt(i);
+                if (c == '(') {
+                    level++;
+                } else if (c == ')') {
+                    level--;
+                    if (level == 0) {
+                        break;
+                    }
+                }
+            }
+            if (level != 0) {
+                // Unbalanced parentheses; give up and copy the rest verbatim.
+                out.append(sql.substring(idx));
+                break;
+            }
+
+            String argsRegion = sql.substring(parenStart + 1, i);
+            List<String> args = splitTopLevelArgs(argsRegion);
+            if (args.size() != 2) {
+                // Only handle the common 2-argument case; copy text as-is.
+                out.append(sql, idx, i + 1);
+                idx = i + 1;
+                continue;
+            }
+
+            String a1 = args.get(0).trim();
+            String a2 = args.get(1).trim();
+            String caseExpr = "(CASE WHEN " + a1 + " " + comparator + " " + a2
+                    + " THEN " + a1 + " ELSE " + a2 + " END)";
+
+            // Append everything before the function name, then our rewritten CASE.
+            out.append(sql, idx, pos);
+            out.append(caseExpr);
+            idx = i + 1;
+        }
+
+        return out.toString();
+    }
+
+    /**
+     * Split a comma-separated argument list into top-level arguments, ignoring
+     * commas that occur inside nested parentheses. This is sufficient for the
+     * simple scalar expressions that appear in our TPC-H queries.
+     */
+    private static List<String> splitTopLevelArgs(String region) {
+        List<String> parts = new ArrayList<>();
+        int level = 0;
+        int start = 0;
+        for (int i = 0; i < region.length(); i++) {
+            char c = region.charAt(i);
+            if (c == '(') {
+                level++;
+            } else if (c == ')') {
+                level--;
+            } else if (c == ',' && level == 0) {
+                parts.add(region.substring(start, i));
+                start = i + 1;
+            }
+        }
+        parts.add(region.substring(start));
+        return parts;
+    }
+
+    /**
      * Compare two SQL queries for semantic equivalence, optionally applying transformations
      * to the first query's RelNode before comparison.
      *
@@ -284,6 +442,9 @@ public class Calcite {
             // Get the optimized RelNode for the second query
             RelNode rel2 = getOptimizedRelNode(planner, sql2);
 
+            if (transformations != null && !transformations.isEmpty()) 
+                rel2 = applyTransformations(rel2, transformations); 
+
             // Normalize sub-queries and decorrelate symmetrically for the second plan as well
             rel2 = normalizeSubqueriesAndDecorrelate(rel2);
 
@@ -296,7 +457,6 @@ public class Calcite {
             // Fallback 1: neutralize input indexes (e.g., $0 → $x) to reduce false negatives
             String nd1 = normalizeDigest(d1);
             String nd2 = normalizeDigest(d2);
-
             if (nd1.equals(nd2)) return true;
             
             // Fallback 2: canonical digest that treats inner-join children as unordered
@@ -319,11 +479,22 @@ public class Calcite {
             //return rel1.deepEquals(rel2); // final fallback: deepEquals (rarely helpful)
             if (tree1.equalsIgnoreChildOrder(tree2))  return true;
 
+            // Fallback 4: compare cleaned PostgreSQL execution plans as a last resort.
+            // If both queries yield the same physical plan on the target database,
+            // treat them as equivalent even if Calcite's logical digests differ.
+            try {
+                String p1 = convertRelNodetoJSONQueryPlan(rel1);
+                String p2 = convertRelNodetoJSONQueryPlan(rel2);
+                if (p1 != null && p1.equals(p2)) return true;
+            } catch (Exception ex) {
+                System.err.println("[Calcite.compareQueries] Plan comparison fallback failed: " + ex.getMessage());
+            }
+
             if (transformations != null)
             {
                 System.out.println("\n[Calcite.compareQueries] NOT EQUIVALENT\n\n");
-                System.out.println("Transformed Rel1: \n" + rel1 + "\n");
-                System.out.println("Rel2: \n" + rel2 + "\n");
+                System.out.println("Transformed Rel1: \n" + RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
+                System.out.println("Rel2: \n" + RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
             }
             return false;
         } catch (Exception e)
@@ -379,6 +550,15 @@ public class Calcite {
             String ct1 = t1 == null ? "null" : t1.canonicalDigest();
             String ct2 = t2 == null ? "null" : t2.canonicalDigest();
             if (ct1.equals(ct2)) return true;
+
+            // Fallback: compare cleaned PostgreSQL execution plans as a last resort
+            try {
+                String p1 = convertRelNodetoJSONQueryPlan(rel1);
+                String p2 = convertRelNodetoJSONQueryPlan(rel2);
+                if (p1 != null && p1.equals(p2)) return true;
+            } catch (Exception ex) {
+                System.out.println("[DEBUG compareQueries tag=" + tag + "] Plan comparison fallback failed: " + ex.getMessage());
+            }
 
             // Final object equality fallback removed to avoid deep recursion and cycles
             boolean eq = false;
