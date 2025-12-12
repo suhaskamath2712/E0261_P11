@@ -11,9 +11,13 @@ import org.json.JSONObject;
  * Supported input formats:
  * 1) JSON object form (preferred):
  *    {
+ *      "reasoning": "...optional free-form analysis...",   // ignored by this class
  *      "equivalent": "true" | "false" | "dont_know",
- *      "transformations": [ "RuleName1", "RuleName2", ... ]
+ *      "transformations": [ "RuleName1", "RuleName2", ... ],
+ *      "preconditions": [ { ... }, ... ]                     // ignored by this class
  *    }
+ *    Extra fields such as `reasoning` and `preconditions` are accepted and
+ *    ignored; only `equivalent` and `transformations` are used for logic.
  * 2) Legacy line-oriented form (fallback):
  *    First line: literal "true" or "false"
  *    Subsequent lines: transformation names (or a single line "No transformations needed" / "No transformations found")
@@ -34,9 +38,11 @@ public class LLMResponse
 
     public String toString() {
         JSONObject obj = new JSONObject();
-        obj.put("equivalent: ", this.queriesAreEquivalent);
-        obj.put("transformations: ", this.transformationSteps);
-        return obj.toString(2); // Pretty print with 2-space indentation
+        // Emit equivalent as a string, matching the LLM contract
+        obj.put("equivalent", this.queriesAreEquivalent ? "true" : "false");
+        // Transformations exactly as stored
+        obj.put("transformations", this.transformationSteps);
+        return obj.toString(2); // Pretty-print with 2-space indentation
     }
 
     /**

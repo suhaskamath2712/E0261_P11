@@ -130,12 +130,12 @@ public class Calcite {
             SqlParser.Config parserConfig = SqlParser.config().withLex(Lex.MYSQL);
 
             // 5. Build the Calcite Framework configuration
-                return Frameworks.newConfigBuilder()
-                    // Use the Postgres schema as default
-                    .defaultSchema(rootSchema.getSubSchema(PG_SCHEMA))
-                    // Use the PostgreSQL-aware parser config
-                    .parserConfig(parserConfig)
-                    .build();
+            return Frameworks.newConfigBuilder()
+                // Use the Postgres schema as default
+                .defaultSchema(rootSchema.getSubSchema(PG_SCHEMA))
+                // Use the PostgreSQL-aware parser config
+                .parserConfig(parserConfig)
+                .build();
 
         }
         catch (SQLException | ClassNotFoundException e) {

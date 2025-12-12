@@ -1,5 +1,6 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "github.copilot.chat.azureModels": {}
 }

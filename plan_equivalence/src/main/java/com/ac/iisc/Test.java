@@ -63,7 +63,9 @@ public class Test
      * for local experiments. Ensure the referenced tables exist in PostgreSQL.
      */
     public static void main(String[] args) throws Exception
-    {            
+    {
+
+        System.out.println("-----------------------------------------------------");
         for (String id : queryIDList)
         {
             String sqlA = FileIO.readOriginalSqlQuery(id);
@@ -77,22 +79,54 @@ public class Test
             //If RelNodes are equivalent, skip LLM call
             if (equivalence)    continue;
 
-            LLMResponse llmResponse1 = LLM.getLLMResponse(sqlA, sqlB);
-            System.out.println("LLM Equivalence 1: " + llmResponse1.areQueriesEquivalent());
-            if (!llmResponse1.areQueriesEquivalent()) continue;
+            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            System.out.println("LLM Equivalence 1: " + llmResponse.areQueriesEquivalent());
 
-            System.out.println("LLM Transformations 1: " + llmResponse1.getTransformationSteps());
-            System.out.println("Equivalence with transformations: " + Calcite.compareQueries(sqlA, sqlB, llmResponse1.getTransformationSteps()));
+            if (!llmResponse.areQueriesEquivalent()) continue;
 
-            LLMResponse llmResponse2 = LLM.getLLMResponse(sqlA, sqlB, llmResponse1);
-            System.out.println("LLM Equivalence 2: " + llmResponse2.areQueriesEquivalent());
+            //Perform transformation-based equivalence check only if transformations are provided
+            if (llmResponse.getTransformationSteps() != null)
+            {
+                System.out.println("LLM Transformations 1: " + llmResponse.getTransformationSteps());
+                System.out.println("Equivalence with transformations: " + Calcite.compareQueries(sqlA, sqlB, llmResponse.getTransformationSteps()));
+            }
+            
+            llmResponse = LLM.getLLMResponse(sqlA, sqlB, llmResponse);
+            System.out.println("LLM Equivalence 2: " + llmResponse.areQueriesEquivalent());
 
-            if (!llmResponse2.areQueriesEquivalent()) continue;
+            if (!llmResponse.areQueriesEquivalent()) continue;
 
-            System.out.println("LLM Transformations 2: " + llmResponse2.getTransformationSteps());
-            System.out.println("Equivalence with transformations: " + Calcite.compareQueries(sqlA, sqlB, llmResponse2.getTransformationSteps()));
+            if (llmResponse.getTransformationSteps() != null)
+            {
+                System.out.println("LLM Transformations 2: " + llmResponse.getTransformationSteps());
+                System.out.println("Equivalence with transformations: " + Calcite.compareQueries(sqlA, sqlB, llmResponse.getTransformationSteps()));
+            }
 
-            System.out.println("-----------------------------------------------------");
+            //If still false, we attempt to get transformations to map from B to A
+
+            llmResponse = LLM.getLLMResponse(sqlB, sqlA);
+            System.out.println("LLM Equivalence 1 (B to A): " + llmResponse.areQueriesEquivalent());
+
+            if (!llmResponse.areQueriesEquivalent()) continue;
+
+            //Perform transformation-based equivalence check only if transformations are provided
+            if (llmResponse.getTransformationSteps() != null)
+            {
+                System.out.println("LLM Transformations 1 (B to A): " + llmResponse.getTransformationSteps());
+                System.out.println("Equivalence with transformations (B to A) " + Calcite.compareQueries(sqlA, sqlB, llmResponse.getTransformationSteps()));
+            }
+            
+            llmResponse = LLM.getLLMResponse(sqlB, sqlA, llmResponse);
+            System.out.println("LLM Equivalence 2 (B to A): " + llmResponse.areQueriesEquivalent());
+
+            if (!llmResponse.areQueriesEquivalent()) continue;
+
+            if (llmResponse.getTransformationSteps() != null)
+            {
+                System.out.println("LLM Transformations 2 (B to A): " + llmResponse.getTransformationSteps());
+                System.out.println("Equivalence with transformations (B to A): " + Calcite.compareQueries(sqlA, sqlB, llmResponse.getTransformationSteps()));
+            }
+            
         } 
     }
 }

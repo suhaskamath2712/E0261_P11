@@ -20,10 +20,17 @@ import com.openai.models.responses.ResponseCreateParams;
  * - Contacts the OpenAI Responses API and extracts assistant text from the
  *   returned object; this extraction is defensive and will fall back to a
  *   non-equivalent response if parsing fails.
- * - The expected assistant output contract is a single JSON object with two fields:
- *   `equivalent` (string; `"true"` | `"false"` | `"dont_know"`) and
- *   `transformations` (array of transformation names, may be empty). The implementation
- *   continues to accept the legacy line-oriented output for backward compatibility.
+ * - The expected assistant output contract is a single JSON object with the
+ *   following fields:
+ *     - `reasoning`: free-form string containing step-by-step analysis.
+ *     - `equivalent`: string; `"true"` | `"false"` | `"dont_know"`.
+ *     - `transformations`: array of transformation names (may be empty).
+ *     - `preconditions`: array of objects describing minimal preconditions for
+ *       each listed transformation (same order as `transformations`).
+ *   The implementation currently consumes only `equivalent` and
+ *   `transformations`; additional fields are included for interpretability.
+ *   The helper continues to accept the legacy line-oriented output format for
+ *   backward compatibility.
  *
  * Note: LLM integration is optional and the rest of the toolchain works
  * without it. Keep credentials out of source control and ensure your JVM
@@ -34,66 +41,98 @@ public class LLM
     private static final String PROMPT_1 = """
             System Message:
             You are an expert in relational query optimization and Apache Calcite transformations.
-            Always respond with exactly one JSON object matching the schema requested. Do not
-            output anything else. Use only transformation names from SUPPORTED_TRANSFORMATIONS.
-            Temperature must be 0.
+            Your job is to compare two PostgreSQL logical plans and decide whether they are
+            semantically equivalent, and if so, which Calcite transformations from
+            SUPPORTED_TRANSFORMATIONS can map ORIGINAL_PLAN_JSON to TARGET_PLAN_JSON.
+            
+            Hard constraints:
+            - Always respond with exactly one JSON object matching the schema requested in
+              RESPONSE SCHEMA. Do not output anything else (no prose outside JSON).
+            - Only use transformation names that appear in SUPPORTED_TRANSFORMATIONS.
+            - If you are not confident, use "equivalent":"dont_know" rather than guessing.
+            - Assume temperature is effectively 0: your answers must be deterministic and reproducible.
             
             TASK:
-            Given ORIGINAL_PLAN and TARGET_PLAN (both in simplified JSON plan format),
+            Given ORIGINAL_PLAN_JSON and TARGET_PLAN_JSON (both in simplified JSON plan format),
+            and SCHEMA_SUMMARY (primary/foreign keys and basic table info),
             decide whether they are equivalent. If equivalent, produce an ordered list of Apache
             Calcite transformations (from SUPPORTED_TRANSFORMATIONS) that map
-            ORIGINAL_PLAN -> TARGET_PLAN.
+            ORIGINAL_PLAN_JSON -> TARGET_PLAN_JSON.
             
-            INPUTS PROVIDED:
+            High-level reasoning steps (to be reflected in the 'reasoning' field of the JSON output):
+            1) Compare overall structure: root operators, join tree shape, grouping/aggregation, projections.
+            2) Compare key semantic properties: join keys, grouping keys, filter predicates, set-ops, limits.
+            3) Identify local structural differences that could be explained by a small number of known
+               transformations (e.g., project/aggregate/join/filter reorderings).
+            4) If a plausible sequence exists, list those transformations and their minimal preconditions.
+               Otherwise, return "equivalent":"dont_know".
+            
+            INPUTS PROVIDED (appended below this prompt):
             1) SCHEMA_SUMMARY: a compact JSON describing tables and primary/foreign keys.
-            (Use the schema summary only for reasoning about join keys and uniqueness.)
-            2) SUPPORTED_TRANSFORMATIONS:
+               Use this only for reasoning about join keys, uniqueness, and nullability assumptions.
+            2) SUPPORTED_TRANSFORMATIONS: the exact set of allowed transformation names.
             """;
 
     private static final String PROMPT_2 = """
             RESPONSE SCHEMA (MUST return exactly this JSON object):
             {
-            "equivalent": <"true" | "false" | "dont_know">,
-            "transformations": [ <ordered list of exact transformation names from SUPPORTED_TRANSFORMATIONS> ],
-            "preconditions": [ <objects describing required preconditions for each transformation, in same order> ]
+              "reasoning": "Step-by-step analysis of whether ORIGINAL_PLAN_JSON can be transformed into TARGET_PLAN_JSON using SUPPORTED_TRANSFORMATIONS. Think carefully here before deciding on 'equivalent' and 'transformations'.",
+              "equivalent": <"true" | "false" | "dont_know">,
+              "transformations": [ <ordered list of exact transformation names from SUPPORTED_TRANSFORMATIONS> ],
+              "preconditions": [ <objects describing required preconditions for each transformation, in the same order as 'transformations'> ]
             }
             
             RULES:
-            1) If plans are identical, return "equivalent":"true", "transformations":[], and "preconditions": [].
-            2) Only use names from SUPPORTED_TRANSFORMATIONS. If none apply, return "equivalent":"dont_know" with empty lists.
-            3) For each transformation listed, provide a corresponding precondition object describing the minimal, strictly necessary condition (e.g., "node X is Project on top of Aggregate", or "filter predicate P exists on child", "join keys (A = B) exist"). Keep preconditions concise.
-            4) Do NOT invent any transformation names. If unsure, return "dont_know".
-            5) Output NOTHING but the required JSON object.
+            1) Use the "reasoning" field to think through the problem BEFORE choosing values for
+               "equivalent", "transformations", and "preconditions". This is where you do your
+               detailed comparison of ORIGINAL_PLAN_JSON and TARGET_PLAN_JSON.
+            2) If plans are structurally and semantically identical, return
+               "equivalent":"true", "transformations":[], and "preconditions":[].
+            3) Only use names from SUPPORTED_TRANSFORMATIONS. If none apply or you are not confident,
+               return "equivalent":"dont_know" with empty lists.
+            4) For each transformation listed, provide a corresponding precondition object describing
+               the minimal, strictly necessary condition (for example:
+               - node X is a Project directly on top of an Aggregate with no column reordering, or
+               - a filter predicate P exists on a specific child, or
+               - join keys (A = B) exist between two inputs).
+               Keep preconditions short and specific.
+            5) Do NOT invent any transformation names. If you are unsure, prefer "equivalent":"dont_know".
+            6) Output NOTHING but the required JSON object. No markdown, no extra text, no comments.
             
             ONE-SHOT EXAMPLE:
             SCHEMA_SUMMARY:
-            { "orders": {"pk":["o_orderkey"], "cols":["o_custkey","o_orderdate"]}, "customer":{"pk":["c_custkey"], "cols":["c_mktsegment"]} }
+            { "orders": {"pk":["o_orderkey"], "cols":["o_custkey","o_orderdate"]},
+              "customer":{"pk":["c_custkey"], "cols":["c_mktsegment"]} }
             
             SUPPORTED_TRANSFORMATIONS: ["AggregateProjectMergeRule","ProjectRemoveRule","JoinAssociateRule", ...]  // (full list)
             
             ORIGINAL_PLAN_JSON:
             { "Node Type":"Join", "Join Type":"Inner",
-            "Plans":[
-                {"Node Type":"Project","Plans":[{"Node Type":"Aggregate","Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]}]},
+              "Plans":[
+                {"Node Type":"Project",
+                 "Plans":[{"Node Type":"Aggregate",
+                           "Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]}]},
                 {"Node Type":"TableScan","Relation Name":"customer"}
-            ],
-            "Join Cond":"(orders.o_custkey = customer.c_custkey)"
+              ],
+              "Join Cond":"(orders.o_custkey = customer.c_custkey)"
             }
             
             TARGET_PLAN_JSON:
             { "Node Type":"Join", "Join Type":"Inner",
-            "Plans":[
-                {"Node Type":"Aggregate","Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]},
+              "Plans":[
+                {"Node Type":"Aggregate",
+                 "Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]},
                 {"Node Type":"TableScan","Relation Name":"customer"}
-            ],
-            "Join Cond":"(orders.o_custkey = customer.c_custkey)"
+              ],
+              "Join Cond":"(orders.o_custkey = customer.c_custkey)"
             }
             
             EXPECTED_RESPONSE:
             {
-            "equivalent":"true",
-            "transformations":["AggregateProjectMergeRule"],
-            "preconditions":[ {"requires":"Project on top of Aggregate with no column reordering"} ]
+              "reasoning": "The only difference is that in ORIGINAL_PLAN_JSON the left input has a Project on top of an Aggregate, whereas in TARGET_PLAN_JSON it is just the Aggregate. The Project appears to be redundant and can be merged into the Aggregate without changing semantics. AggregateProjectMergeRule is designed for exactly this pattern.",
+              "equivalent": "true",
+              "transformations": ["AggregateProjectMergeRule"],
+              "preconditions": [ { "requires": "Project directly on top of Aggregate with no column reordering or expression changes" } ]
             }
             
             NOW PROCESS:
@@ -209,8 +248,16 @@ public class LLM
         sb.append("\nORIGINAL_PLAN_JSON:\n").append(sqlAJSON == null ? "(null)" : sqlAJSON);
         sb.append("\n\nTARGET_PLAN_JSON:\n").append(sqlBJSON == null ? "(null)" : sqlBJSON);
 
-        sb.append("\nYou gave this reponse the first time. The answer is incorrect. Please try again and provide a different answer.\n");
-        sb.append(previousResponse.toString());
+        sb.append("""
+                
+                The JSON object shown below was your previous response. It was judged incorrect
+                by an external equivalence checker. Carefully reconsider SCHEMA_SUMMARY,
+                ORIGINAL_PLAN_JSON, TARGET_PLAN_JSON, and SUPPORTED_TRANSFORMATIONS, then
+                return a NEW JSON object that follows the RESPONSE SCHEMA. Do not simply repeat
+                the same 'transformations' list unless you have a strong reason to believe it is correct.
+                Previous response:
+                """);
+        sb.append('\n').append(previousResponse.toString()).append('\n');
 
         String prompt = sb.toString();
 
