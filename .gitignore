@@ -1,2 +1,4 @@
 *.env
 *.properties
+plan_equivalence/src/main/resources/config.properties
+plan_equivalence/target/classes/config.properties
