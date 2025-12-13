@@ -1,7 +1,9 @@
 package com.ac.iisc;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -29,11 +31,14 @@ import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect;
 import org.apache.calcite.sql2rel.RelDecorrelator;
+import org.apache.calcite.sql.type.SqlTypeFamily;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
@@ -287,6 +292,15 @@ public class Calcite {
             // (i.e., join child order is normalized before comparison).
             if (c1.equals(c2)) return true;
 
+            // Additional robustness: treat conjunctions inside canonical digests
+            // as order-insensitive. In rare cases (e.g., mixed RANGE(...) sources
+            // from SEARCH vs. inequalities), AND terms may still appear in
+            // different textual order despite representing the same multiset of
+            // conjuncts. Normalize those segments and compare again.
+            String c1AndNorm = normalizeAndOrderingInDigest(c1);
+            String c2AndNorm = normalizeAndOrderingInDigest(c2);
+            if (c1AndNorm.equals(c2AndNorm)) return true;
+
             // Fallback 3: tree comparison ignoring child order
             RelTreeNode tree1 = buildRelTree(rel1);
             RelTreeNode tree2 = buildRelTree(rel2);
@@ -302,6 +316,10 @@ public class Calcite {
             if (p1 != null && p1.equals(p2)) return true;
 
             if (transformations != null) {
+                // Debug: print canonical digests as well to understand any
+                // residual differences that survive all comparison layers.
+                System.out.println("[Calcite.compareQueries] canonicalDigest Rel1: " + c1);
+                System.out.println("[Calcite.compareQueries] canonicalDigest Rel2: " + c2);
                 System.out.println("\n[Calcite.compareQueries] NOT EQUIVALENT\n\n");
                 System.out.println("Transformed Rel1: \n" + RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
                 System.out.println("Rel2: \n" + RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
@@ -513,6 +531,20 @@ public class Calcite {
     private static String canonicalizeRex(RexNode node) {
         if (node == null) return "null";
         RexNode n = stripAllCasts(node);
+        // If this is a literal of character type, normalize trailing spaces inside
+        // quoted text so that 'SHIP' and 'SHIP      ' hash the same for CHAR(n)
+        // columns. We only affect the digest string; the underlying RexLiteral is
+        // left unchanged.
+        if (n instanceof RexLiteral lit) {
+            if (lit.getType() != null
+                    && lit.getType().getSqlTypeName() != null
+                    && lit.getType().getSqlTypeName().getFamily() == SqlTypeFamily.CHARACTER) {
+                String text = lit.toString();
+                text = normalizeCharLiteralText(text);
+                return normalizeDigest(text);
+            }
+            return normalizeDigest(n.toString());
+        }
         // Predicate normalization: for commutative boolean ops (AND/OR), we sort
         // operands during canonicalization so A AND B ≡ B AND A. This ensures
         // filter predicate order does not affect equivalence.
@@ -524,8 +556,26 @@ public class Calcite {
             for (RexNode op : call.getOperands()) parts.add(canonicalizeRex(op));
 
             switch (kind) {
-                // Commutative containers: sort operands so order does not matter
-                case AND, OR, PLUS, TIMES -> {
+                // Conjunctions: decompose into conjuncts, normalize each, apply
+                // range folding, then sort and dedupe.
+                case AND -> {
+                    // AND nodes are always RexCall here; use conjunctive
+                    // decomposition + range folding for canonicalization.
+                    String andDigest = canonicalizeAndWithRanges(call);
+                    return normalizeDigest(andDigest);
+                }
+
+                // Other commutative containers: sort operands so order does not matter
+                case OR, PLUS, TIMES -> {
+                    // For PLUS, attempt to fold date + interval YEAR into a single
+                    // DATE literal so 1995-01-01 + INTERVAL '1 year' aligns with
+                    // a plain 1996-01-01 literal used elsewhere.
+                    if (kind == SqlKind.PLUS && call != null) {
+                        String folded = tryFoldDatePlusInterval(call);
+                        if (folded != null) {
+                            return normalizeDigest(folded);
+                        }
+                    }
                     parts.sort(String::compareTo);
                     return normalizeDigest(kind + "(" + String.join(",", parts) + ")");
                 }
@@ -565,6 +615,22 @@ public class Calcite {
                     return "CAST(?)";
                 }
 
+                // SEARCH(value, Sarg[...]) – normalize Sarg text so that differences
+                // in CHAR length annotations and trailing spaces inside literals do
+                // not cause spurious mismatches.
+                case SEARCH -> {
+                    String valueExpr = parts.size() > 0 ? parts.get(0) : "?";
+                    String sargExpr = parts.size() > 1 ? parts.get(1) : "?";
+                    String cleanedSarg = normalizeSearchSargText(sargExpr);
+                    // If the Sarg represents a single interval, convert to RANGE(...) to match
+                    // any AND-based range canonicalization.
+                    String maybeRange = parseSingleIntervalFromSarg(cleanedSarg);
+                    if (maybeRange != null) {
+                        return normalizeDigest("RANGE(" + valueExpr + "," + maybeRange + ")");
+                    }
+                    return normalizeDigest("SEARCH(" + valueExpr + "," + cleanedSarg + ")");
+                }
+
                 default -> {
                     // Generic operator/function: include operator kind and canonicalized operands
                     return normalizeDigest(kind + "(" + String.join(",", parts) + ")");
@@ -572,6 +638,394 @@ public class Calcite {
             }
         }
         return normalizeDigest(n.toString());
+    }
+
+    /**
+     * Normalize character literal text for digesting by trimming trailing spaces
+     * inside single-quoted segments. For example, "'SHIP      '" becomes
+     * "'SHIP'". Non-literal parts of the string are left unchanged. This is
+     * intentionally simple and tailored to the string forms produced by RexNode
+     * toString for CHAR(n) literals in this project.
+     */
+    private static String normalizeCharLiteralText(String text) {
+        if (text == null || text.indexOf('\'') < 0) {
+            return text;
+        }
+        StringBuilder sb = new StringBuilder(text.length());
+        int i = 0;
+        int len = text.length();
+        while (i < len) {
+            char c = text.charAt(i);
+            if (c == '\'') {
+                sb.append(c); // opening quote
+                i++;
+                int litStart = i;
+                while (i < len && text.charAt(i) != '\'') {
+                    i++;
+                }
+                String literalContent = text.substring(litStart, i);
+                int end = literalContent.length();
+                while (end > 0 && literalContent.charAt(end - 1) == ' ') {
+                    end--;
+                }
+                sb.append(literalContent, 0, end);
+                if (i < len && text.charAt(i) == '\'') {
+                    sb.append('\'');
+                    i++;
+                }
+            } else {
+                sb.append(c);
+                i++;
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Normalize SEARCH/Sarg textual representation for digest purposes by
+     * removing explicit CHAR length annotations (e.g., ":CHAR(8)") and applying
+     * {@link #normalizeCharLiteralText(String)} to trim trailing spaces inside any
+     * quoted literals.
+     */
+    private static String normalizeSearchSargText(String sargExpr) {
+        if (sargExpr == null) {
+            return "";
+        }
+        // Remove type suffixes like :CHAR(8) or :CHAR(15) that do not affect
+        // logical range semantics but would otherwise cause different digests.
+        String cleaned = sargExpr.replaceAll(":CHAR\\(\\d+\\)", "");
+        // Normalize trailing spaces inside quoted literals in the Sarg text.
+        cleaned = normalizeCharLiteralText(cleaned);
+        return cleaned;
+    }
+
+    /**
+     * If the cleaned Sarg text encodes a single closed-open interval, return
+     * a pair "lower,upper" where bounds are the textual literal forms used
+     * in canonical digests. Otherwise return null.
+     */
+    private static String parseSingleIntervalFromSarg(String cleanedSarg) {
+        if (cleanedSarg == null) return null;
+        // Look for a simple pattern like "Sarg[[LOWER..UPPER)]" or variants
+        int dots = cleanedSarg.indexOf("..");
+        if (dots < 0) return null;
+        // heuristically extract tokens around '..'
+        int left = cleanedSarg.lastIndexOf('[', dots);
+        if (left < 0) left = cleanedSarg.lastIndexOf('(', dots);
+        int right = cleanedSarg.indexOf(')', dots);
+        if (right < 0) right = cleanedSarg.indexOf(']', dots);
+        if (left < 0 || right < 0 || right <= left) return null;
+        String inner = cleanedSarg.substring(left + 1, right);
+        String[] parts = inner.split("\\.\\.");
+        if (parts.length != 2) return null;
+        String low = parts[0].trim();
+        String up = parts[1].trim();
+        // remove surrounding quotes if present
+        low = stripSurroundingQuotes(low);
+        up = stripSurroundingQuotes(up);
+        return low + "," + up;
+    }
+
+    private static String stripSurroundingQuotes(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        if (s.length() >= 2 && s.charAt(0) == '\'' && s.charAt(s.length() - 1) == '\'') {
+            return s.substring(1, s.length() - 1);
+        }
+        return s;
+    }
+
+    /**
+     * Best-effort normalization of conjunction (AND) segments inside a
+     * canonical digest string. Any substring of the form {@code AND(a&b&c)}
+     * is rewritten so that the {@code a,b,c} parts are sorted
+     * lexicographically, making AND order-insensitive at the string level.
+     *
+     * This is a safety net on top of expression-level canonicalization to
+     * avoid false negatives when equivalent plans differ only in conjunct
+     * ordering.
+     */
+    private static String normalizeAndOrderingInDigest(String digest) {
+        if (digest == null) return null;
+        StringBuilder out = new StringBuilder(digest.length());
+        int idx = 0;
+        while (idx < digest.length()) {
+            int andPos = digest.indexOf("AND(", idx);
+            if (andPos < 0) {
+                out.append(digest.substring(idx));
+                break;
+            }
+            // copy text before AND(
+            out.append(digest, idx, andPos);
+            int start = andPos + 4; // position after "AND("
+
+            // Find the matching closing parenthesis for this AND( using a
+            // simple depth counter so that inner parentheses from sub-
+            // expressions (e.g., "<($x,$x)") do not terminate the search.
+            int depth = 1;
+            int i = start;
+            int end = -1;
+            while (i < digest.length() && depth > 0) {
+                char ch = digest.charAt(i);
+                if (ch == '(') {
+                    depth++;
+                } else if (ch == ')') {
+                    depth--;
+                    if (depth == 0) {
+                        end = i;
+                        break;
+                    }
+                }
+                i++;
+            }
+            if (end < 0) {
+                // Malformed; append rest and stop
+                out.append(digest.substring(andPos));
+                break;
+            }
+
+            // The substring between start and end contains the raw conjunct
+            // strings separated by '&', but may itself contain nested
+            // parentheses. Splitting on '&' is safe because '&' is the
+            // top-level separator we introduced when formatting AND.
+            String inside = digest.substring(start, end);
+            String[] parts = inside.split("&");
+            Arrays.sort(parts);
+            out.append("AND(");
+            out.append(String.join("&", parts));
+            out.append(")");
+            idx = end + 1;
+        }
+        return out.toString();
+    }
+
+    /**
+     * Canonicalize an AND-expression by:
+     *  - Decomposing into individual conjuncts (flatten nested ANDs)
+     *  - Identifying inequality pairs that form ranges on the same expression
+     *    and emitting a single RANGE(expr,lower,upper) term
+     *  - Canonicalizing all remaining conjuncts
+     *  - Sorting and de-duplicating the resulting conjunct strings.
+     *
+     * This ensures that forms like (col >= L AND col < U) and SEARCH(col, Sarg[[L..U)))
+     * both contribute a RANGE(...) term and otherwise share the same multiset of
+     * conjunct digests.
+     */
+    private static String canonicalizeAndWithRanges(RexCall andCall) {
+        // 1) Flatten nested ANDs into a simple list of conjunct nodes
+        java.util.List<RexNode> conjuncts = new java.util.ArrayList<>();
+        collectConjuncts(andCall, conjuncts);
+
+        // 2) First pass: discover candidate lower/upper bounds per expression key.
+        // Instead of requiring a literal RexNode, we look for comparisons where
+        // exactly one side contains an input reference ("$") and treat the
+        // other side as the bound. This allows us to fold patterns like
+        // col < (DATE + INTERVAL YEAR) once the arithmetic has been folded to a
+        // literal by canonicalizeRex. Importantly, we derive the expression key
+        // from the raw (non-normalized) RexNode string so that different input
+        // refs ($12 vs $14) are not collapsed to the same "$x" placeholder.
+        java.util.Map<String, java.util.Map<String, String>> rangeMap = new java.util.HashMap<>();
+        for (RexNode conj : conjuncts) {
+            if (!(conj instanceof RexCall oc) || oc.getOperator() == null) continue;
+            SqlKind k = oc.getOperator().getKind();
+            switch (k) {
+                case GREATER_THAN, GREATER_THAN_OR_EQUAL, LESS_THAN, LESS_THAN_OR_EQUAL, EQUALS -> {
+                    RexNode left = oc.getOperands().size() > 0 ? oc.getOperands().get(0) : null;
+                    RexNode right = oc.getOperands().size() > 1 ? oc.getOperands().get(1) : null;
+                    if (left == null || right == null) continue;
+
+                    String leftStr = canonicalizeRex(left);
+                    String rightStr = canonicalizeRex(right);
+                    boolean leftHasRef = leftStr.contains("$");
+                    boolean rightHasRef = rightStr.contains("$");
+
+                    // We only consider simple ranges where one side is an
+                    // expression on columns (contains "$") and the other side
+                    // is a bound without input refs (typically a literal or
+                    // literal expression like DATE+INTERVAL).
+                    String exprKey;
+                    String bound;
+                    if (leftHasRef && !rightHasRef) {
+                        exprKey = canonicalizeRangeKey(left);
+                        bound = rightStr;
+                    } else if (!leftHasRef && rightHasRef) {
+                        exprKey = canonicalizeRangeKey(right);
+                        bound = leftStr;
+                    } else {
+                        continue;
+                    }
+
+                    java.util.Map<String, String> row = rangeMap.getOrDefault(exprKey, new java.util.HashMap<>());
+                    if (k == SqlKind.GREATER_THAN || k == SqlKind.GREATER_THAN_OR_EQUAL) {
+                        row.put("lower", bound);
+                    } else if (k == SqlKind.LESS_THAN || k == SqlKind.LESS_THAN_OR_EQUAL) {
+                        row.put("upper", bound);
+                    } else if (k == SqlKind.EQUALS) {
+                        row.put("lower", bound);
+                        row.put("upper", bound);
+                    }
+                    rangeMap.put(exprKey, row);
+                }
+                default -> {}
+            }
+        }
+
+        // 3) Determine which conjunct nodes are consumed by range folding
+        java.util.Set<RexNode> consumed = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        java.util.List<String> rangeConjs = new java.util.ArrayList<>();
+
+        for (var e : rangeMap.entrySet()) {
+            String exprKey = e.getKey();
+            java.util.Map<String, String> row = e.getValue();
+            if (!(row.containsKey("lower") && row.containsKey("upper"))) continue;
+            String lower = stripSurroundingQuotes(row.get("lower"));
+            String upper = stripSurroundingQuotes(row.get("upper"));
+            rangeConjs.add("RANGE(" + exprKey + "," + lower + "," + upper + ")");
+
+            // Mark comparison conjuncts on this expression as consumed so we
+            // don't also include them individually.
+            for (RexNode conj : conjuncts) {
+                if (!(conj instanceof RexCall oc) || oc.getOperator() == null) continue;
+                SqlKind k = oc.getOperator().getKind();
+                if (k != SqlKind.GREATER_THAN && k != SqlKind.GREATER_THAN_OR_EQUAL
+                        && k != SqlKind.LESS_THAN && k != SqlKind.LESS_THAN_OR_EQUAL
+                        && k != SqlKind.EQUALS) {
+                    continue;
+                }
+                RexNode left = oc.getOperands().size() > 0 ? oc.getOperands().get(0) : null;
+                RexNode right = oc.getOperands().size() > 1 ? oc.getOperands().get(1) : null;
+                if (left == null || right == null) continue;
+
+                String leftStr = canonicalizeRex(left);
+                String rightStr = canonicalizeRex(right);
+                boolean leftHasRef = leftStr.contains("$");
+                boolean rightHasRef = rightStr.contains("$");
+
+                String exprKey2 = null;
+                if (leftHasRef && !rightHasRef) {
+                    exprKey2 = canonicalizeRangeKey(left);
+                } else if (!leftHasRef && rightHasRef) {
+                    exprKey2 = canonicalizeRangeKey(right);
+                } else {
+                    continue;
+                }
+
+                if (exprKey.equals(exprKey2)) {
+                    consumed.add(conj);
+                }
+            }
+        }
+
+        // 4) Canonicalize remaining conjuncts, skipping those folded into ranges
+        java.util.List<String> conjStrings = new java.util.ArrayList<>();
+        conjStrings.addAll(rangeConjs);
+
+        for (RexNode conj : conjuncts) {
+            if (consumed.contains(conj)) continue;
+            String s = canonicalizeRex(conj);
+            if ("true".equalsIgnoreCase(s)) continue;
+            conjStrings.add(s);
+        }
+
+        // 5) Sort and de-duplicate
+        java.util.Set<String> uniq = new java.util.LinkedHashSet<>(conjStrings);
+        java.util.List<String> ordered = new java.util.ArrayList<>(uniq);
+        java.util.Collections.sort(ordered);
+        return "AND(" + String.join("&", ordered) + ")";
+    }
+
+    // Helper: recursively flatten nested ANDs into a list of conjuncts
+    private static void collectConjuncts(RexNode node, java.util.List<RexNode> out) {
+        if (node instanceof RexCall call && call.getOperator() != null
+                && call.getOperator().getKind() == SqlKind.AND) {
+            for (RexNode op : call.getOperands()) {
+                collectConjuncts(op, out);
+            }
+        } else {
+            out.add(node);
+        }
+    }
+
+    // Helper: build a stable key for grouping range predicates that preserves
+    // column identity. We strip CASTs but otherwise use the raw RexNode
+    // toString so that $12 and $14 remain distinct (unlike the normalized
+    // "$x" placeholder used in canonicalizeRex).
+    private static String canonicalizeRangeKey(RexNode expr) {
+        if (expr == null) return "";
+        RexNode base = stripAllCasts(expr);
+        return base == null ? "" : base.toString();
+    }
+
+    /**
+     * Best-effort folding of expressions of the form DATE + INTERVAL YEAR
+     * (or INTERVAL YEAR + DATE) into a single DATE literal string for
+     * digesting. This helps align range predicates expressed via explicit
+     * date arithmetic with those that use a literal upper bound.
+     */
+    private static String tryFoldDatePlusInterval(RexCall call) {
+        if (call == null || call.getOperands().size() != 2) return null;
+        RexNode a = call.getOperands().get(0);
+        RexNode b = call.getOperands().get(1);
+
+        RexLiteral dateLit = null;
+        RexLiteral intervalLit = null;
+
+        if (a instanceof RexLiteral litA && isDateLiteral(litA)) {
+            dateLit = litA;
+        }
+        if (b instanceof RexLiteral litB && isDateLiteral(litB)) {
+            if (dateLit != null) return null; // two dates, not our pattern
+            dateLit = litB;
+        }
+        if (a instanceof RexLiteral litAInt && isYearIntervalLiteral(litAInt)) {
+            intervalLit = litAInt;
+        }
+        if (b instanceof RexLiteral litBInt && isYearIntervalLiteral(litBInt)) {
+            if (intervalLit != null) return null; // two intervals, not our pattern
+            intervalLit = litBInt;
+        }
+
+        if (dateLit == null || intervalLit == null) return null;
+
+        try {
+            // Parse base date from literal text
+            String dateText = normalizeCharLiteralText(dateLit.toString());
+            dateText = stripSurroundingQuotes(dateText);
+            if (dateText == null || dateText.isEmpty()) return null;
+            LocalDate base = LocalDate.parse(dateText);
+
+            // Extract month count from interval literal text, e.g. "12:INTERVAL YEAR".
+            // Calcite's INTERVAL_YEAR_MONTH literal encodes a total month count
+            // as the numeric prefix, so "12:INTERVAL YEAR" means 12 months
+            // (i.e., 1 year), not 12 years.
+            String intervalText = intervalLit.toString();
+            int colon = intervalText.indexOf(':');
+            if (colon <= 0) return null;
+            String monthsPart = intervalText.substring(0, colon).trim();
+            if (monthsPart.isEmpty()) return null;
+            int months = Integer.parseInt(monthsPart);
+
+            LocalDate result = base.plusMonths(months);
+            // Represent as a quoted literal to match other DATE literal digests
+            return "'" + result.toString() + "'";
+        } catch (Exception e) {
+            // Best-effort: if parsing fails, fall back to the generic PLUS handling
+            return null;
+        }
+    }
+
+    private static boolean isDateLiteral(RexLiteral lit) {
+        if (lit == null || lit.getType() == null || lit.getType().getSqlTypeName() == null) return false;
+        return lit.getType().getSqlTypeName() == SqlTypeName.DATE;
+    }
+
+    private static boolean isYearIntervalLiteral(RexLiteral lit) {
+        if (lit == null || lit.getType() == null || lit.getType().getSqlTypeName() == null) return false;
+        SqlTypeName typeName = lit.getType().getSqlTypeName();
+        // Treat any interval whose family is YEAR-MONTH as a year interval,
+        // which covers textual forms like "12:INTERVAL YEAR" in Calcite's
+        // RexLiteral rendering.
+        return typeName.getFamily() == SqlTypeFamily.INTERVAL_YEAR_MONTH;
     }
 
     // Helper: collect factors and conditions from a nested INNER join tree

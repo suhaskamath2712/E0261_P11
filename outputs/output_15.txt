@@ -1,0 +1,633 @@
+-----------------------------------------------------
+Query ID: U1
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U3
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U5
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U6
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U7
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U8
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: U9
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: O1
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: O2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: O3
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: O4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: O5
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: O6
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: A1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: A2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: A3
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: A4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: N1
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: Alaap
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: Nested_Test
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: paper_sample
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: F1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: MQ1
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ3
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ5
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ6
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ10
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ11
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ17
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ18
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: MQ21
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCH_Q9
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCH_Q13
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q1
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q5
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q6
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q6_1
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q6_2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q7
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q9
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q10
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q12
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q14
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q15
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q21
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q23
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q24
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_3
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [AggregateJoinTransposeRule, AggregateRemoveRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$3, $1, $2]])
+    LogicalAggregate(group=[{0, 1, 2}], revenue=[SUM($3)])
+      LogicalProject(exprs=[[$19, $13, $16, *($24, -(1, $25))]])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          LogicalFilter(condition=[=($6, 'FURNITURE ')])
+            JdbcTableScan(table=[[public, customer]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[>($10, 1995-01-01)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$4, $1, $2]])
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $3, $4]])
+        LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[=($6, 'FURNITURE ')])
+              JdbcTableScan(table=[[public, customer]])
+          LogicalProject(inputs=[0..1], exprs=[[$4, $7]])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+      LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+        LogicalProject(inputs=[0], exprs=[[*($5, -(1, $6))]])
+          LogicalFilter(condition=[>($10, 1995-01-01)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: [AggregateJoinTransposeRule, AggregateRemoveRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$3, $1, $2]])
+    LogicalAggregate(group=[{0, 1, 2}], revenue=[SUM($3)])
+      LogicalProject(exprs=[[$19, $13, $16, *($24, -(1, $25))]])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          LogicalFilter(condition=[=($6, 'FURNITURE ')])
+            JdbcTableScan(table=[[public, customer]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[>($10, 1995-01-01)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$4, $1, $2]])
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $3, $4]])
+        LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[=($6, 'FURNITURE ')])
+              JdbcTableScan(table=[[public, customer]])
+          LogicalProject(inputs=[0..1], exprs=[[$4, $7]])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+      LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+        LogicalProject(inputs=[0], exprs=[[*($5, -(1, $6))]])
+          LogicalFilter(condition=[>($10, 1995-01-01)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 1 (B to A): true
+LLM Transformations 1 (B to A): [AggregateJoinTransposeRule, ProjectRemoveRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$3, $1, $2]])
+    LogicalAggregate(group=[{0, 1, 2}], revenue=[SUM($3)])
+      LogicalProject(exprs=[[$19, $13, $16, *($24, -(1, $25))]])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          LogicalFilter(condition=[=($6, 'FURNITURE ')])
+            JdbcTableScan(table=[[public, customer]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[>($10, 1995-01-01)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$2], dir0=[DESC], dir1=[ASC])
+  LogicalProject(inputs=[0], exprs=[[$4, $1, $2]])
+    LogicalJoin(condition=[=($0, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $3, $4]])
+        LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[=($6, 'FURNITURE ')])
+              JdbcTableScan(table=[[public, customer]])
+          LogicalProject(inputs=[0..1], exprs=[[$4, $7]])
+            LogicalFilter(condition=[<($4, 1995-01-01)])
+              JdbcTableScan(table=[[public, orders]])
+      LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+        LogicalProject(inputs=[0], exprs=[[*($5, -(1, $6))]])
+          LogicalFilter(condition=[>($10, 1995-01-01)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations (B to A) false
+LLM Equivalence 2 (B to A): false
+-----------------------------------------------------
+Query ID: LITHE_4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_5
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [JoinAddRedundantSemiJoinRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], dir0=[DESC])
+  LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+    LogicalProject(exprs=[[$45, *($24, -(1, $25))]])
+      LogicalJoin(condition=[AND(=($3, $39), =($19, $9))], joinType=[inner], semiJoinDone=[true])
+        LogicalJoin(condition=[AND(=($3, $39), =($19, $9))], joinType=[semi])
+          LogicalJoin(condition=[=($0, $10)], joinType=[inner], semiJoinDone=[true])
+            LogicalJoin(condition=[=($0, $10)], joinType=[semi])
+              JdbcTableScan(table=[[public, customer]])
+              LogicalFilter(condition=[AND(>=($4, 1995-01-01), <($4, +(1995-01-01, 12:INTERVAL YEAR)))])
+                JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[AND(>=($4, 1995-01-01), <($4, +(1995-01-01, 12:INTERVAL YEAR)))])
+              JdbcTableScan(table=[[public, orders]])
+          LogicalJoin(condition=[=($2, $17)], joinType=[inner], semiJoinDone=[true])
+            LogicalJoin(condition=[=($2, $17)], joinType=[semi])
+              JdbcTableScan(table=[[public, lineitem]])
+              LogicalJoin(condition=[=($3, $8)], joinType=[inner], semiJoinDone=[true])
+                LogicalJoin(condition=[=($3, $8)], joinType=[semi])
+                  JdbcTableScan(table=[[public, supplier]])
+                  LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                    LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                      JdbcTableScan(table=[[public, nation]])
+                      LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                        JdbcTableScan(table=[[public, region]])
+                    LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                      JdbcTableScan(table=[[public, region]])
+                LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                  LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                    JdbcTableScan(table=[[public, nation]])
+                    LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                      JdbcTableScan(table=[[public, region]])
+                  LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                    JdbcTableScan(table=[[public, region]])
+            LogicalJoin(condition=[=($3, $8)], joinType=[inner], semiJoinDone=[true])
+              LogicalJoin(condition=[=($3, $8)], joinType=[semi])
+                JdbcTableScan(table=[[public, supplier]])
+                LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                  LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                    JdbcTableScan(table=[[public, nation]])
+                    LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                      JdbcTableScan(table=[[public, region]])
+                  LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                    JdbcTableScan(table=[[public, region]])
+              LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                  JdbcTableScan(table=[[public, nation]])
+                  LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                    JdbcTableScan(table=[[public, region]])
+                LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                  JdbcTableScan(table=[[public, region]])
+        LogicalJoin(condition=[=($2, $17)], joinType=[inner], semiJoinDone=[true])
+          LogicalJoin(condition=[=($2, $17)], joinType=[semi])
+            JdbcTableScan(table=[[public, lineitem]])
+            LogicalJoin(condition=[=($3, $8)], joinType=[inner], semiJoinDone=[true])
+              LogicalJoin(condition=[=($3, $8)], joinType=[semi])
+                JdbcTableScan(table=[[public, supplier]])
+                LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                  LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                    JdbcTableScan(table=[[public, nation]])
+                    LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                      JdbcTableScan(table=[[public, region]])
+                  LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                    JdbcTableScan(table=[[public, region]])
+              LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                  JdbcTableScan(table=[[public, nation]])
+                  LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                    JdbcTableScan(table=[[public, region]])
+                LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                  JdbcTableScan(table=[[public, region]])
+          LogicalJoin(condition=[=($3, $8)], joinType=[inner], semiJoinDone=[true])
+            LogicalJoin(condition=[=($3, $8)], joinType=[semi])
+              JdbcTableScan(table=[[public, supplier]])
+              LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+                LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                  JdbcTableScan(table=[[public, nation]])
+                  LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                    JdbcTableScan(table=[[public, region]])
+                LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                  JdbcTableScan(table=[[public, region]])
+            LogicalJoin(condition=[=($2, $5)], joinType=[inner], semiJoinDone=[true])
+              LogicalJoin(condition=[=($2, $5)], joinType=[semi])
+                JdbcTableScan(table=[[public, nation]])
+                LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                  JdbcTableScan(table=[[public, region]])
+              LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                JdbcTableScan(table=[[public, region]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], dir0=[DESC])
+  LogicalAggregate(group=[{0}], revenue=[SUM($1)])
+    LogicalProject(exprs=[[$45, *($24, -(1, $25))]])
+      LogicalJoin(condition=[AND(=($3, $39), =($19, $9))], joinType=[inner])
+        LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+          JdbcTableScan(table=[[public, customer]])
+          LogicalFilter(condition=[AND(>=($4, 1995-01-01), <($4, +(1995-01-01, 12:INTERVAL YEAR)))])
+            LogicalProject(inputs=[0..9])
+              LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+                JdbcTableScan(table=[[public, orders]])
+                LogicalAggregate(group=[{0}])
+                  LogicalProject(inputs=[0])
+                    JdbcTableScan(table=[[public, lineitem]])
+        LogicalJoin(condition=[=($2, $17)], joinType=[inner])
+          JdbcTableScan(table=[[public, lineitem]])
+          LogicalJoin(condition=[=($3, $8)], joinType=[inner])
+            JdbcTableScan(table=[[public, supplier]])
+            LogicalJoin(condition=[=($2, $5)], joinType=[inner])
+              JdbcTableScan(table=[[public, nation]])
+              LogicalFilter(condition=[=($1, 'ASIA                     ')])
+                JdbcTableScan(table=[[public, region]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: false
+-----------------------------------------------------
+Query ID: LITHE_6
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_7
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_8
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_9
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+LLM Equivalence 1 (B to A): true
+LLM Transformations 1 (B to A): []
+Equivalence with transformations (B to A) false
+LLM Equivalence 2 (B to A): true
+LLM Transformations 2 (B to A): []
+Equivalence with transformations (B to A): false
+-----------------------------------------------------
+Query ID: LITHE_10
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_11
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_12
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT       ', '2-HIGH         ']:CHAR(15)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT       '), ('1-URGENT       '..'2-HIGH         '), ('2-HIGH         '..+∞)]:CHAR(15)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP      '), <($11, $12), <($10, $11), >=($12, 1995-01-01), <($12, +(1995-01-01, 12:INTERVAL YEAR)))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT', '2-HIGH':CHAR(8)]:CHAR(8)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT'), ('1-URGENT'..'2-HIGH':CHAR(8)), ('2-HIGH':CHAR(8)..+∞)]:CHAR(8)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP'), <($11, $12), <($10, $11), SEARCH($12, Sarg[[1995-01-01..1996-01-01)]))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT       ', '2-HIGH         ']:CHAR(15)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT       '), ('1-URGENT       '..'2-HIGH         '), ('2-HIGH         '..+∞)]:CHAR(15)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP      '), <($11, $12), <($10, $11), >=($12, 1995-01-01), <($12, +(1995-01-01, 12:INTERVAL YEAR)))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT', '2-HIGH':CHAR(8)]:CHAR(8)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT'), ('1-URGENT'..'2-HIGH':CHAR(8)), ('2-HIGH':CHAR(8)..+∞)]:CHAR(8)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP'), <($11, $12), <($10, $11), SEARCH($12, Sarg[[1995-01-01..1996-01-01)]))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 1 (B to A): true
+LLM Transformations 1 (B to A): [CoerceInputsRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT       ', '2-HIGH         ']:CHAR(15)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT       '), ('1-URGENT       '..'2-HIGH         '), ('2-HIGH         '..+∞)]:CHAR(15)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP      '), <($11, $12), <($10, $11), >=($12, 1995-01-01), <($12, +(1995-01-01, 12:INTERVAL YEAR)))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT', '2-HIGH':CHAR(8)]:CHAR(8)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT'), ('1-URGENT'..'2-HIGH':CHAR(8)), ('2-HIGH':CHAR(8)..+∞)]:CHAR(8)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP'), <($11, $12), <($10, $11), SEARCH($12, Sarg[[1995-01-01..1996-01-01)]))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations (B to A) false
+LLM Equivalence 2 (B to A): true
+LLM Transformations 2 (B to A): []
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT       ', '2-HIGH         ']:CHAR(15)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT       '), ('1-URGENT       '..'2-HIGH         '), ('2-HIGH         '..+∞)]:CHAR(15)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP      '), <($11, $12), <($10, $11), >=($12, 1995-01-01), <($12, +(1995-01-01, 12:INTERVAL YEAR)))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], high_line_count=[SUM($1)], low_line_count=[SUM($2)])
+    LogicalProject(exprs=[[$24, CASE(SEARCH($5, Sarg['1-URGENT', '2-HIGH':CHAR(8)]:CHAR(8)), 1, 0), CASE(SEARCH($5, Sarg[(-∞..'1-URGENT'), ('1-URGENT'..'2-HIGH':CHAR(8)), ('2-HIGH':CHAR(8)..+∞)]:CHAR(8)), 1, 0)]])
+      LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+        JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(=($14, 'SHIP'), <($11, $12), <($10, $11), SEARCH($12, Sarg[[1995-01-01..1996-01-01)]))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations (B to A): false
+-----------------------------------------------------
+Query ID: LITHE_13
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_14
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_15
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_16
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: [SemiJoinRule, SemiJoinJoinTransposeRule]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$3], sort1=[$0], sort2=[$1], sort3=[$2], dir0=[DESC], dir1=[ASC], dir2=[ASC], dir3=[ASC])
+  LogicalAggregate(group=[{0, 1, 2}], supplier_cnt=[COUNT(DISTINCT $3)])
+    LogicalProject(exprs=[[$9, $10, $11, $1]])
+      LogicalJoin(condition=[=($6, $0)], joinType=[inner])
+        LogicalProject(inputs=[0..5])
+          LogicalFilter(condition=[OR(=($6, 0), AND(IS NULL($9), >=($7, $6)))])
+            LogicalJoin(condition=[=($1, $8)], joinType=[left])
+              LogicalJoin(condition=[true], joinType=[inner])
+                JdbcTableScan(table=[[public, partsupp]])
+                LogicalProject(inputs=[0], exprs=[[$0]])
+                  LogicalAggregate(group=[{}], c=[COUNT()])
+                    LogicalFilter(condition=[LIKE($6, '%Customer%Complaints%')])
+                      JdbcTableScan(table=[[public, supplier]])
+              LogicalAggregate(group=[{0}], i=[LITERAL_AGG(true)])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[LIKE($6, '%Customer%Complaints%')])
+                    JdbcTableScan(table=[[public, supplier]])
+        LogicalFilter(condition=[AND(<>($3, 'Brand#23'), SEARCH($5, Sarg[1, 4, 7]), NOT(LIKE($4, 'MEDIUM POLISHED%')))])
+          JdbcTableScan(table=[[public, part]])
+
+
+Rel2: 
+LogicalSort(sort0=[$3], sort1=[$0], sort2=[$1], sort3=[$2], dir0=[DESC], dir1=[ASC], dir2=[ASC], dir3=[ASC])
+  LogicalAggregate(group=[{0, 1, 2}], supplier_cnt=[COUNT(DISTINCT $3)])
+    LogicalProject(exprs=[[$9, $10, $11, $1]])
+      LogicalFilter(condition=[IS NULL($16)])
+        LogicalJoin(condition=[=($1, $16)], joinType=[left])
+          LogicalJoin(condition=[=($6, $0)], joinType=[inner])
+            JdbcTableScan(table=[[public, partsupp]])
+            LogicalFilter(condition=[AND(<>($3, 'Brand#23'), SEARCH($5, Sarg[1, 4, 7]), NOT(LIKE($4, 'MEDIUM POLISHED%')))])
+              JdbcTableScan(table=[[public, part]])
+          LogicalFilter(condition=[LIKE($6, '%Customer%Complaints%')])
+            JdbcTableScan(table=[[public, supplier]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: false
+-----------------------------------------------------
+Query ID: LITHE_17
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_18
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_19
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_20
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_21
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: LITHE_22
+Equivalence without transformations: true

@@ -151,7 +151,7 @@ public class LLM
         if (loaded == null || loaded.isEmpty()) {
             SUPPORTED_TRANSFORMATIONS = List.of();
         } else {
-            SUPPORTED_TRANSFORMATIONS = java.util.List.copyOf(loaded);
+            SUPPORTED_TRANSFORMATIONS = List.copyOf(loaded);
         }
     }
     
