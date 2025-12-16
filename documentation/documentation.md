@@ -112,6 +112,14 @@ All methods are static on `Calcite`.
     8) Aggregate: sort group keys; format/sort calls deterministically; recurse.
     9) Other: emit normalized type plus canonicalized children.
 
+  Recent canonicalization robustness improvements
+  ---------------------------------------------
+  - CHAR literal trimming: fixed-width CHAR padding is ignored when comparing literal values.
+  - SEARCH/SARG normalization: SEARCH expressions are normalized and single-interval SARGs folded to `RANGE(...)`.
+  - Conjunct decomposition and range folding: AND-chains are decomposed, inequalities folded into `RANGE(...)` expressions, then deduped and sorted.
+  - Date + INTERVAL folding: `DATE + INTERVAL_YEAR_MONTH` with a numeric prefix is interpreted as months and folded to concrete DATE literals when safe.
+  - Range grouping key stability: range grouping uses a raw RexNode key, avoiding conflation of distinct input refs normalized to `$x`.
+
 - private static String canonicalizeRex(RexNode node)
   - Input: `RexNode` expression
   - Returns: Normalized string for expression; behavior includes:

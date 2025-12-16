@@ -142,12 +142,18 @@ SELECT p_name, s_phone, ps_supplycost, n_name FROM part RIGHT OUTER JOIN partsup
 -- Query ID: A1
 -- Description: An aggregate query counting line items by ship mode based on date and price conditions.
 -- =================================================================
-Select l_shipmode, count(*) as cnt From orders, lineitem Where
-o_orderkey = l_orderkey and l_commitdate < l_receiptdate and
-l_shipdate < l_commitdate and l_receiptdate >= '1994-01-01' and
-l_receiptdate < '1995-01-01' and l_extendedprice <= o_totalprice
-and l_extendedprice <= 70000 and o_totalprice > 60000 Group By
-l_shipmode Order By l_shipmode;
+Select l_shipmode, count(*) as cnt
+From orders, lineitem
+Where o_orderkey = l_orderkey
+    and l_commitdate < l_receiptdate
+    and l_shipdate < l_commitdate
+    and l_receiptdate >= '1994-01-01'
+    and l_receiptdate < '1995-01-01'
+    and l_extendedprice <= o_totalprice
+    and l_extendedprice <= 70000
+    and o_totalprice > 60000
+Group By l_shipmode
+Order By l_shipmode;
 
 -- =================================================================
 -- Query ID: A2
@@ -193,12 +199,22 @@ Select p_brand, p_type, p_size, Count(*) as supplier_cnt
 -- Description: Combines line items for JUMBO container parts with customers having specific keys.
 -- =================================================================
 (
-	select l_orderkey, l_extendedprice as price, p_partkey from lineitem, part
-	where l_partkey = p_partkey  and p_container LIKE 'JUMBO%' and p_partkey > 3000 and l_partkey < 3010
-	Order by l_orderkey, price desc Limit 100
-) union all (select o_orderkey, c_acctbal as price, c_custkey
-from customer LEFT OUTER JOIN orders on c_custkey = o_custkey
- where c_custkey > 1000 and c_custkey < 1010 Order By price desc, o_orderkey, c_custkey Limit 100);
+	select l_orderkey, l_extendedprice as price, p_partkey
+    from lineitem, part
+	where l_partkey = p_partkey
+        and p_container LIKE 'JUMBO%'
+        and p_partkey > 3000
+        and l_partkey < 3010
+	Order by l_orderkey, price desc
+    Limit 100
+)
+union all
+(   select o_orderkey, c_acctbal as price, c_custkey
+    from customer LEFT OUTER JOIN orders on c_custkey = o_custkey
+    where c_custkey > 1000 and c_custkey < 1010
+    Order By price desc, o_orderkey, c_custkey
+    Limit 100
+);
 
 -- =================================================================
 -- Query ID: MQ1 (TPCH Q1)
@@ -788,7 +804,20 @@ group by c_address;
 -- Query ID: LITHE_1
 -- Description: Standard query Q1 (pricing summary).
 -- =================================================================
-select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty, avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*) as count_order from lineitem where l_shipdate <= date '1998-12-01' - interval '3' day group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus ;
+select l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+    sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    count(*) as count_order
+from lineitem
+where l_shipdate <= date '1998-12-01' - interval '3' day
+group by l_returnflag, l_linestatus
+order by l_returnflag, l_linestatus;
 
 -- =================================================================
 -- Query ID: LITHE_2

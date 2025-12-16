@@ -118,7 +118,13 @@ Failure Handling: Unknown rule names ignored. Exceptions during planning bubble 
 Convenience structural comparisons, optionally treating children as unordered sets.
 
 ### Private / Internal Helpers (Selected)
-- `canonicalizeRex(RexNode)`: strips CASTs, sorts operands for commutative operators, normalizes ordering comparisons into `<`/`<=` forms, treats equals/unequals symmetrically.
+ - `canonicalizeRex(RexNode)`: strips CASTs, sorts operands for commutative operators, normalizes ordering comparisons into `<`/`<=` forms, treats equals/unequals symmetrically.
+   - Recent extensions include:
+      - CHAR literal trimming: treats fixed-width CHAR padding as semantically insignificant.
+      - SEARCH/SARG normalization and single-interval → `RANGE(...)` folding.
+      - Conjunct decomposition and range folding (detect inequality pairs/triples → `RANGE`).
+      - Date + INTERVAL_YEAR_MONTH folding (numeric prefix interpreted as months) to produce concrete DATE literals.
+      - Use of a raw RexNode key for range grouping to avoid conflating different input refs normalized to `$x`.
 - `stripAllCasts(RexNode)`: recursively remove CAST nodes, cloning calls where operand lists change.
 - `collectInnerJoinFactors(...)`: flattens nested inner joins while gathering conditions.
 - `decomposeConj(RexNode, List<String>)`: recursively splits AND-chains into individual conjunct digests.

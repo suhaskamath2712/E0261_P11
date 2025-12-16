@@ -53,6 +53,23 @@ import org.apache.calcite.tools.Planner;
  *   - Structural digest: {@code RelOptUtil.toString(..., DIGEST_ATTRIBUTES)} — order‑sensitive.
  *   - Normalized digest: {@link #normalizeDigest(String)} — replaces input refs like {@code $0}→{@code $x}, collapses spacing.
  *   - Canonical digest: {@link #canonicalDigest(RelNode)} — inner‑join children flattened and sorted; expressions canonicalized; CASTs stripped; aggregates ordered.
+ *
+ *   Additional canonicalization details (recent robustness updates):
+ *   - CHAR literal canonicalization: trailing padding in fixed‑width CHAR literals is trimmed
+ *     so semantically equivalent CHAR constants compare equal regardless of declaration width.
+ *   - SEARCH / SARG normalization: Calcite's SEARCH/SARG textual forms are normalized and
+ *     single‑interval SEARCH expressions are mapped to a compact RANGE(...) form.
+ *   - Conjunct decomposition and range folding: filter AND chains are decomposed into
+ *     individual conjuncts; pairs/triples of inequalities are detected and folded into
+ *     canonical RANGE(...) expressions, then deduplicated and sorted.
+ *   - Date + INTERVAL folding: literal DATE + INTERVAL_YEAR_MONTH expressions with a numeric
+ *     prefix are interpreted as months (e.g., `12 INTERVAL YEAR` → +12 months) and folded to
+ *     concrete date literals when safe.
+ *   - Range grouping key stability: range detection groups predicates using a raw RexNode key
+ *     that preserves distinct input refs (avoids conflating different columns that were
+ *     previously normalized to the same `$x` token).
+ *   - Digest-level AND order normalization: after canonicalization, conjuncts inside textual
+ *     `AND(...)` digests are lexicographically sorted to make order differences benign.
  *   - Tree canonical digest: {@link RelTreeNode#canonicalDigest()} — ignores child order across the tree.
  * - Apply specific {@link org.apache.calcite.rel.rules.CoreRules} by name to a {@link RelNode}
  *   using a registry‑driven approach (`RULE_MAP`) and a composite Hep program to reduce oscillation.
@@ -575,8 +592,25 @@ public class Calcite {
                         if (folded != null) {
                             return normalizeDigest(folded);
                         }
+                        // Also fold DATE +/- INTERVAL DAY expressions when the interval
+                        // is an exact whole number of days.
+                        folded = tryFoldDatePlusOrMinusDayTimeInterval(call, false);
+                        if (folded != null) {
+                            return normalizeDigest(folded);
+                        }
                     }
                     parts.sort(String::compareTo);
+                    return normalizeDigest(kind + "(" + String.join(",", parts) + ")");
+                }
+
+                case MINUS -> {
+                    // Fold DATE - INTERVAL DAY_TIME (when the interval is a whole number
+                    // of days) so expressions like 1998-12-01 - 259200000:INTERVAL DAY
+                    // canonicalize to 1998-11-28.
+                    String folded = tryFoldDatePlusOrMinusDayTimeInterval(call, true);
+                    if (folded != null) {
+                        return normalizeDigest(folded);
+                    }
                     return normalizeDigest(kind + "(" + String.join(",", parts) + ")");
                 }
 
@@ -1006,10 +1040,96 @@ public class Calcite {
             int months = Integer.parseInt(monthsPart);
 
             LocalDate result = base.plusMonths(months);
-            // Represent as a quoted literal to match other DATE literal digests
-            return "'" + result.toString() + "'";
+            // Match Calcite RexLiteral date rendering (typically unquoted: 1998-11-28)
+            return result.toString();
         } catch (Exception e) {
             // Best-effort: if parsing fails, fall back to the generic PLUS handling
+            return null;
+        }
+    }
+
+    /**
+     * Best-effort folding for DATE +/- INTERVAL_DAY_TIME when the interval represents an
+     * exact whole number of days.
+     *
+     * Why: Calcite sometimes represents "DATE - INTERVAL '3' DAY" as
+     * {@code MINUS(1998-12-01, 259200000:INTERVAL DAY)} (milliseconds), while other
+     * queries may simplify to the literal {@code 1998-11-28}. Folding makes these
+     * representations compare equal in canonical digests.
+     *
+     * @param call RexCall of kind PLUS or MINUS
+     * @param isMinus true for DATE - INTERVAL, false for DATE + INTERVAL
+     * @return folded date literal string (e.g., {@code 1998-11-28}) or null if not foldable
+     */
+    private static String tryFoldDatePlusOrMinusDayTimeInterval(RexCall call, boolean isMinus) {
+        if (call == null || call.getOperands().size() != 2) return null;
+        RexNode a = call.getOperands().get(0);
+        RexNode b = call.getOperands().get(1);
+
+        RexLiteral dateLit = null;
+        RexLiteral intervalLit = null;
+
+        if (isMinus) {
+            // Be conservative: only fold DATE - INTERVAL patterns where DATE is the left operand.
+            if (a instanceof RexLiteral litA && isDateLiteral(litA)) {
+                dateLit = litA;
+            } else {
+                return null;
+            }
+            if (b instanceof RexLiteral litB && isDayTimeIntervalLiteral(litB)) {
+                intervalLit = litB;
+            } else {
+                return null;
+            }
+        } else {
+            // PLUS is commutative: accept either order.
+            if (a instanceof RexLiteral litA && isDateLiteral(litA)) {
+                dateLit = litA;
+            }
+            if (b instanceof RexLiteral litB && isDateLiteral(litB)) {
+                if (dateLit != null) return null;
+                dateLit = litB;
+            }
+            if (a instanceof RexLiteral litAInt && isDayTimeIntervalLiteral(litAInt)) {
+                intervalLit = litAInt;
+            }
+            if (b instanceof RexLiteral litBInt && isDayTimeIntervalLiteral(litBInt)) {
+                if (intervalLit != null) return null;
+                intervalLit = litBInt;
+            }
+            if (dateLit == null || intervalLit == null) return null;
+        }
+
+        try {
+            String dateText = normalizeCharLiteralText(dateLit.toString());
+            dateText = stripSurroundingQuotes(dateText);
+            if (dateText == null || dateText.isEmpty()) return null;
+            LocalDate base = LocalDate.parse(dateText);
+
+            // Calcite encodes INTERVAL_DAY_TIME as a numeric prefix representing total millis.
+            // Example: 259200000:INTERVAL DAY  (3 * 86400000)
+            String intervalText = intervalLit.toString();
+            int colon = intervalText.indexOf(':');
+            if (colon <= 0) return null;
+            String millisPart = intervalText.substring(0, colon).trim();
+            if (millisPart.isEmpty()) return null;
+            long millis = Long.parseLong(millisPart);
+
+            final long MILLIS_PER_DAY = 24L * 60L * 60L * 1000L;
+            if (millis % MILLIS_PER_DAY != 0L) {
+                // Not a whole number of days; folding could change type/semantics.
+                return null;
+            }
+            long days = millis / MILLIS_PER_DAY;
+
+            LocalDate result;
+            if (isMinus) {
+                result = base.minusDays(days);
+            } else {
+                result = base.plusDays(days);
+            }
+            return result.toString();
+        } catch (Exception e) {
             return null;
         }
     }
@@ -1026,6 +1146,12 @@ public class Calcite {
         // which covers textual forms like "12:INTERVAL YEAR" in Calcite's
         // RexLiteral rendering.
         return typeName.getFamily() == SqlTypeFamily.INTERVAL_YEAR_MONTH;
+    }
+
+    private static boolean isDayTimeIntervalLiteral(RexLiteral lit) {
+        if (lit == null || lit.getType() == null || lit.getType().getSqlTypeName() == null) return false;
+        SqlTypeName typeName = lit.getType().getSqlTypeName();
+        return typeName.getFamily() == SqlTypeFamily.INTERVAL_DAY_TIME;
     }
 
     // Helper: collect factors and conditions from a nested INNER join tree

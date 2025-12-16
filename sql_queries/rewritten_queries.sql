@@ -98,7 +98,18 @@ SELECT p_name, s_phone, ps_supplycost, n_name FROM part RIGHT OUTER JOIN partsup
 -- Query ID: A1 (Rewritten)
 -- Description: An aggregate query counting line items by ship mode based on date and price conditions.
 -- =================================================================
-SELECT l_shipmode, COUNT(*) AS cnt FROM lineitem JOIN orders ON o_orderkey = l_orderkey WHERE l_commitdate < l_receiptdate AND l_shipdate < l_commitdate AND l_receiptdate >= '1994-01-01' AND l_receiptdate < '1995-01-01' AND l_extendedprice <= LEAST(o_totalprice, 70000) AND o_totalprice > 60000 GROUP BY l_shipmode ORDER BY l_shipmode;
+SELECT l_shipmode, COUNT(*) AS cnt
+FROM lineitem JOIN orders
+ON o_orderkey = l_orderkey
+WHERE l_commitdate < l_receiptdate
+    AND l_shipdate < l_commitdate
+    AND l_receiptdate >= '1994-01-01' 
+    AND l_receiptdate < '1995-01-01' 
+    -- CAUGHT: If o_totalprice is NULL, LEAST returns NULL, so the condition fails
+    AND l_extendedprice <= LEAST(o_totalprice, 70000)
+    AND o_totalprice > 60000 
+GROUP BY l_shipmode
+ORDER BY l_shipmode;
 
 -- =================================================================
 -- Query ID: A2 (Rewritten)
@@ -356,7 +367,20 @@ select c_address as city from customer, orders, lineitem, part, partsupp where c
 -- Query ID: LITHE_1
 -- Description: Standard query Q1 (pricing summary).
 -- =================================================================
-SELECT l_returnflag, l_linestatus, SUM(l_quantity) AS sum_qty, SUM(l_extendedprice) AS sum_base_price, SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price, SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge, AVG(l_quantity) AS avg_qty, AVG(l_extendedprice) AS avg_price, AVG(l_discount) AS avg_disc, COUNT(*) AS count_order FROM lineitem WHERE l_shipdate < '1998-11-29' GROUP BY l_returnflag, l_linestatus ORDER BY l_returnflag, l_linestatus;
+SELECT l_returnflag,
+    l_linestatus,
+    SUM(l_quantity) AS sum_qty,
+    SUM(l_extendedprice) AS sum_base_price,
+    SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price,
+    SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+    AVG(l_quantity) AS avg_qty,
+    AVG(l_extendedprice) AS avg_price,
+    AVG(l_discount) AS avg_disc,
+    COUNT(*) AS count_order
+FROM lineitem
+WHERE l_shipdate <= '1998-11-28'
+GROUP BY l_returnflag, l_linestatus
+ORDER BY l_returnflag, l_linestatus;
 
 -- =================================================================
 -- Query ID: LITHE_2

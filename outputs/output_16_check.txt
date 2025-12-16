@@ -1,0 +1,40 @@
+-----------------------------------------------------
+Query ID: LITHE_1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_3
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_5
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_9
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+Equivalence with transformations: false
+LLM Equivalence 1 (B to A): true
+LLM Transformations 1 (B to A): []
+Equivalence with transformations: false
+LLM Equivalence 2 (B to A): true
+LLM Transformations 2 (B to A): []
+Equivalence with transformations (B to A): false
+Equivalence with transformations: false
+-----------------------------------------------------
+Query ID: LITHE_15
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_16
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_20
+Equivalence without transformations: false
+LLM Equivalence 1: false

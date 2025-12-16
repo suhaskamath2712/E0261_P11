@@ -53,13 +53,10 @@ public class Test
     */
 
     private static final List<String> queryIDList = List.of(
-        "LITHE_3"
+        "LITHE_1"
     );
 
-    //Rewritten queries: ETPCH_Q7, ETPCH_Q9, ETPCH_Q23, LITHE_9
-    // gives expected answer, but gives some error also
-
-    //Mutated queries: MQ11, ETPCH_Q9
+    //A1, F1 are not equivalent in reality
 
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the

@@ -38,6 +38,13 @@ import com.openai.models.responses.ResponseCreateParams;
  */
 public class LLM
 {
+    /**
+     * Default model used if no configuration is provided.
+     *
+     * Config key: {@code llm_model} in {@code config.properties}.
+     */
+    private static final String DEFAULT_LLM_MODEL = "gpt-5";
+
     private static final String PROMPT_1 = """
             System Message:
             You are an expert in relational query optimization and Apache Calcite transformations.
@@ -200,9 +207,11 @@ public class LLM
 
         // Contact the OpenAI Responses API using env configuration
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
+        String model = getConfiguredModel();
+
         ResponseCreateParams params = ResponseCreateParams.builder()
             .input(prompt)
-            .model("gpt-5")
+            .model(model)
             .build();
 
         Response resp = client.responses().create(params);
@@ -263,9 +272,11 @@ public class LLM
 
         // Contact the OpenAI Responses API using env configuration
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
+        String model = getConfiguredModel();
+
         ResponseCreateParams params = ResponseCreateParams.builder()
             .input(prompt)
-            .model("gpt-5")
+            .model(model)
             .build();
 
         Response resp = client.responses().create(params);
@@ -286,6 +297,19 @@ public class LLM
         //System.out.println("LLM Assistant Text: " + contentText);
 
         return contentText.trim();
+    }
+
+    /**
+     * Reads the configured LLM model from {@code config.properties}.
+     *
+     * Uses {@link FileIO#getProperty(String, String)} so model selection can be changed without
+     * recompiling. Falls back to {@link #DEFAULT_LLM_MODEL} if missing/blank.
+     */
+    private static String getConfiguredModel() {
+        String v = FileIO.getProperty("llm_model", DEFAULT_LLM_MODEL);
+        if (v == null) return DEFAULT_LLM_MODEL;
+        v = v.trim();
+        return v.isEmpty() ? DEFAULT_LLM_MODEL : v;
     }
 
     public static LLMResponse getLLMResponse(String sqlA, String sqlB)

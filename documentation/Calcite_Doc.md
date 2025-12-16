@@ -27,6 +27,20 @@ This document describes how the codebase uses Apache Calcite to parse, validate,
 - `GetQueryPlans.getCleanedQueryPlanJSONasString(sql)`: Runs EXPLAIN (FORMAT JSON, BUFFERS); lifts the root `Plan` node and strips executor‑specific keys; returns pretty‑printed JSON.
 ## Equivalence Normalization
 
+Recent robustness additions (canonicalization improvements):
+
+- CHAR literal canonicalization: trims trailing padding in fixed-width CHAR literals so
+  semantically-equal constants compare equal despite declaration width.
+- SEARCH/SARG normalization: normalizes Calcite SEARCH/SARG text and maps single-interval
+  SEARCH expressions to a canonical RANGE(...) representation.
+- Conjunct decomposition & range folding: decomposes AND chains, detects inequality
+  ranges and folds them into RANGE(...), then deduplicates and sorts conjuncts.
+- Date + INTERVAL folding: folds DATE + INTERVAL_YEAR_MONTH (numeric prefix interpreted
+  as months) into concrete DATE literals where safe.
+- Range grouping key stability: grouping for range detection uses a raw RexNode key to
+  avoid conflating different input refs that were otherwise normalized to `$x`.
+
+
 Comparison proceeds in layers:
 1. Structural digest: order‑sensitive structure.
 2. Normalized digest: collapses input refs (`$0`, `$12` → `$x`) and spacing.

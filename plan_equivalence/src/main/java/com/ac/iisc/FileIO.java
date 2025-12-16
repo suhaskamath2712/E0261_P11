@@ -15,6 +15,9 @@
  *    from the original_query_plans directory.
  *  - readRewrittenQueryPlan(String): Same for rewritten_query_plans.
  *  - readMutatedQueryPlan(String): Same for mutated_query_plans.
+ * - readSchemaSummary(): Load a JSON schema summary (e.g., `tpch_schema_summary.json`) used
+ *   by canonicalization code to obtain table primary/foreign key metadata for conservative
+ *   schema-aware transformations and checks.
  *
  *  Conventions
  *  -----------
