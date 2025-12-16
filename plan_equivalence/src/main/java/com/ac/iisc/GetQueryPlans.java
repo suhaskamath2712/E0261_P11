@@ -94,7 +94,7 @@ public class GetQueryPlans {
     * Execute an EXPLAIN (FORMAT JSON, BUFFERS) against the provided SQL statement.
      *
      * Responsibilities:
-     *  - Prefix the SQL with the EXPLAIN options (FORMAT JSON, ANALYZE, BUFFERS).
+        *  - Prefix the SQL with the EXPLAIN options used by this project (FORMAT JSON, BUFFERS).
      *  - Use a PreparedStatement for safe execution (no manual string concatenation of params).
      *  - Return the first column of the first row as a parsed {@link JSONArray}.
      *
@@ -115,8 +115,9 @@ public class GetQueryPlans {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     // The first column contains the JSON array as text; parse via org.json.
-                    // Note: EXPLAIN ... ANALYZE actually executes the query. Be mindful
-                    // when running this across many or heavy queries (it will run them).
+                    // Note: This project does NOT use EXPLAIN ANALYZE by default.
+                    // If you enable ANALYZE, it will execute the query; be mindful
+                    // when running this across many or heavy queries.
                     String json = rs.getString(1);
                     return new JSONArray(json);
                 }
@@ -276,7 +277,7 @@ public class GetQueryPlans {
      *  2. Retrieves the nested Plan JSONObject.
      *  3. Invokes {@link #cleanPlanTree(Object)} to strip execution metrics and lift the plan tree.
      *
-     * @param raw JSONArray returned directly by EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS).
+    * @param raw JSONArray returned directly by EXPLAIN (FORMAT JSON, BUFFERS).
      * @return Cleaned root plan node or null if structure is unexpected.
      */
     private static JSONObject extractAndClean(JSONArray raw) {

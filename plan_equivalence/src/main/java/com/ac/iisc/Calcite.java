@@ -56,6 +56,8 @@ import org.json.JSONObject;
  *   - Structural digest: {@code RelOptUtil.toString(..., DIGEST_ATTRIBUTES)} — order‑sensitive.
  *   - Normalized digest: {@link #normalizeDigest(String)} — replaces input refs like {@code $0}→{@code $x}, collapses spacing.
  *   - Canonical digest: {@link #canonicalDigest(RelNode)} — inner‑join children flattened and sorted; expressions canonicalized; CASTs stripped; aggregates ordered.
+ *   - Canonical-digest AND normalization: {@link #normalizeAndOrderingInDigest(String)} — safety net to make textual AND term order benign.
+ *   - Optional fallback: PostgreSQL EXPLAIN JSON equality (see {@link #convertRelNodetoJSONQueryPlan(RelNode)}).
  *
  *   Additional canonicalization details (recent robustness updates):
  *   - CHAR literal canonicalization: trailing padding in fixed‑width CHAR literals is trimmed
@@ -73,7 +75,9 @@ import org.json.JSONObject;
  *     previously normalized to the same `$x` token).
  *   - Digest-level AND order normalization: after canonicalization, conjuncts inside textual
  *     `AND(...)` digests are lexicographically sorted to make order differences benign.
- *   - Tree canonical digest: {@link RelTreeNode#canonicalDigest()} — ignores child order across the tree.
+ *
+ * Debug helpers (not part of the equivalence ladder by default):
+ * - Tree canonical digest: {@link RelTreeNode#canonicalDigest()} — ignores child order across the tree.
  * - Apply specific {@link org.apache.calcite.rel.rules.CoreRules} by name to a {@link RelNode}
  *   using a registry‑driven approach (`RULE_MAP`) and a composite Hep program to reduce oscillation.
  * - Normalize scalar subqueries (convert to correlates) and decorrelate to join+aggregate forms where possible, symmetrically for both sides.
@@ -305,8 +309,9 @@ public class Calcite {
     * 3. If still different, compare a canonical digest where inner-join children are treated as
     *    an unordered set (child digests sorted), commutative/symmetric expressions are normalized,
     *    and harmless CASTs are ignored. Projection order is preserved.
-    * 4. If still different, compare tree structure ignoring child order.
-    * 5. Final fallback: object equality or deepEquals (rarely helpful).
+    * 4. If still different, compare a canonical digest with additional AND-term ordering
+    *    normalization at the string level (safety net).
+    * 5. Final fallback: compare cleaned PostgreSQL EXPLAIN JSON plans (best-effort).
      *
      * @param sql1 First query string
      * @param sql2 Second query string
@@ -475,7 +480,8 @@ public class Calcite {
     * 4) For INNER Join: flatten nested inner joins, sort child digests, split/normalize/deduplicate/sort conjuncts, then build an order-insensitive join string.
     * 5) For non-INNER Join: keep left/right order and include normalized condition.
     * 6) For Union: flatten matching ALL/DISTINCT unions, sort child digests, build a stable representation.
-    * 7) For Sort: ignore sort keys; include fetch/offset presence; then recurse.
+    * 7) For Sort: ignore sort keys unless FETCH/OFFSET is present (Top-N), in which case
+    *    include the sort collation (field indexes + direction/null direction); then recurse.
     * 8) For Aggregate: sort group keys; format/sort aggregate calls deterministically; then recurse.
     * 9) For other nodes: emit normalized type plus canonicalized children.
     * 10) Expressions are canonicalized by stripping CASTs, sorting operands for commutative ops, making equality symmetric, normalizing inequality orientation, and replacing input refs with placeholders.
@@ -618,7 +624,7 @@ public class Calcite {
             path.remove(rel);
             return result;
         }
-        // Sort/Limit: ignore sort keys, keep fetch/offset presence
+        // Sort/Limit: ignore ordering unless FETCH/OFFSET is present (Top-N); then include collation
         if (rel instanceof LogicalSort s) {
             // ORDER BY is only semantically relevant when paired with LIMIT/OFFSET.
             // For Top-N queries, the sort keys and directions determine which rows

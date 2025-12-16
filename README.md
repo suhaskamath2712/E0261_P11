@@ -2,69 +2,83 @@
 
 # E0261_P11 — Plan Equivalence Helper
 
-Tools to parse, normalize, and compare SQL query plans using Apache Calcite, and to retrieve cleaned PostgreSQL EXPLAIN plans.
+Parse, normalize, and compare SQL query plans using Apache Calcite, with an optional PostgreSQL EXPLAIN JSON fallback.
 
 </div>
 
-## Table of Contents
-- Overview
-- Features
-- Architecture
-- Quick Start
-- Usage
-- Configuration
-- Documentation
-- Contributing
-- License
-- Deprecation Note
+## What this repo does
 
-## Overview
-This project detects semantic equivalence between an original SQL query and its rewritten or mutated variants. It is tolerant to harmless syntactic or planner differences (CASTs, commutativity, inner‑join child order, etc.).
+Given two SQL queries (typically **original** vs **rewritten**/**mutated**), this project tries to decide whether they are equivalent under a set of conservative normalizations.
 
-## Features
-- Parse SQL into Calcite `RelNode` plans and optionally run planner rules.
-- Layered comparison strategy: structural → normalized → canonical → tree‑canonical.
-- Normalizations include:
-  - Recursive CAST stripping.
-  - Commutative/symmetric expression canonicalization (AND/OR/EQUALS).
-  - Inequality orientation normalization (prefer `<`/`<=`).
-  - UNION flattening with sorted children where safe.
-  - Sort abstraction (ignore sort keys; preserve `fetch`/`offset`).
-- Cleaned PostgreSQL EXPLAIN (FORMAT JSON, BUFFERS) output with executor‑specific fields removed.
-- Optional schema introspection dump (schemas, tables, columns, types).
+It aims to reduce **false negatives** from harmless planner/representation differences (join commutativity, CAST noise, predicate order, etc.), while being careful about **false positives**.
 
-## Architecture
-- `plan_equivalence/src/main/java/com/ac/iisc/`
-  - `Calcite.java` — Core parsing, optimization, canonicalization, and comparison utilities. Public API entry point for building planners, optimizing queries, and running equivalence checks.
-  - `CalciteUtil.java` — Shared Calcite utilities that are not directly tied to comparison logic (framework configuration, LEAST/GREATEST SQL rewrites, JSON plan → RelNode mapping, and small debug helpers).
-  - `FileIO.java` — SQL and plan file read/write helpers.
-  - `GetQueryPlans.java` — Capture EXPLAIN JSON and clean it for comparison.
-  - `LLM.java` / `LLMResponse.java` — Optional LLM integration helpers.
-  - `RelTreeNode.java` — Canonical tree digests for order‑insensitive comparisons.
-  - `Test.java` — Batch driver to compare queries and print diagnostics.
-- `sql_queries/`, `original_query_plans/`, `mutated_query_plans/` — SQL queries.
+## How equivalence is decided
 
-## Usage
-- Compare queries programmatically: use `Calcite.compareQueries(String a, String b, List<String> transformations)`.
-- Print layered diagnostics: use `Calcite.compareQueriesDebug(...)`.
-- Obtain cleaned EXPLAIN JSON: `GetQueryPlans.getCleanedQueryPlanJSONasString(sql)`.
-- Print database schema:
-```java
-String schema = GetQueryPlans.getDatabaseSchema();
-System.out.println(schema);
-```
+The core logic lives in `plan_equivalence/src/main/java/com/ac/iisc/Calcite.java`.
+
+High-level flow:
+
+1. Parse + validate SQL with Calcite against a PostgreSQL-backed schema (`CalciteUtil.getFrameworkConfig()`).
+2. Normalize each query’s logical plan using a small phased HepPlanner program (`getOptimizedRelNode`).
+3. (Optional) Apply a caller-supplied list of transformation rules to the *left* plan (`applyTransformations`).
+4. Normalize scalar subqueries by converting them to correlates and attempting decorrelation (`normalizeSubqueriesAndDecorrelate`) on **both** sides.
+5. Compare in layers (stop at the first match):
+   - **Structural digest**: `RelOptUtil.toString(rel, DIGEST_ATTRIBUTES)`
+   - **Normalized digest**: input refs like `$0`, `$12` are rewritten to `$x` (`normalizeDigest`)
+   - **Canonical digest**: inner joins flattened/sorted, predicates canonicalized, CASTs stripped, aggregates normalized, etc. (`canonicalDigest`)
+   - **Canonical digest + AND safety-net**: lexicographically sorts textual `AND(...)` term lists (`normalizeAndOrderingInDigest`)
+   - **Optional EXPLAIN fallback**: generate SQL via `RelToSqlConverter`, run `EXPLAIN (FORMAT JSON, BUFFERS)`, clean non-semantic keys, and compare the cleaned JSON.
+
+### Canonicalization highlights
+
+`canonicalDigest(RelNode)` is where most robustness lives:
+
+- **INNER join commutativity**: nested INNER joins are flattened; child digests are sorted.
+- **Predicate normalization**:
+  - AND chains are decomposed, canonicalized, deduped, sorted.
+  - SEARCH/SARG expressions are normalized; some single-interval cases fold into a `RANGE(...)` form.
+  - Inequality pairs can fold into `RANGE(expr, lower, upper)`.
+- **Literal normalization**: trims trailing padding in CHAR literals.
+- **Date arithmetic folding**:
+  - DATE + INTERVAL_YEAR_MONTH (numeric prefix treated as months) folded when safe.
+  - DATE ± INTERVAL_DAY_TIME folded when the interval is a whole number of days.
+- **Top-N sort semantics**:
+  - `ORDER BY` is ignored *unless* there is `FETCH`/`OFFSET` (Top‑N). For Top‑N, sort collation (field index + direction/null direction) is included.
+
+## Project layout
+
+`plan_equivalence/src/main/java/com/ac/iisc/`
+
+- `Calcite.java` — equivalence engine, canonicalization, EXPLAIN fallback.
+- `CalciteUtil.java` — framework configuration and SQL pre-rewrites (LEAST/GREATEST, GROUP BY alias expansion), plus JSON-plan→RelNode structural mapping.
+- `GetQueryPlans.java` — runs `EXPLAIN (FORMAT JSON, BUFFERS)` and removes execution-only keys while preserving semantic fields.
+- `FileIO.java` — reads SQL blocks by Query ID from consolidated `.sql` files; reads config and schema summary.
+- `LLM.java` / `LLMResponse.java` — optional LLM integration.
+- `RelTreeNode.java` — tree representation used for debugging (not part of the equivalence ladder by default).
+- `Test.java` — ad-hoc runner.
 
 ## Configuration
-- Runtime configuration: edit `src/main/resources/config.properties` to change database connection details, SQL file paths, and other runtime parameters. The project reads these values at runtime via the `com.ac.iisc.FileIO` helper; you do not need to modify Java sources to change connection settings.
-- Supported transformations (machine-readable): canonical transformation names are listed (one per line) in `src/main/resources/transformation_list.txt`. This file is consumed at runtime by `LLM`/helpers and should contain exact, canonical rule names when used programmatically.
-- Planner reuse: planners are recreated per query for reliability.
 
-## Documentation
-- Conceptual overview and normalization details: `documentation/Calcite_Doc.md`.
-- API and behavior reference: `documentation/code_reference.md`.
-- Project notes and per‑class documentation: `documentation/documentation.md`.
+Runtime configuration is read via `FileIO` from `plan_equivalence/src/main/resources/config.properties`.
 
-### Plan Cleaning Notes (GetQueryPlans)
-- Removes executor‑specific fields from EXPLAIN JSON (timings, buffers, worker details, costing/width estimates, sort/hash internals, scan/index minutiae, planner bookkeeping). See `KEYS_TO_REMOVE` in `GetQueryPlans.java`.
-- Optional genericization helper `removeImplementationDetails(JSONObject)`: maps executor‑specific node types (`Hash Join`→`Join`, `Seq Scan`→`Scan`) and renames fields (`Hash Cond`→`Join Condition`, `Relation Name`→`Relation`, `Index Name`→`Index`). Not enabled by default.
+Common keys:
+
+- `pg_url`, `pg_user`, `pg_password`, `pg_schema`
+- `original_sql_path`, `rewritten_sql_path`, `mutated_sql_path`
+- `schema_summary_resource` (path to `tpch_schema_summary.json`)
+- `llm_model` (model name used by `LLM`; default is `gpt-5`)
+- `transformation_list_path` (optional override path for `transformation_list.txt`)
+
+## Optional: LLM integration
+
+`com.ac.iisc.LLM` is used only when you explicitly call it from the harness.
+
+- Requires `OPENAI_API_KEY` to be set in the environment.
+- Model is configured via `llm_model` in `config.properties`.
+
+## Docs
+
+- `documentation/Calcite_Doc.md` — design notes and normalization details.
+- `documentation/code_reference.md` — class-by-class reference.
+- `documentation/documentation.md` — project-level notes and configuration.
 

@@ -33,9 +33,9 @@ import org.postgresql.ds.PGSimpleDataSource;
  */
 public final class CalciteUtil {
 
-    // --- 1. PostgreSQL Connection Configuration (UPDATE THESE) ---
-    // Driver and JDBC settings for connecting Calcite's JdbcSchema to PostgreSQL.
-    // These are used only to expose the Postgres catalog (tables/columns) to Calcite's planner.
+    // --- PostgreSQL Connection Configuration ---
+    // These values are sourced from `config.properties` via FileIO.
+    // They are used only to expose the Postgres catalog (tables/columns) to Calcite's planner.
     private static final String PG_DRIVER = "org.postgresql.Driver";
     private static final String PG_URL = FileIO.getPgUrl(); 
     private static final String PG_USER = FileIO.getPgUser();
