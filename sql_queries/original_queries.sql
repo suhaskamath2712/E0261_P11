@@ -829,7 +829,18 @@ select s_acctbal, s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comme
 -- Query ID: LITHE_3
 -- Description: Standard query Q3 (shipping priority revenue).
 -- =================================================================
-select l_orderkey, sum(l_extendedprice * (1 - l_discount)) as revenue, o_orderdate, o_shippriority from customer, orders, lineitem where c_mktsegment = 'FURNITURE' and c_custkey = o_custkey and l_orderkey = o_orderkey and o_orderdate < date '1995-01-01' and l_shipdate > date '1995-01-01' group by l_orderkey, o_orderdate, o_shippriority order by revenue desc, o_orderdate ;
+select l_orderkey,
+    sum(l_extendedprice * (1 - l_discount)) as revenue,
+    o_orderdate,
+    o_shippriority
+from customer, orders, lineitem
+where c_mktsegment = 'FURNITURE'
+    and c_custkey = o_custkey
+    and l_orderkey = o_orderkey
+    and o_orderdate < date '1995-01-01'
+    and l_shipdate > date '1995-01-01'
+group by l_orderkey, o_orderdate, o_shippriority
+order by revenue desc, o_orderdate ;
 
 -- =================================================================
 -- Query ID: LITHE_4
@@ -841,7 +852,20 @@ select o_orderpriority, count(*) as order_count from orders where o_orderdate >=
 -- Query ID: LITHE_5
 -- Description: Standard query Q5 (local supplier volume-like).
 -- =================================================================
-select n_name, sum(l_extendedprice * (1 - l_discount)) as revenue from customer, orders, lineitem, supplier, nation, region where c_custkey = o_custkey and l_orderkey = o_orderkey and l_suppkey = s_suppkey and c_nationkey = s_nationkey and s_nationkey = n_nationkey and n_regionkey = r_regionkey and r_name = 'ASIA' and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + INTERVAL '1' YEAR group by n_name order by revenue desc ;
+select n_name,
+    sum(l_extendedprice * (1 - l_discount)) as revenue
+from customer, orders, lineitem, supplier, nation, region
+where c_custkey = o_custkey
+    and l_orderkey = o_orderkey
+    and l_suppkey = s_suppkey
+    and c_nationkey = s_nationkey
+    and s_nationkey = n_nationkey
+    and n_regionkey = r_regionkey
+    and r_name = 'ASIA'
+    and o_orderdate >= date '1995-01-01'
+    and o_orderdate < date '1995-01-01' + INTERVAL '1' YEAR
+group by n_name
+order by revenue desc ;
 
 -- =================================================================
 -- Query ID: LITHE_6
@@ -865,7 +889,23 @@ select o_year, sum(case when nation = 'INDIA' then volume else 0 end) / sum(volu
 -- Query ID: LITHE_9
 -- Description: Standard query Q9 (profit by nation and year).
 -- =================================================================
-select nation, o_year, sum(amount) as sum_profit from ( select n_name as nation, p_name, extract(year from o_orderdate) as o_year, l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount from part, supplier, lineitem, partsupp, orders, nation where s_suppkey = l_suppkey and ps_suppkey = l_suppkey and ps_partkey = l_partkey and p_partkey = l_partkey and o_orderkey = l_orderkey and s_nationkey = n_nationkey and p_name like 'co%' ) as profit group by nation, o_year order by nation, o_year desc ;
+select nation, o_year, sum(amount) as sum_profit
+from (
+    select n_name as nation,
+        p_name,
+        extract(year from o_orderdate) as o_year,
+        l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
+    from part, supplier, lineitem, partsupp, orders, nation
+    where s_suppkey = l_suppkey
+        and ps_suppkey = l_suppkey 
+        and ps_partkey = l_partkey 
+        and p_partkey = l_partkey 
+        and o_orderkey = l_orderkey 
+        and s_nationkey = n_nationkey 
+        and p_name like 'co%' )
+as profit
+group by nation, o_year 
+order by nation, o_year desc ;
 
 -- =================================================================
 -- Query ID: LITHE_10

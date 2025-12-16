@@ -392,7 +392,26 @@ WITH min_supplycost AS ( SELECT ps_partkey, MIN(ps_supplycost) AS min_cost FROM 
 -- Query ID: LITHE_3
 -- Description: Standard query Q3 (shipping priority revenue).
 -- =================================================================
-with customer_orders_cte as ( select o_orderkey, o_orderdate, o_shippriority from customer, orders where c_mktsegment = 'FURNITURE' and c_custkey = o_custkey and o_orderdate < date '1995-01-01' ), lineitem_revenue_cte as ( select l_orderkey, sum(l_extendedprice * (1 - l_discount)) as revenue from lineitem where l_shipdate > date '1995-01-01' group by l_orderkey ) select co.o_orderkey, lr.revenue, co.o_orderdate, co.o_shippriority from customer_orders_cte co join lineitem_revenue_cte lr on co.o_orderkey = lr.l_orderkey order by lr.revenue desc, co.o_orderdate;
+with customer_orders_cte as 
+    (select o_orderkey,
+        o_orderdate,
+        o_shippriority
+    from customer, orders
+    where c_mktsegment = 'FURNITURE'
+        and c_custkey = o_custkey
+        and o_orderdate < date '1995-01-01'
+    ),
+    lineitem_revenue_cte as
+    (select l_orderkey,
+        sum(l_extendedprice * (1 - l_discount)) as revenue
+        from lineitem
+        where l_shipdate > date '1995-01-01'
+        group by l_orderkey
+    )
+select co.o_orderkey, lr.revenue, co.o_orderdate, co.o_shippriority
+from customer_orders_cte co join lineitem_revenue_cte lr
+on co.o_orderkey = lr.l_orderkey
+order by lr.revenue desc, co.o_orderdate;
 
 -- =================================================================
 -- Query ID: LITHE_4
@@ -404,7 +423,23 @@ select o_orderpriority, count(*) as order_count from orders where o_orderdate >=
 -- Query ID: LITHE_5
 -- Description: Standard query Q5 (local supplier volume-like).
 -- =================================================================
-with filtered_orders as ( select * from orders where o_orderkey in ( select l_orderkey from lineitem ) ) select n_name, sum(l_extendedprice * (1 - l_discount)) as revenue from customer, filtered_orders as orders, lineitem, supplier, nation, region where c_custkey = o_custkey and l_orderkey = o_orderkey and l_suppkey = s_suppkey and c_nationkey = s_nationkey and s_nationkey = n_nationkey and n_regionkey = r_regionkey and r_name = 'ASIA' and o_orderdate >= date '1995-01-01' and o_orderdate < date '1995-01-01' + INTERVAL '1' YEAR group by n_name order by revenue desc;
+with filtered_orders as
+    (select * from orders where o_orderkey in
+        (select l_orderkey from lineitem))
+select n_name,
+    sum(l_extendedprice * (1 - l_discount)) as revenue
+from customer, filtered_orders as orders, lineitem, supplier, nation, region
+where c_custkey = o_custkey
+    and l_orderkey = o_orderkey
+    and l_suppkey = s_suppkey 
+    and c_nationkey = s_nationkey 
+    and s_nationkey = n_nationkey 
+    and n_regionkey = r_regionkey 
+    and r_name = 'ASIA' 
+    and o_orderdate >= date '1995-01-01' 
+    and o_orderdate < date '1995-01-01' + INTERVAL '1' YEAR 
+group by n_name
+order by revenue desc;
 
 -- =================================================================
 -- Query ID: LITHE_6
@@ -428,7 +463,17 @@ select o_year, sum(case when nation = 'INDIA' then volume else 0 end) / sum(volu
 -- Query ID: LITHE_9
 -- Description: Standard query Q9 (profit by nation and year).
 -- =================================================================
-SELECT n_name AS nation, EXTRACT(YEAR FROM o_orderdate) AS o_year, SUM(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS sum_profit FROM part JOIN partsupp ON p_partkey = ps_partkey JOIN lineitem ON l_partkey = p_partkey AND l_suppkey = ps_suppkey JOIN supplier ON s_suppkey = l_suppkey JOIN orders ON o_orderkey = l_orderkey JOIN nation ON s_nationkey = n_nationkey WHERE p_name LIKE 'co%' GROUP BY n_name, o_year ORDER BY n_name, o_year DESC;
+SELECT n_name AS nation,
+    EXTRACT(YEAR FROM o_orderdate) AS o_year,
+    SUM(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity) AS sum_profit
+    FROM part JOIN partsupp ON p_partkey = ps_partkey
+    JOIN lineitem ON l_partkey = p_partkey AND l_suppkey = ps_suppkey
+    JOIN supplier ON s_suppkey = l_suppkey
+    JOIN orders ON o_orderkey = l_orderkey
+    JOIN nation ON s_nationkey = n_nationkey
+    WHERE p_name LIKE 'co%'
+GROUP BY n_name, o_year
+ORDER BY n_name, o_year DESC;
 
 -- =================================================================
 -- Query ID: LITHE_10

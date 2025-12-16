@@ -205,6 +205,8 @@ public class LLM
 
         String prompt = sb.toString();
 
+        //System.out.println("Prompt sent to LLM: \n" + prompt);
+
         // Contact the OpenAI Responses API using env configuration
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
         String model = getConfiguredModel();

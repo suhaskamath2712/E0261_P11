@@ -114,6 +114,156 @@ public final class CalciteUtil {
     }
 
     /**
+     * Rewrite queries that use SELECT-list aliases in a top-level GROUP BY.
+     *
+     * Why: PostgreSQL allows grouping by a SELECT alias in some cases, but Calcite
+     * validation frequently treats the alias as a column reference and fails with
+     * errors like: "Column 'o_year' not found in any table".
+     *
+     * What we do (conservative):
+     * - Only operates at the outermost query level (nesting level 0).
+     * - Only considers SELECT items of the form: <expr> AS <alias>
+     * - Only rewrites the outermost GROUP BY clause by replacing occurrences of
+     *   <alias> with the captured <expr> using word-boundary matching.
+     * - Skips aliases with non-identifier names or expressions that look unsafe
+     *   (e.g., contain top-level commas).
+     *
+     * This is intended as a small compatibility shim for benchmark SQL.
+     */
+    public static String rewriteGroupByAliases(String sql) {
+        if (sql == null) return null;
+        String s = sql;
+
+        // Find top-level SELECT ... FROM ...
+        int sel = indexOfTopLevelKeyword(s, "SELECT", 0);
+        if (sel < 0) return s;
+        int from = indexOfTopLevelKeyword(s, "FROM", sel + 6);
+        if (from < 0) return s;
+
+        String selectList = s.substring(sel + 6, from);
+        // Build alias -> expr mapping from select list.
+        java.util.Map<String, String> aliasToExpr = new java.util.LinkedHashMap<>();
+        for (String item : splitTopLevelCommaSeparated(selectList)) {
+            String it = item.trim();
+            if (it.isEmpty()) continue;
+
+            // Match "<expr> AS <alias>" (case-insensitive for AS)
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?is)^(.*?)(?:\\s+)AS(?:\\s+)([A-Za-z_][A-Za-z0-9_]*)\\s*$")
+                    .matcher(it);
+            if (!m.find()) continue;
+
+            String expr = m.group(1).trim();
+            String alias = m.group(2).trim();
+            if (expr.isEmpty() || alias.isEmpty()) continue;
+
+            // Avoid rewriting if expr has a top-level comma (would change arity).
+            if (containsTopLevelComma(expr)) continue;
+
+            aliasToExpr.put(alias, expr);
+        }
+        if (aliasToExpr.isEmpty()) return s;
+
+        // Find top-level GROUP BY region.
+        int groupBy = indexOfTopLevelKeyword(s, "GROUP BY", from);
+        if (groupBy < 0) return s;
+        int groupStart = groupBy + "GROUP BY".length();
+        int groupEnd = nextTopLevelClauseBoundary(s, groupStart);
+
+        String groupRegion = s.substring(groupStart, groupEnd);
+        String rewrittenGroup = groupRegion;
+        for (java.util.Map.Entry<String, String> e : aliasToExpr.entrySet()) {
+            String alias = e.getKey();
+            String expr = e.getValue();
+            // Replace alias tokens with the captured expression.
+            rewrittenGroup = rewrittenGroup.replaceAll("(?i)\\b" + java.util.regex.Pattern.quote(alias) + "\\b", java.util.regex.Matcher.quoteReplacement(expr));
+        }
+
+        if (rewrittenGroup.equals(groupRegion)) return s;
+        return s.substring(0, groupStart) + rewrittenGroup + s.substring(groupEnd);
+    }
+
+    // --- helpers for rewriteGroupByAliases ---
+
+    private static int indexOfTopLevelKeyword(String sql, String keyword, int start) {
+        String up = sql.toUpperCase(Locale.ROOT);
+        String k = keyword.toUpperCase(Locale.ROOT);
+        int level = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        for (int i = Math.max(0, start); i <= up.length() - k.length(); i++) {
+            char c = up.charAt(i);
+            if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if (c == '"' && !inSingle) inDouble = !inDouble;
+            if (inSingle || inDouble) continue;
+            if (c == '(') level++;
+            else if (c == ')') level = Math.max(0, level - 1);
+            if (level != 0) continue;
+
+            if (up.startsWith(k, i)) {
+                // Ensure keyword boundary on both sides where applicable.
+                char prev = i > 0 ? up.charAt(i - 1) : ' ';
+                char next = (i + k.length()) < up.length() ? up.charAt(i + k.length()) : ' ';
+                boolean prevOk = !Character.isLetterOrDigit(prev) && prev != '_';
+                boolean nextOk = !Character.isLetterOrDigit(next) && next != '_';
+                if (prevOk && nextOk) return i;
+            }
+        }
+        return -1;
+    }
+
+    private static int nextTopLevelClauseBoundary(String sql, int start) {
+        // End at the earliest of HAVING / ORDER BY / LIMIT / OFFSET / FETCH / UNION / INTERSECT / EXCEPT, at top-level.
+        int end = sql.length();
+        String[] clauses = {"HAVING", "ORDER BY", "LIMIT", "OFFSET", "FETCH", "UNION", "INTERSECT", "EXCEPT"};
+        for (String c : clauses) {
+            int p = indexOfTopLevelKeyword(sql, c, start);
+            if (p >= 0) end = Math.min(end, p);
+        }
+        return end;
+    }
+
+    private static java.util.List<String> splitTopLevelCommaSeparated(String region) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (region == null) return out;
+        int level = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        int start = 0;
+        for (int i = 0; i < region.length(); i++) {
+            char c = region.charAt(i);
+            if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if (c == '"' && !inSingle) inDouble = !inDouble;
+            if (inSingle || inDouble) continue;
+            if (c == '(') level++;
+            else if (c == ')') level = Math.max(0, level - 1);
+            else if (c == ',' && level == 0) {
+                out.add(region.substring(start, i));
+                start = i + 1;
+            }
+        }
+        out.add(region.substring(start));
+        return out;
+    }
+
+    private static boolean containsTopLevelComma(String expr) {
+        if (expr == null) return false;
+        int level = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        for (int i = 0; i < expr.length(); i++) {
+            char c = expr.charAt(i);
+            if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if (c == '"' && !inSingle) inDouble = !inDouble;
+            if (inSingle || inDouble) continue;
+            if (c == '(') level++;
+            else if (c == ')') level = Math.max(0, level - 1);
+            else if (c == ',' && level == 0) return true;
+        }
+        return false;
+    }
+
+    /**
      * Rewrite dialect-specific LEAST/GREATEST function calls into standard SQL
      * CASE expressions. This is used as a defensive pre-processing step before
      * handing SQL to Calcite's parser so that queries continue to work even if

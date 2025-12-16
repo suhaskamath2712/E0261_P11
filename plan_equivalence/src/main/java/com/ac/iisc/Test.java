@@ -53,7 +53,7 @@ public class Test
     */
 
     private static final List<String> queryIDList = List.of(
-        "LITHE_1"
+        "LITHE_9"
     );
 
     //A1, F1 are not equivalent in reality

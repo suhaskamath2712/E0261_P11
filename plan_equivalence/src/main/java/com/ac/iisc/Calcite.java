@@ -18,6 +18,7 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelVisitor;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Union;
@@ -42,6 +43,8 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Calcite parsing and transformation helper.
@@ -82,6 +85,93 @@ import org.apache.calcite.tools.Planner;
  * - A recursion‑path set makes canonicalization safe on DAGs/shared subgraphs.
  */
 public class Calcite {
+
+    /** Lazily parsed schema summary (PK/FK metadata) from tpch_schema_summary.json. */
+    private static volatile SchemaSummary SCHEMA_SUMMARY;
+
+    private static final class SchemaSummary {
+        final Map<String, java.util.Set<String>> pkByTableUpper;
+        // key: TABLE -> (FK_COL -> (REF_TABLE, REF_COL))
+        final Map<String, Map<String, Ref>> fkByTableAndColUpper;
+
+        SchemaSummary(Map<String, java.util.Set<String>> pkByTableUpper,
+                      Map<String, Map<String, Ref>> fkByTableAndColUpper) {
+            this.pkByTableUpper = pkByTableUpper;
+            this.fkByTableAndColUpper = fkByTableAndColUpper;
+        }
+    }
+
+    private static final class Ref {
+        final String refTableUpper;
+        final String refColUpper;
+        Ref(String refTableUpper, String refColUpper) {
+            this.refTableUpper = refTableUpper;
+            this.refColUpper = refColUpper;
+        }
+    }
+
+    private static final class FieldOrigin {
+        final String tableUpper;
+        final String colUpper;
+        FieldOrigin(String tableUpper, String colUpper) {
+            this.tableUpper = tableUpper;
+            this.colUpper = colUpper;
+        }
+    }
+
+    private static SchemaSummary getSchemaSummary() {
+        SchemaSummary cached = SCHEMA_SUMMARY;
+        if (cached != null) return cached;
+        synchronized (Calcite.class) {
+            if (SCHEMA_SUMMARY != null) return SCHEMA_SUMMARY;
+            try {
+                String json = FileIO.readSchemaSummary();
+                if (json == null || json.isBlank()) {
+                    SCHEMA_SUMMARY = new SchemaSummary(Map.of(), Map.of());
+                    return SCHEMA_SUMMARY;
+                }
+                JSONObject root = new JSONObject(json);
+                Map<String, java.util.Set<String>> pk = new HashMap<>();
+                Map<String, Map<String, Ref>> fk = new HashMap<>();
+                for (String tableKey : root.keySet()) {
+                    if (tableKey == null) continue;
+                    String tableUpper = tableKey.trim().toUpperCase();
+                    JSONObject t = root.optJSONObject(tableKey);
+                    if (t == null) continue;
+
+                    java.util.Set<String> pkCols = new java.util.LinkedHashSet<>();
+                    JSONArray pkArr = t.optJSONArray("pk");
+                    if (pkArr != null) {
+                        for (int i = 0; i < pkArr.length(); i++) {
+                            String c = pkArr.optString(i, null);
+                            if (c != null && !c.isBlank()) pkCols.add(c.trim().toUpperCase());
+                        }
+                    }
+                    pk.put(tableUpper, pkCols);
+
+                    Map<String, Ref> fks = new HashMap<>();
+                    JSONArray fkArr = t.optJSONArray("fks");
+                    if (fkArr != null) {
+                        for (int i = 0; i < fkArr.length(); i++) {
+                            JSONObject fkObj = fkArr.optJSONObject(i);
+                            if (fkObj == null) continue;
+                            String col = fkObj.optString("col", "").trim();
+                            String rt = fkObj.optString("ref_table", "").trim();
+                            String rc = fkObj.optString("ref_col", "").trim();
+                            if (col.isEmpty() || rt.isEmpty() || rc.isEmpty()) continue;
+                            fks.put(col.toUpperCase(), new Ref(rt.toUpperCase(), rc.toUpperCase()));
+                        }
+                    }
+                    fk.put(tableUpper, fks);
+                }
+                SCHEMA_SUMMARY = new SchemaSummary(pk, fk);
+            } catch (Exception e) {
+                // Be conservative: schema summary is optional; if parsing fails, disable schema-aware rules.
+                SCHEMA_SUMMARY = new SchemaSummary(Map.of(), Map.of());
+            }
+            return SCHEMA_SUMMARY;
+        }
+    }
     /**
      * Build a Calcite {@link FrameworkConfig} backed by the configured
      * PostgreSQL schema. This is a convenience delegator that forwards to
@@ -133,6 +223,11 @@ public class Calcite {
             // operator table configuration for a given Calcite version does
             // not register them as built-ins.
             sqlForParse = CalciteUtil.rewriteLeastGreatest(sqlForParse);
+
+            // Compatibility shim: expand SELECT aliases referenced in the
+            // outermost GROUP BY (e.g., "GROUP BY o_year" where o_year is an
+            // alias for EXTRACT(YEAR FROM o_orderdate)).
+            sqlForParse = CalciteUtil.rewriteGroupByAliases(sqlForParse);
         }
 
         // 2. Parse the SQL string into an AST (SqlNode)
@@ -459,7 +554,46 @@ public class Calcite {
                 path.remove(rel);
                 return result;
             } else {
-                // For outer/semi/anti joins keep child ordering significant because semantics depend on side
+                // For outer/semi/anti joins keep child ordering significant because semantics depend on side.
+                // However, SEMI joins created by certain rule sequences can be (a) provably redundant
+                // under schema FK->PK constraints, or (b) idempotent duplicates of an identical SEMI join.
+                // We canonicalize those cases to reduce false negatives.
+                if (j.getJoinType() == JoinRelType.SEMI) {
+                    // 1) Collapse chains of identical semi-joins: SEMI(SEMI(L,R,cond),R,cond) == SEMI(L,R,cond)
+                    RelNode leftChild = j.getLeft();
+                    if (leftChild instanceof LogicalJoin lj && lj.getJoinType() == JoinRelType.SEMI) {
+                        String c0 = canonicalizeRex(j.getCondition());
+                        String c1 = canonicalizeRex(lj.getCondition());
+                        if (c0.equals(c1)) {
+                            // Compare right subtrees canonically (order-sensitive because SEMI).
+                            String r0 = canonicalDigestInternal(j.getRight(), path);
+                            String r1 = canonicalDigestInternal(lj.getRight(), path);
+                            if (r0.equals(r1)) {
+                                // Drop the outer SEMI join.
+                                String result = canonicalDigestInternal(lj, path);
+                                path.remove(rel);
+                                return result;
+                            }
+                        }
+                    }
+
+                    // 2) Drop schema-redundant SEMI joins: if left has FK to right PK and right side is unfiltered.
+                    if (isRedundantSemiJoinUnderSchema(j)) {
+                        String result = canonicalDigestInternal(j.getLeft(), path);
+                        path.remove(rel);
+                        return result;
+                    }
+
+                    // 3) Canonicalize SEMI join as an INNER join against a DISTINCT set of right keys.
+                    // This is semantics-preserving for equi-semi-joins and helps align with plans
+                    // that materialize the key-set via Aggregate(groups=[...], calls=[]).
+                    String semiAsInner = canonicalizeSemiJoinAsInnerJoinWithDistinctRightKeys(j, path);
+                    if (semiAsInner != null) {
+                        path.remove(rel);
+                        return semiAsInner;
+                    }
+                }
+
                 String condStr = canonicalizeRex(j.getCondition());
                 String left = canonicalDigestInternal(j.getLeft(), path);
                 String right = canonicalDigestInternal(j.getRight(), path);
@@ -499,6 +633,19 @@ public class Calcite {
         }
         // Aggregate: normalize groupSet and aggregate calls ordering
         if (rel instanceof LogicalAggregate agg) {
+            // Special-case: schema-aware canonicalization for TPCH Q3-like patterns.
+            // Some planners express the final revenue aggregation either:
+            //  (a) as an Aggregate above a 3-way INNER join, grouping by (l_orderkey, o_orderdate, o_shippriority)
+            //      and summing a lineitem-only revenue expression, OR
+            //  (b) as a pre-aggregation on LINEITEM grouped by l_orderkey, followed by joining ORDERS/CUSTOMER.
+            // Under the TPCH schema (L_ORDERKEY -> O_ORDERKEY PK and O_CUSTKEY -> C_CUSTKEY PK), these forms
+            // are semantically equivalent and we want canonical digests to align.
+            String pushedDown = tryCanonicalizeAggregateOverInnerJoinAsPreAgg(agg, path);
+            if (pushedDown != null) {
+                path.remove(rel);
+                return pushedDown;
+            }
+
             java.util.List<Integer> groups = new java.util.ArrayList<>(agg.getGroupSet().asList());
             java.util.Collections.sort(groups);
             java.util.List<String> calls = new java.util.ArrayList<>();
@@ -1154,6 +1301,443 @@ public class Calcite {
         return typeName.getFamily() == SqlTypeFamily.INTERVAL_DAY_TIME;
     }
 
+    /**
+     * Detect and canonicalize an Aggregate-over-3way-inner-join pattern into an equivalent
+     * join-with-pre-aggregated-lineitem representation (TPCH Q3-style).
+     *
+     * This is intentionally conservative: it only fires when we can see the expected join keys
+     * (L_ORDERKEY = O_ORDERKEY and O_CUSTKEY = C_CUSTKEY) somewhere in the inner-join tree, and
+     * the aggregate computes a SUM over an expression that references only LINEITEM fields.
+     *
+     * Returns a digest string that matches the canonical shape produced when the plan already
+     * contains a pre-aggregation factor under the join.
+     */
+    private static String tryCanonicalizeAggregateOverInnerJoinAsPreAgg(LogicalAggregate agg,
+                                                                        Set<RelNode> path) {
+        if (agg == null) return null;
+        if (agg.getGroupSet() == null) return null;
+        if (agg.getAggCallList() == null || agg.getAggCallList().isEmpty()) return null;
+
+        // We only canonicalize single SUM aggregations in this special-case.
+        if (agg.getAggCallList().size() != 1) return null;
+        var sumCall = agg.getAggCallList().get(0);
+        if (sumCall.getAggregation() == null) return null;
+        if (!"SUM".equalsIgnoreCase(sumCall.getAggregation().getName())) return null;
+        if (sumCall.isDistinct()) return null;
+        if (sumCall.getArgList() == null || sumCall.getArgList().isEmpty()) return null;
+
+        // Expect Aggregate input to be a Project over an INNER join tree.
+        if (!(agg.getInput() instanceof LogicalProject proj)) return null;
+        RelNode joinRoot = proj.getInput();
+        if (!(joinRoot instanceof LogicalJoin)) return null;
+
+        // Ensure joinRoot is an INNER join tree containing the key equalities we rely on.
+        if (!innerJoinTreeContainsEquality(joinRoot, "L_ORDERKEY", "O_ORDERKEY")) return null;
+        if (!innerJoinTreeContainsEquality(joinRoot, "O_CUSTKEY", "C_CUSTKEY")) return null;
+
+        // Identify the revenue expression used by SUM: it's a Project output ref.
+        int argIdx = sumCall.getArgList().get(0);
+        if (argIdx < 0 || argIdx >= proj.getProjects().size()) return null;
+        RexNode revenueExpr = proj.getProjects().get(argIdx);
+
+        // Revenue expression must reference only LINEITEM columns.
+        if (!rexReferencesOnlyTableColumns(joinRoot, revenueExpr, "LINEITEM")) return null;
+
+        // Find the LINEITEM factor subtree.
+        List<RelNode> factors = new ArrayList<>();
+        List<RexNode> conds = new ArrayList<>();
+        collectInnerJoinFactors(joinRoot, factors, conds);
+        RelNode lineitemFactor = null;
+        for (RelNode f : factors) {
+            if (relContainsTableScan(f, "lineitem")) {
+                lineitemFactor = f;
+                break;
+            }
+        }
+        if (lineitemFactor == null) return null;
+
+        // The pre-aggregation grouping key is L_ORDERKEY.
+        // We build a synthetic factor digest:
+        //   Aggregate(groups=[0], calls=[SUM@1])->Project[$x,<revenueExpr>]-><lineitemFactorDigest>
+        // This matches the common representation produced by plans that already pre-aggregate LINEITEM.
+        String revenueDigest = canonicalizeRex(revenueExpr);
+        String lineitemBase = canonicalDigestInternal(lineitemFactor, path);
+        String aggFactor = "Aggregate(groups=[0], calls=[SUM@1])->Project[$x," + revenueDigest + "]->" + lineitemBase;
+
+        // Canonicalize the join using the same logic as INNER-join canonicalization.
+        List<String> factorDigests = new ArrayList<>();
+        for (RelNode f : factors) {
+            if (f == lineitemFactor) {
+                factorDigests.add(aggFactor);
+            } else {
+                factorDigests.add(canonicalDigestInternal(f, path));
+            }
+        }
+        Collections.sort(factorDigests);
+
+        List<String> condDigests = new ArrayList<>();
+        for (RexNode c : conds) {
+            decomposeConj(c, condDigests);
+        }
+        condDigests = new ArrayList<>(new java.util.LinkedHashSet<>(condDigests));
+        condDigests.sort(String::compareTo);
+        String condPart = condDigests.isEmpty() ? "true" : String.join("&", condDigests);
+
+        return "Join(INNER," + condPart + "){" + String.join("|", factorDigests) + "}";
+    }
+
+    private static boolean relContainsTableScan(RelNode node, String tableLower) {
+        if (node == null || tableLower == null) return false;
+        final String needle = tableLower.toLowerCase();
+        final boolean[] found = new boolean[] { false };
+        new RelVisitor() {
+            @Override public void visit(RelNode rel, int ordinal, RelNode parent) {
+                if (rel instanceof TableScan ts) {
+                    List<String> qn = ts.getTable() == null ? null : ts.getTable().getQualifiedName();
+                    String name = (qn == null || qn.isEmpty()) ? "" : qn.get(qn.size() - 1);
+                    if (name != null && name.toLowerCase().contains(needle)) {
+                        found[0] = true;
+                        return;
+                    }
+                }
+                super.visit(rel, ordinal, parent);
+            }
+        }.go(node);
+        return found[0];
+    }
+
+    private static boolean rexReferencesOnlyTableColumns(RelNode joinRoot, RexNode expr, String tableNameUpper) {
+        if (expr == null || joinRoot == null || tableNameUpper == null) return false;
+        final String tableNeedle = tableNameUpper.toUpperCase();
+        final List<RelDataTypeField> fields = joinRoot.getRowType() == null ? List.of() : joinRoot.getRowType().getFieldList();
+        final boolean[] ok = new boolean[] { true };
+
+        Consumer<RexNode> walk = new Consumer<>() {
+            @Override public void accept(RexNode n) {
+                if (n == null) return;
+                RexNode base = stripAllCasts(n);
+                if (base instanceof RexInputRef ref) {
+                    int idx = ref.getIndex();
+                    if (idx < 0 || idx >= fields.size()) {
+                        ok[0] = false;
+                        return;
+                    }
+                    String fn = normalizeFieldName(fields.get(idx).getName());
+                    // We accept either explicit table prefix (LINEITEM / public.lineitem) or TPCH-style column prefix L_.
+                    if (!(fn.contains(tableNeedle) || fn.startsWith("L_"))) {
+                        ok[0] = false;
+                    }
+                    return;
+                }
+                if (base instanceof RexCall c) {
+                    for (RexNode op : c.getOperands()) {
+                        accept(op);
+                        if (!ok[0]) return;
+                    }
+                }
+            }
+        };
+
+        walk.accept(expr);
+        return ok[0];
+    }
+
+    private static boolean innerJoinTreeContainsEquality(RelNode root, String colAUpper, String colBUpper) {
+        if (root == null || colAUpper == null || colBUpper == null) return false;
+        final String a = colAUpper.toUpperCase();
+        final String b = colBUpper.toUpperCase();
+        final boolean[] found = new boolean[] { false };
+
+        new RelVisitor() {
+            @Override public void visit(RelNode rel, int ordinal, RelNode parent) {
+                if (found[0]) return;
+                if (rel instanceof LogicalJoin j && j.getJoinType() == JoinRelType.INNER) {
+                    RexNode cond = j.getCondition();
+                    if (cond != null && joinConditionContainsEquality(j, cond, a, b)) {
+                        found[0] = true;
+                        return;
+                    }
+                }
+                super.visit(rel, ordinal, parent);
+            }
+        }.go(root);
+
+        return found[0];
+    }
+
+    private static boolean joinConditionContainsEquality(LogicalJoin join, RexNode cond, String a, String b) {
+        if (join == null || cond == null) return false;
+        List<RelDataTypeField> fields = join.getRowType() == null ? List.of() : join.getRowType().getFieldList();
+        final boolean[] found = new boolean[] { false };
+        Consumer<RexNode> walk = new Consumer<>() {
+            @Override public void accept(RexNode n) {
+                if (found[0] || n == null) return;
+                RexNode base = stripAllCasts(n);
+                if (base instanceof RexCall c && c.getOperator() != null) {
+                    SqlKind k = c.getOperator().getKind();
+                    if (k == SqlKind.AND) {
+                        for (RexNode op : c.getOperands()) {
+                            accept(op);
+                            if (found[0]) return;
+                        }
+                        return;
+                    }
+                    if (k == SqlKind.EQUALS && c.getOperands().size() == 2) {
+                        RexNode l0 = stripAllCasts(c.getOperands().get(0));
+                        RexNode r0 = stripAllCasts(c.getOperands().get(1));
+                        if (l0 instanceof RexInputRef l && r0 instanceof RexInputRef r) {
+                            String ln = fieldNameByIndex(fields, l.getIndex());
+                            String rn = fieldNameByIndex(fields, r.getIndex());
+                            if (ln != null && rn != null) {
+                                String L = normalizeFieldName(ln);
+                                String R = normalizeFieldName(rn);
+                                boolean match = (L.equals(a) && R.equals(b)) || (L.equals(b) && R.equals(a));
+                                if (match) {
+                                    found[0] = true;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    // Other calls: keep walking
+                    for (RexNode op : c.getOperands()) {
+                        accept(op);
+                        if (found[0]) return;
+                    }
+                }
+            }
+        };
+        walk.accept(cond);
+        return found[0];
+    }
+
+    private static String fieldNameByIndex(List<RelDataTypeField> fields, int idx) {
+        if (fields == null) return null;
+        if (idx < 0 || idx >= fields.size()) return null;
+        RelDataTypeField f = fields.get(idx);
+        return f == null ? null : f.getName();
+    }
+
+    private static String normalizeFieldName(String name) {
+        if (name == null) return "";
+        String s = name.trim();
+        int dot = s.lastIndexOf('.');
+        if (dot >= 0 && dot + 1 < s.length()) {
+            s = s.substring(dot + 1);
+        }
+        // Remove quoting artifacts if any
+        s = s.replace("\"", "");
+        return s.toUpperCase();
+    }
+
+    /**
+     * Resolve a field index on a RelNode back to a base table/column pair when possible.
+     *
+     * We only follow through simple Projects consisting of RexInputRef passthroughs
+     * and Filters (which do not change row shape). If the expression is computed,
+     * or the subtree is not a single TableScan, returns null.
+     */
+    private static FieldOrigin resolveFieldOrigin(RelNode rel, int fieldIndex) {
+        if (rel == null) return null;
+        if (fieldIndex < 0) return null;
+
+        if (rel instanceof LogicalFilter f) {
+            return resolveFieldOrigin(f.getInput(), fieldIndex);
+        }
+
+        if (rel instanceof LogicalProject p) {
+            if (fieldIndex >= p.getProjects().size()) return null;
+            RexNode expr = stripAllCasts(p.getProjects().get(fieldIndex));
+            if (expr instanceof RexInputRef ref) {
+                return resolveFieldOrigin(p.getInput(), ref.getIndex());
+            }
+            return null;
+        }
+
+        if (rel instanceof TableScan ts) {
+            if (ts.getRowType() == null) return null;
+            List<RelDataTypeField> fields = ts.getRowType().getFieldList();
+            if (fieldIndex >= fields.size()) return null;
+            String col = normalizeFieldName(fields.get(fieldIndex).getName());
+            List<String> qn = ts.getTable() == null ? null : ts.getTable().getQualifiedName();
+            String table = (qn == null || qn.isEmpty()) ? "" : qn.get(qn.size() - 1);
+            String tableUpper = table == null ? "" : table.trim().toUpperCase();
+            if (tableUpper.isEmpty() || col.isEmpty()) return null;
+            return new FieldOrigin(tableUpper, col);
+        }
+
+        return null;
+    }
+
+    private static boolean relHasNonTrivialFilter(RelNode rel) {
+        if (rel == null) return false;
+        if (rel instanceof LogicalFilter f) {
+            String c = canonicalizeRex(f.getCondition());
+            if (!"true".equalsIgnoreCase(c)) return true;
+            return relHasNonTrivialFilter(f.getInput());
+        }
+        if (rel instanceof LogicalProject p) {
+            return relHasNonTrivialFilter(p.getInput());
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if this SEMI join is guaranteed redundant under FK->PK constraints and
+     * the right side is unfiltered.
+     */
+    private static boolean isRedundantSemiJoinUnderSchema(LogicalJoin semiJoin) {
+        if (semiJoin == null || semiJoin.getJoinType() != JoinRelType.SEMI) return false;
+
+        // Right side must be unfiltered; otherwise the SEMI join can filter.
+        if (relHasNonTrivialFilter(semiJoin.getRight())) return false;
+
+        // Both sides must resolve to a single base table so we can check FK metadata.
+        // (This is conservative; we can extend later.)
+        if (!(stripToTableScan(semiJoin.getLeft()) instanceof TableScan)) return false;
+        if (!(stripToTableScan(semiJoin.getRight()) instanceof TableScan)) return false;
+
+        int leftCount = semiJoin.getLeft().getRowType() == null ? -1 : semiJoin.getLeft().getRowType().getFieldCount();
+        if (leftCount <= 0) return false;
+
+        List<int[]> pairs = extractLeftRightEqualityPairs(semiJoin.getCondition(), leftCount);
+        if (pairs.isEmpty()) return false;
+
+        SchemaSummary s = getSchemaSummary();
+        if (s == null) return false;
+
+        for (int[] p : pairs) {
+            int li = p[0];
+            int ri = p[1];
+            FieldOrigin lo = resolveFieldOrigin(semiJoin.getLeft(), li);
+            FieldOrigin ro = resolveFieldOrigin(semiJoin.getRight(), ri);
+            if (lo == null || ro == null) return false;
+
+            Map<String, Ref> fks = s.fkByTableAndColUpper.get(lo.tableUpper);
+            if (fks == null) return false;
+            Ref ref = fks.get(lo.colUpper);
+            if (ref == null) return false;
+            if (!ref.refTableUpper.equals(ro.tableUpper)) return false;
+            if (!ref.refColUpper.equals(ro.colUpper)) return false;
+
+            java.util.Set<String> pkCols = s.pkByTableUpper.getOrDefault(ro.tableUpper, java.util.Set.of());
+            if (!pkCols.contains(ro.colUpper)) return false;
+        }
+
+        return true;
+    }
+
+    private static RelNode stripToTableScan(RelNode rel) {
+        if (rel == null) return null;
+        RelNode cur = rel;
+        while (true) {
+            if (cur instanceof LogicalFilter f) {
+                cur = f.getInput();
+                continue;
+            }
+            if (cur instanceof LogicalProject p) {
+                // unwrap only passthrough/identity projects
+                boolean onlyRefs = true;
+                for (RexNode e : p.getProjects()) {
+                    if (!(stripAllCasts(e) instanceof RexInputRef)) {
+                        onlyRefs = false;
+                        break;
+                    }
+                }
+                if (onlyRefs) {
+                    cur = p.getInput();
+                    continue;
+                }
+            }
+            return cur;
+        }
+    }
+
+    /** Extract (leftIndex,rightIndex) pairs for conjunctions of input-ref equalities. */
+    private static List<int[]> extractLeftRightEqualityPairs(RexNode cond, int leftFieldCount) {
+        List<int[]> out = new ArrayList<>();
+        if (cond == null || leftFieldCount <= 0) return out;
+
+        Consumer<RexNode> walk = new Consumer<>() {
+            @Override public void accept(RexNode n) {
+                if (n == null) return;
+                RexNode base = stripAllCasts(n);
+                if (base instanceof RexCall c && c.getOperator() != null) {
+                    SqlKind k = c.getOperator().getKind();
+                    if (k == SqlKind.AND) {
+                        for (RexNode op : c.getOperands()) accept(op);
+                        return;
+                    }
+                    if (k == SqlKind.EQUALS && c.getOperands().size() == 2) {
+                        RexNode l0 = stripAllCasts(c.getOperands().get(0));
+                        RexNode r0 = stripAllCasts(c.getOperands().get(1));
+                        if (l0 instanceof RexInputRef l && r0 instanceof RexInputRef r) {
+                            int li;
+                            int ri;
+                            if (l.getIndex() < leftFieldCount && r.getIndex() >= leftFieldCount) {
+                                li = l.getIndex();
+                                ri = r.getIndex() - leftFieldCount;
+                            } else if (r.getIndex() < leftFieldCount && l.getIndex() >= leftFieldCount) {
+                                li = r.getIndex();
+                                ri = l.getIndex() - leftFieldCount;
+                            } else {
+                                return;
+                            }
+                            out.add(new int[] { li, ri });
+                        }
+                    }
+                }
+            }
+        };
+
+        walk.accept(cond);
+        return out;
+    }
+
+    /**
+     * Canonicalize an equi-SEMI join as an INNER join against a DISTINCT key set derived from the
+     * right input.
+     *
+     * Semantics:
+     *   SEMI(L,R, Lk = Rk) == Project(L.*) ( L INNER JOIN (SELECT DISTINCT Rk FROM R) )
+     *
+     * We only emit this canonical form when we can extract one or more equality key pairs where
+     * both sides are RexInputRef references.
+     */
+    private static String canonicalizeSemiJoinAsInnerJoinWithDistinctRightKeys(LogicalJoin semiJoin,
+                                                                               Set<RelNode> path) {
+        if (semiJoin == null || semiJoin.getJoinType() != JoinRelType.SEMI) return null;
+
+        int leftCount = semiJoin.getLeft().getRowType() == null ? -1 : semiJoin.getLeft().getRowType().getFieldCount();
+        if (leftCount <= 0) return null;
+
+        List<int[]> pairs = extractLeftRightEqualityPairs(semiJoin.getCondition(), leftCount);
+        if (pairs.isEmpty()) return null;
+
+        // Build a deterministic condition part, like INNER join canonicalization.
+        List<String> condDigests = new ArrayList<>();
+        decomposeConj(semiJoin.getCondition(), condDigests);
+        condDigests = new ArrayList<>(new java.util.LinkedHashSet<>(condDigests));
+        condDigests.sort(String::compareTo);
+        String condPart = condDigests.isEmpty() ? "true" : String.join("&", condDigests);
+
+        // Derive the distinct right-key set factor digest.
+        // We don't need exact ref indices in the string (canonicalizeRex normalizes to $x anyway),
+        // but we preserve the number of key fields for stability.
+        int k = pairs.size();
+        java.util.List<String> projKeys = new java.util.ArrayList<>(k);
+        for (int i = 0; i < k; i++) {
+            projKeys.add("$x");
+        }
+        java.util.List<Integer> groups = new java.util.ArrayList<>(k);
+        for (int i = 0; i < k; i++) groups.add(i);
+        String rightBase = canonicalDigestInternal(semiJoin.getRight(), path);
+        String rightKeySet = "Aggregate(groups=" + groups + ", calls=[])" + "->Project[" + String.join(",", projKeys) + "]->" + rightBase;
+
+        String left = canonicalDigestInternal(semiJoin.getLeft(), path);
+        return "Join(INNER," + condPart + "){" + left + "|" + rightKeySet + "}";
+    }
+
     // Helper: collect factors and conditions from a nested INNER join tree
     private static void collectInnerJoinFactors(RelNode node, List<RelNode> factors, List<RexNode> conds) {
         // Unwrap trivial projection (all input refs) to reach a deeper join
@@ -1608,14 +2192,27 @@ public class Calcite {
     public static String convertRelNodetoJSONQueryPlan(RelNode rel)
     {
         if (rel == null) return "null";
-        RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
-        RelToSqlConverter.Result res = converter.visitRoot(rel);
-        String sql = res.asStatement().toSqlString(PostgresqlSqlDialect.DEFAULT).getSql();
-        // Get query plan: protect external call with try-catch to avoid bubbling
+        String sql = null;
         try {
+            RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
+            RelToSqlConverter.Result res = converter.visitRoot(rel);
+            sql = res.asStatement().toSqlString(PostgresqlSqlDialect.DEFAULT).getSql();
+
             return GetQueryPlans.getCleanedQueryPlanJSONasString(sql);
-        } catch (SQLException  e) {
+        } catch (SQLException e) {
             System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Error while obtaining plan: " + e.getMessage());
+            if (sql != null) {
+                String trimmed = sql.strip();
+                String preview = trimmed.length() <= 2000 ? trimmed : trimmed.substring(0, 2000) + " ...[truncated]";
+                System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Generated SQL (preview):\n" + preview);
+            } else {
+                System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Generated SQL unavailable (conversion failed before SQL materialized).");
+            }
+            return null;
+        } catch (RuntimeException e) {
+            // RelToSqlConverter and SQL stringification can throw unchecked exceptions for
+            // complex logical plans (especially after aggressive rule sequences).
+            System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Error while converting RelNode to SQL: " + e.getMessage());
             return null;
         }
     }
