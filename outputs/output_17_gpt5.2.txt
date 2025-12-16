@@ -1,0 +1,57 @@
+-----------------------------------------------------
+Query ID: A1
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Aggregate(groups=[0], calls=[COUNT@-1])->Project[$x]->Join(INNER,<=($x,$x)&=($x,$x)){Filter(<($x,60000))->Scan(public.orders)|Filter(AND(<($x,$x)&<=($x,70000)&RANGE($x,1994-01-01,1995-01-01)))->Scan(public.lineitem)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Aggregate(groups=[0], calls=[COUNT@-1])->Project[$x]->Join(INNER,=($x,$x)&CASE($x,<=($x,$x),$x)){Project[$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,<=($x,70000:DECIMAL(10, 0))]->Filter(AND(<($x,$x)&RANGE($x,1994-01-01,1995-01-01)))->Scan(public.lineitem)|Project[$x,$x,$x,$x,$x,$x,$x,$x,$x,$x,<=($x,70000),$x]->Filter(<($x,60000))->Scan(public.orders)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], cnt=[COUNT()])
+    LogicalProject(exprs=[[$24]])
+      LogicalJoin(condition=[AND(=($0, $10), <=($15, $3))], joinType=[inner])
+        LogicalFilter(condition=[>($3, 60000)])
+          JdbcTableScan(table=[[public, orders]])
+        LogicalFilter(condition=[AND(<($11, $12), <($10, $11), SEARCH($12, Sarg[[1994-01-01..1995-01-01)]), <=($5, 70000))])
+          JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], cnt=[COUNT()])
+    LogicalProject(exprs=[[$14]])
+      LogicalJoin(condition=[AND(=($18, $0), CASE($28, <=($5, $29), $17))], joinType=[inner])
+        LogicalProject(inputs=[0..16], exprs=[[<=($5, 70000:DECIMAL(10, 0))]])
+          LogicalFilter(condition=[AND(<($11, $12), <($10, $11), SEARCH($12, Sarg[[1994-01-01..1995-01-01)]))])
+            JdbcTableScan(table=[[public, lineitem]])
+        LogicalProject(inputs=[0..9], exprs=[[<=($3, 70000), CAST($3):DECIMAL(10, 0)]])
+          LogicalFilter(condition=[>($3, 60000)])
+            JdbcTableScan(table=[[public, orders]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: false
+-----------------------------------------------------
+Query ID: F1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_5
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_15
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_16
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_20
+Equivalence without transformations: false
+LLM Equivalence 1: false

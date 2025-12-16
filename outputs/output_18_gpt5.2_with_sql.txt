@@ -1,0 +1,65 @@
+-----------------------------------------------------
+Query ID: A1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: F1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_5
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_15
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_16
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: LITHE_20
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: ETPCH_Q21
+Rel1: 
+LogicalSort(sort0=[$1], sort1=[$0], dir0=[DESC], dir1=[ASC])
+  LogicalAggregate(group=[{0}], numwait=[COUNT()])
+    LogicalProject(exprs=[[$1]])
+      LogicalJoin(condition=[AND(=($0, $25), =($3, $8))], joinType=[inner])
+        LogicalFilter(condition=[AND(EXISTS({
+LogicalFilter(condition=[AND(=($cor0.l_orderkey, $0), <>($cor0.l_suppkey, $2))])
+  JdbcTableScan(table=[[public, lineitem]])
+}), NOT(EXISTS({
+LogicalFilter(condition=[AND(=($cor0.l_orderkey, $0), <>($cor0.l_suppkey, $2), <($11, $12))])
+  JdbcTableScan(table=[[public, lineitem]])
+})))])
+          JdbcTableScan(table=[[public, supplier]])
+        LogicalJoin(condition=[true], joinType=[inner])
+          LogicalFilter(condition=[=($1, 'ARGENTINA                ')])
+            JdbcTableScan(table=[[public, nation]])
+          LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+            LogicalFilter(condition=[=($2, 'F')])
+              JdbcTableScan(table=[[public, orders]])
+            LogicalFilter(condition=[<($11, $12)])
+              JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalAggregate(group=[{0}], numwait=[COUNT()])
+    LogicalProject(exprs=[[$1]])
+      LogicalJoin(condition=[=($0, $25)], joinType=[inner])
+        LogicalJoin(condition=[=($3, $8)], joinType=[inner])
+          JdbcTableScan(table=[[public, supplier]])
+          LogicalFilter(condition=[=($1, 'GERMANY                  ')])
+            JdbcTableScan(table=[[public, nation]])
+        LogicalJoin(condition=[=($10, $0)], joinType=[inner])
+          LogicalFilter(condition=[<>($2, 'F')])
+            JdbcTableScan(table=[[public, orders]])
+          LogicalFilter(condition=[>($11, $12)])
+            JdbcTableScan(table=[[public, lineitem]])
+
+

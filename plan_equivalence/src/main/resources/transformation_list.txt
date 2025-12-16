@@ -1,96 +1,96 @@
-AggregateExpandDistinctAggregatesRule
-AggregateExtractProjectRule
-AggregateFilterToCaseRule
-AggregateFilterTransposeRule
-AggregateJoinJoinRemoveRule
-AggregateJoinRemoveRule
-AggregateJoinTransposeRule
-AggregateMergeRule
-AggregateProjectMergeRule
-AggregateProjectPullUpConstantsRule
-AggregateProjectStarTableRule
-AggregateReduceFunctionsRule
-AggregateRemoveRule
-AggregateStarTableRule
-AggregateUnionAggregateRule
-AggregateUnionTransposeRule
-AggregateValuesRule
-CalcMergeRule
-CalcRemoveRule
-CalcSplitRule
-CoerceInputsRule
-ExchangeRemoveConstantKeysRule
-FilterAggregateTransposeRule
-FilterCalcMergeRule
-FilterCorrelateRule
-FilterJoinRule.FilterIntoJoinRule
-FilterJoinRule.JoinConditionPushRule
-FilterMergeRule
-FilterMultiJoinMergeRule
-FilterProjectTransposeRule
-FilterSampleTransposeRule
-FilterSetOpTransposeRule
-FilterTableFunctionTransposeRule
-FilterToCalcRule
-FilterWindowTransposeRule
-IntersectToDistinctRule
-JoinAddRedundantSemiJoinRule
-JoinAssociateRule
-JoinDeriveIsNotNullFilterRule
-JoinExtractFilterRule
-JoinProjectBothTransposeRule
-JoinProjectLeftTransposeRule
-JoinProjectRightTransposeRule
-JoinPushExpressionsRule
-JoinPushTransitivePredicatesRule
-JoinToCorrelateRule
-JoinToMultiJoinRule
-JoinLeftUnionTransposeRule
-JoinRightUnionTransposeRule
-MatchRule
-MinusToAntiJoinRule
-MinusToDistinctRule
-MinusMergeRule
-MultiJoinOptimizeBushyRule
-ProjectAggregateMergeRule
-ProjectCalcMergeRule
-ProjectCorrelateTransposeRule
-ProjectFilterTransposeRule
-ProjectJoinJoinRemoveRule
-ProjectJoinRemoveRule
-ProjectJoinTransposeRule
-ProjectMergeRule
-ProjectMultiJoinMergeRule
-ProjectRemoveRule
-ProjectSetOpTransposeRule
-ProjectToCalcRule
-ProjectToWindowRule
-ProjectToWindowRule.CalcToWindowRule
-ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule
-ProjectWindowTransposeRule
-ReduceDecimalsRule
-ReduceExpressionsRule.CalcReduceExpressionsRule
-ReduceExpressionsRule.FilterReduceExpressionsRule
-ReduceExpressionsRule.JoinReduceExpressionsRule
-ReduceExpressionsRule.ProjectReduceExpressionsRule
-ReduceExpressionsRule.WindowReduceExpressionsRule
-SampleToFilterRule
-SemiJoinFilterTransposeRule
-SemiJoinJoinTransposeRule
-SemiJoinProjectTransposeRule
-SemiJoinRemoveRule
-SemiJoinRule
-SemiJoinRule.JoinOnUniqueToSemiJoinRule
-SemiJoinRule.JoinToSemiJoinRule
-SemiJoinRule.ProjectToSemiJoinRule
-SortJoinCopyRule
-SortJoinTransposeRule
-SortProjectTransposeRule
-SortRemoveConstantKeysRule
-SortRemoveRedundantRule
-SortRemoveRule
-SortUnionTransposeRule
-TableScanRule
-UnionMergeRule
-UnionPullUpConstantsRule
-UnionToDistinctRule
+AggregateExpandDistinctAggregatesRule - Rewrites DISTINCT aggregates (e.g., COUNT(DISTINCT x)) into an equivalent plan using additional grouping / joins so the engine can execute them without DISTINCT inside the aggregate.
+AggregateExtractProjectRule - Pulls complex aggregate arguments into a Project so the Aggregate operates on simple input refs.
+AggregateFilterToCaseRule - Converts aggregate FILTER clauses into CASE expressions inside the aggregate (e.g., SUM(x) FILTER (WHERE p) → SUM(CASE WHEN p THEN x ELSE NULL END)).
+AggregateFilterTransposeRule - Pushes a Filter below an Aggregate when the filter references only grouping keys (or otherwise is safe).
+AggregateJoinJoinRemoveRule - Removes unnecessary joins in join/aggregate patterns when they do not affect aggregate results (key-preserving redundancy).
+AggregateJoinRemoveRule - Removes a join under an aggregate when the joined side is not needed and the join is provably redundant.
+AggregateJoinTransposeRule - Pushes an Aggregate below a Join (or pulls it up) when safe, often to pre-aggregate early and reduce rows.
+AggregateMergeRule - Merges stacked Aggregates into a single Aggregate when the upper aggregate can be expressed over the lower one.
+AggregateProjectMergeRule - Merges a Project with an Aggregate when the Project is only renaming/reordering passthrough fields needed by the Aggregate.
+AggregateProjectPullUpConstantsRule - Pulls constants through Project/Aggregate to simplify group keys and remove unnecessary expressions.
+AggregateProjectStarTableRule - Star-schema optimization: recognizes star-join patterns and restructures Aggregate+Project for star-table execution.
+AggregateReduceFunctionsRule - Simplifies certain aggregate functions to equivalent cheaper forms (where safe), e.g., reducing redundant wrappers.
+AggregateRemoveRule - Removes a redundant Aggregate (e.g., GROUP BY on a unique key with no aggregate calls).
+AggregateStarTableRule - Star-schema optimization: rewrites Aggregate over a star join into a star-table-friendly form.
+AggregateUnionAggregateRule - Rewrites/merges Aggregate over Union with Aggregates to a more efficient combined aggregate plan.
+AggregateUnionTransposeRule - Pushes Aggregate through Union by aggregating each input and combining the partial results.
+AggregateValuesRule - Folds Aggregate over VALUES into a simplified VALUES result (constant evaluation).
+CalcMergeRule - Merges adjacent Calc nodes (Calc = Project+Filter) into a single Calc.
+CalcRemoveRule - Removes a Calc that has no effect (identity projection and/or always-true filter).
+CalcSplitRule - Splits a Calc into separate Project and Filter (or simpler calcs) to enable other rule matches.
+CoerceInputsRule - Inserts casts/coercions so operator input types match required type signatures.
+ExchangeRemoveConstantKeysRule - Removes constant distribution/partition keys from Exchange because they do not affect data distribution.
+FilterAggregateTransposeRule - Pushes Filter below Aggregate when the predicate depends only on grouping keys.
+FilterCalcMergeRule - Merges a Filter into an adjacent Calc.
+FilterCorrelateRule - Pushes Filter into/through a Correlate (correlated subquery operator) when safe.
+FilterJoinRule.FilterIntoJoinRule - Pushes filter predicates into join inputs and/or into the join condition to reduce rows early.
+FilterJoinRule.JoinConditionPushRule - Pushes parts of the join condition down into the join inputs as filters when possible.
+FilterMergeRule - Merges stacked Filters into one.
+FilterMultiJoinMergeRule - Merges a Filter into a MultiJoin’s condition.
+FilterProjectTransposeRule - Pushes Filter past Project by rewriting the filter in terms of the Project’s input expressions.
+FilterSampleTransposeRule - Pushes Filter past Sample when safe.
+FilterSetOpTransposeRule - Pushes Filter past set operators (UNION/INTERSECT/MINUS) to each input when valid.
+FilterTableFunctionTransposeRule - Pushes Filter past a table function scan when the predicate can be applied before/inside the function.
+FilterToCalcRule - Converts a Filter into a Calc to enable Calc-based merging/splitting optimizations.
+FilterWindowTransposeRule - Pushes Filter past Window when the predicate can be evaluated before window computation.
+IntersectToDistinctRule - Rewrites INTERSECT (set intersection) into an equivalent plan using joins and DISTINCT/aggregation.
+JoinAddRedundantSemiJoinRule - Introduces a semijoin derived from a join predicate (intentionally redundant) to enable later semijoin reorder/transpose optimizations.
+JoinAssociateRule - Reassociates joins (changes join tree shape) to expose better join orders.
+JoinDeriveIsNotNullFilterRule - Adds IS NOT NULL filters implied by join predicates (e.g., inner join equality implies both sides are not null).
+JoinExtractFilterRule - Extracts non-joinable predicates from a join condition into a separate Filter (or separates filter/join conditions).
+JoinProjectBothTransposeRule - Pushes a Project through a Join on both sides to reduce carried columns.
+JoinProjectLeftTransposeRule - Pushes a Project through a Join on the left input.
+JoinProjectRightTransposeRule - Pushes a Project through a Join on the right input.
+JoinPushExpressionsRule - Pushes computed expressions into Projects around a Join so join conditions become simpler/more optimizable.
+JoinPushTransitivePredicatesRule - Infers and pushes transitive predicates across joins (predicate propagation).
+JoinToCorrelateRule - Converts a Join to a Correlate form in patterns involving correlation/subqueries.
+JoinToMultiJoinRule - Converts a join tree into a single MultiJoin (n-ary join) to enable global join reordering.
+JoinLeftUnionTransposeRule - Distributes a Join over a Union on the left side.
+JoinRightUnionTransposeRule - Distributes a Join over a Union on the right side.
+MatchRule - Normalizes/rewrites MATCH_RECOGNIZE (pattern matching) into a canonical relational form.
+MinusToAntiJoinRule - Rewrites MINUS/EXCEPT into an anti-join based implementation.
+MinusToDistinctRule - Implements MINUS DISTINCT semantics by combining MINUS ALL with a DISTINCT/aggregation step.
+MinusMergeRule - Merges adjacent MINUS operations where safe.
+MultiJoinOptimizeBushyRule - Reorders a MultiJoin into a bushy join tree using heuristics/costing to improve performance.
+ProjectAggregateMergeRule - Merges a Project above an Aggregate into the Aggregate when the Project only reshapes aggregate inputs/outputs.
+ProjectCalcMergeRule - Merges Project into an adjacent Calc.
+ProjectCorrelateTransposeRule - Pushes Project through Correlate when safe.
+ProjectFilterTransposeRule - Pushes Project past Filter (or pulls Filter past Project) when semantics allow, typically to reduce expression duplication.
+ProjectJoinJoinRemoveRule - Removes redundant joins in project/join patterns when joins do not affect projected outputs.
+ProjectJoinRemoveRule - Removes a join when the projected columns come from one side and the join is provably redundant.
+ProjectJoinTransposeRule - Pushes Project through Join to prune unused columns early.
+ProjectMergeRule - Merges stacked Projects into one.
+ProjectMultiJoinMergeRule - Merges a Project into a MultiJoin, pushing column pruning into the MultiJoin.
+ProjectRemoveRule - Removes an identity Project.
+ProjectSetOpTransposeRule - Pushes Project past set operators to each input when valid.
+ProjectToCalcRule - Converts Project into a Calc.
+ProjectToWindowRule - Converts window-function expressions in a Project into an explicit Window operator.
+ProjectToWindowRule.CalcToWindowRule - Converts a Calc containing window functions into Window + (optional) Project/Calc.
+ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule - Splits a Project with window functions into Project + Window for clearer optimization.
+ProjectWindowTransposeRule - Pushes Project past Window when the projection does not change window semantics.
+ReduceDecimalsRule - Simplifies/reduces decimal casts/precision/scale where safe.
+ReduceExpressionsRule.CalcReduceExpressionsRule - Constant folds and simplifies expressions inside a Calc.
+ReduceExpressionsRule.FilterReduceExpressionsRule - Constant folds and simplifies Filter predicates.
+ReduceExpressionsRule.JoinReduceExpressionsRule - Constant folds and simplifies Join conditions.
+ReduceExpressionsRule.ProjectReduceExpressionsRule - Constant folds and simplifies Project expressions.
+ReduceExpressionsRule.WindowReduceExpressionsRule - Constant folds and simplifies Window expressions.
+SampleToFilterRule - Rewrites certain sampling constructs into an equivalent Filter-based predicate when supported.
+SemiJoinFilterTransposeRule - Pushes Filter past/into a SemiJoin when safe.
+SemiJoinJoinTransposeRule - Transposes a SemiJoin with a Join to change join order and enable further optimizations.
+SemiJoinProjectTransposeRule - Pushes Project past a SemiJoin to prune columns.
+SemiJoinRemoveRule - Removes a redundant SemiJoin when it can be proven to have no effect.
+SemiJoinRule - Introduces or transforms patterns into SemiJoins when they preserve query semantics and can improve performance.
+SemiJoinRule.JoinOnUniqueToSemiJoinRule - Converts a join against a unique-key side into a semijoin when only the other side’s columns are needed.
+SemiJoinRule.JoinToSemiJoinRule - Converts a suitable join into a semijoin based on usage/predicate patterns.
+SemiJoinRule.ProjectToSemiJoinRule - Converts a project+join pattern into a semijoin when projections indicate only one side is needed.
+SortJoinCopyRule - Copies a Sort/Limit across a Join into an input when order/limit can be applied earlier without changing results.
+SortJoinTransposeRule - Pushes Sort past Join to one/both inputs when safe.
+SortProjectTransposeRule - Pushes Sort past Project.
+SortRemoveConstantKeysRule - Removes constant sort keys that do not affect ordering.
+SortRemoveRedundantRule - Removes a Sort that is redundant because the input already satisfies the required ordering/limit.
+SortRemoveRule - Removes a Sort with no ordering keys and no fetch/offset effect.
+SortUnionTransposeRule - Pushes Sort past Union to inputs when safe.
+TableScanRule - Normalizes table access into a TableScan / applies table-scan conversion for optimization/planning.
+UnionMergeRule - Merges adjacent Union operators into one.
+UnionPullUpConstantsRule - Pulls up constant expressions through Union to simplify and reduce per-input computation.
+UnionToDistinctRule - Rewrites UNION DISTINCT into UNION ALL followed by a DISTINCT (typically an Aggregate with grouping).

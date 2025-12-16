@@ -190,12 +190,23 @@ public class FileIO
 		Pattern headerPattern = Pattern.compile(
 				"(?m)^--\\s*Query ID:\\s*" + Pattern.quote(queryId) + "\\b(?:\\s*\\([^)]*\\))?\\s*$");
 		Matcher headerMatcher = headerPattern.matcher(fileContent);
-		if (!headerMatcher.find()) {
+		int afterHeaderPos = -1;
+		int matches = 0;
+		while (headerMatcher.find()) {
+			afterHeaderPos = headerMatcher.end();
+			matches++;
+		}
+		if (afterHeaderPos < 0) {
 			// Query ID not present
 			return null;
 		}
-
-		int afterHeaderPos = headerMatcher.end();
+		if (matches > 1) {
+			// Duplicate IDs can exist in the consolidated SQL files. Prefer the last
+			// occurrence (typically the most recently added/corrected block) to avoid
+			// silently reading an older version.
+			System.err.println("[FileIO] Warning: Query ID '" + queryId + "' appears " + matches
+					+ " times; using the last occurrence.");
+		}
 
 		// 2) Find the next separator line (the one after Description), then SQL starts after it
 		Pattern sepPattern = Pattern.compile("(?m)^--\\s*=+\\s*$");

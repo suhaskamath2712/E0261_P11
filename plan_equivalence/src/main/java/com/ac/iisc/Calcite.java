@@ -90,7 +90,7 @@ public class Calcite {
     private static volatile SchemaSummary SCHEMA_SUMMARY;
 
     private static final class SchemaSummary {
-        final Map<String, java.util.Set<String>> pkByTableUpper;
+        final Map<String, Set<String>> pkByTableUpper;
         // key: TABLE -> (FK_COL -> (REF_TABLE, REF_COL))
         final Map<String, Map<String, Ref>> fkByTableAndColUpper;
 
@@ -379,6 +379,10 @@ public class Calcite {
                 rel1 = applyTransformations(rel1, transformations);
             }
 
+            //System.out.println("Rel1: \n" + RelOptUtil.toString(rel1, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
+            //System.out.println("Rel2: \n" + RelOptUtil.toString(rel2, SqlExplainLevel.DIGEST_ATTRIBUTES) + "\n");
+            
+
             // Normalize sub-queries and decorrelate to align scalar subquery vs join forms
             rel1 = normalizeSubqueriesAndDecorrelate(rel1);
             // Normalize sub-queries and decorrelate symmetrically for the second plan as well
@@ -413,14 +417,7 @@ public class Calcite {
             String c2AndNorm = normalizeAndOrderingInDigest(c2);
             if (c1AndNorm.equals(c2AndNorm)) return true;
 
-            // Fallback 3: tree comparison ignoring child order
-            RelTreeNode tree1 = buildRelTree(rel1);
-            RelTreeNode tree2 = buildRelTree(rel2);
-            // equalsIgnoreChildOrder also compares via a canonical form that ignores
-            // child ordering, further neutralizing INNER-join commutativity.
-            if (tree1.equalsIgnoreChildOrder(tree2))  return true;
-
-            // Fallback 4: compare cleaned PostgreSQL execution plans as a last resort.
+            // Final fallback: compare cleaned PostgreSQL execution plans as a last resort.
             // If both queries yield the same physical plan on the target database,
             // treat them as equivalent even if Calcite's logical digests differ.
             String p1 = convertRelNodetoJSONQueryPlan(rel1);
@@ -623,10 +620,36 @@ public class Calcite {
         }
         // Sort/Limit: ignore sort keys, keep fetch/offset presence
         if (rel instanceof LogicalSort s) {
+            // ORDER BY is only semantically relevant when paired with LIMIT/OFFSET.
+            // For Top-N queries, the sort keys and directions determine which rows
+            // are returned, so we must include them in the canonical digest.
+            boolean topN = (s.fetch != null || s.offset != null);
+
             String fetch = s.fetch == null ? "" : ("fetch=" + canonicalizeRex(s.fetch));
             String offset = s.offset == null ? "" : ("offset=" + canonicalizeRex(s.offset));
             String meta = (fetch + (fetch.isEmpty() || offset.isEmpty() ? "" : ",") + offset).trim();
-            String head = meta.isEmpty() ? "Sort" : ("Sort(" + meta + ")");
+
+            String order = "";
+            if (topN && s.getCollation() != null && s.getCollation().getFieldCollations() != null
+                    && !s.getCollation().getFieldCollations().isEmpty()) {
+                java.util.List<String> keys = new java.util.ArrayList<>();
+                for (org.apache.calcite.rel.RelFieldCollation fc : s.getCollation().getFieldCollations()) {
+                    keys.add(fc.getFieldIndex() + ":" + fc.direction + ":" + fc.nullDirection);
+                }
+                order = "order=" + keys;
+            }
+
+            String head;
+            if (meta.isEmpty() && order.isEmpty()) {
+                head = "Sort";
+            } else if (meta.isEmpty()) {
+                head = "Sort(" + order + ")";
+            } else if (order.isEmpty()) {
+                head = "Sort(" + meta + ")";
+            } else {
+                head = "Sort(" + meta + "," + order + ")";
+            }
+
             String result = head + "->" + canonicalDigestInternal(s.getInput(), path);
             path.remove(rel);
             return result;
@@ -1907,10 +1930,25 @@ public class Calcite {
         }
         // compact label for sort/limit in tree view
         if (rel instanceof LogicalSort s) {
+            boolean topN = (s.fetch != null || s.offset != null);
             String fetch = s.fetch == null ? "" : ("fetch=" + canonicalizeRex(s.fetch));
             String offset = s.offset == null ? "" : ("offset=" + canonicalizeRex(s.offset));
             String meta = (fetch + (fetch.isEmpty() || offset.isEmpty() ? "" : ",") + offset).trim();
-            return meta.isEmpty() ? "Sort" : ("Sort(" + meta + ")");
+
+            String order = "";
+            if (topN && s.getCollation() != null && s.getCollation().getFieldCollations() != null
+                    && !s.getCollation().getFieldCollations().isEmpty()) {
+                java.util.List<String> keys = new java.util.ArrayList<>();
+                for (org.apache.calcite.rel.RelFieldCollation fc : s.getCollation().getFieldCollations()) {
+                    keys.add(fc.getFieldIndex() + ":" + fc.direction + ":" + fc.nullDirection);
+                }
+                order = "order=" + keys;
+            }
+
+            if (meta.isEmpty() && order.isEmpty()) return "Sort";
+            if (meta.isEmpty()) return "Sort(" + order + ")";
+            if (order.isEmpty()) return "Sort(" + meta + ")";
+            return "Sort(" + meta + "," + order + ")";
         }
         // fully qualified table name
         if (rel instanceof TableScan ts) {
@@ -2192,6 +2230,17 @@ public class Calcite {
     public static String convertRelNodetoJSONQueryPlan(RelNode rel)
     {
         if (rel == null) return "null";
+
+        // RelToSqlConverter in Calcite does not reliably support correlated plans
+        // (LogicalCorrelate) and can throw AssertionError such as
+        // "field ordinal X out of range". Since this method is only a best-effort
+        // fallback (Postgres EXPLAIN), we skip correlated plans instead of
+        // crashing the whole equivalence run.
+        if (containsLogicalCorrelate(rel)) {
+            System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Skipping EXPLAIN fallback: plan contains LogicalCorrelate.");
+            return null;
+        }
+
         String sql = null;
         try {
             RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
@@ -2209,11 +2258,35 @@ public class Calcite {
                 System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Generated SQL unavailable (conversion failed before SQL materialized).");
             }
             return null;
+        } catch (AssertionError e) {
+            // Calcite may throw AssertionError for some logical operator combinations
+            // during RelNode -> SQL conversion (notably correlated plans).
+            System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] AssertionError while converting RelNode to SQL: " + e.getMessage());
+            return null;
         } catch (RuntimeException e) {
             // RelToSqlConverter and SQL stringification can throw unchecked exceptions for
             // complex logical plans (especially after aggressive rule sequences).
             System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Error while converting RelNode to SQL: " + e.getMessage());
             return null;
         }
+    }
+
+    /** Detect whether a plan still contains a LogicalCorrelate. */
+    private static boolean containsLogicalCorrelate(RelNode rel) {
+        if (rel == null) return false;
+        final boolean[] found = new boolean[] { false };
+        RelVisitor v = new RelVisitor() {
+            @Override
+            public void visit(RelNode node, int ordinal, RelNode parent) {
+                if (found[0]) return;
+                if (node instanceof org.apache.calcite.rel.logical.LogicalCorrelate) {
+                    found[0] = true;
+                    return;
+                }
+                super.visit(node, ordinal, parent);
+            }
+        };
+        v.go(rel);
+        return found[0];
     }
 }

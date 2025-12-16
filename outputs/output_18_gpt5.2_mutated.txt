@@ -1,0 +1,255 @@
+-----------------------------------------------------
+Query ID: MQ4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q9
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q14
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: ETPCH_Q15
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MAX@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MIN@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MAX($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MIN($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: true
+LLM Transformations 2: []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MAX@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MIN@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MAX($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MIN($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 1 (B to A): true
+LLM Transformations 1 (B to A): []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MAX@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MIN@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MAX($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MIN($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2 (B to A): true
+LLM Transformations 2 (B to A): []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MAX@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MIN@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MAX($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MIN($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations (B to A): false
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MAX@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-01-01,1995-02-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,$x))->Join(LEFT,true){Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)|Aggregate(groups=[], calls=[MIN@0])->Project[$x]->Aggregate(groups=[0], calls=[SUM@1])->Project[$x,TIMES($x,MINUS(1,$x))]->Filter(AND(RANGE($x,1995-02-01,1995-03-01)))->Scan(public.lineitem)}|Scan(public.supplier)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MAX($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-01-01), <($10, +(1995-01-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], dir0=[ASC])
+  LogicalProject(inputs=[0..2], exprs=[[$4, $9]])
+    LogicalJoin(condition=[=($0, $8)], joinType=[inner])
+      JdbcTableScan(table=[[public, supplier]])
+      LogicalProject(inputs=[0..1])
+        LogicalFilter(condition=[=($1, $2)])
+          LogicalJoin(condition=[true], joinType=[left])
+            LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+              LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                  JdbcTableScan(table=[[public, lineitem]])
+            LogicalAggregate(group=[{}], EXPR$0=[MIN($0)])
+              LogicalProject(exprs=[[$1]])
+                LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+                  LogicalProject(exprs=[[$2, *($5, -(1, $6))]])
+                    LogicalFilter(condition=[AND(>=($10, 1995-02-01), <($10, +(1995-02-01, 1:INTERVAL MONTH)))])
+                      JdbcTableScan(table=[[public, lineitem]])
+
+
+Equivalence with transformations: false

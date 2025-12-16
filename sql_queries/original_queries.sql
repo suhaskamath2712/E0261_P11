@@ -941,13 +941,32 @@ select 100.00 * sum(case when p_type like 'PROMO%' then l_extendedprice * (1 - l
 -- Query ID: LITHE_15
 -- Description: Standard query Q15 (top supplier revenue using CTE).
 -- =================================================================
-with revenue(supplier_no, total_revenue) as (select l_suppkey, sum(l_extendedprice * (1 - l_discount)) from lineitem where l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + INTERVAL '3' MONTH group by l_suppkey) select s_suppkey, s_name, s_address, s_phone, total_revenue from supplier, revenue where s_suppkey = supplier_no and total_revenue = ( select max(total_revenue) from revenue ) order by s_suppkey ;
+with revenue(supplier_no, total_revenue) as
+    (select l_suppkey, sum(l_extendedprice * (1 - l_discount))
+    from lineitem
+    where l_shipdate >= date '1995-01-01'
+        and l_shipdate < date '1995-01-01' + INTERVAL '3' MONTH
+    group by l_suppkey)
+select s_suppkey, s_name, s_address, s_phone, total_revenue
+from supplier, revenue
+where s_suppkey = supplier_no 
+    and total_revenue = (select max(total_revenue) from revenue)
+order by s_suppkey ;
 
 -- =================================================================
 -- Query ID: LITHE_16
 -- Description: Standard query Q16 (parts/supplier relationship stats).
 -- =================================================================
-select p_brand, p_type, p_size, count(distinct ps_suppkey) as supplier_cnt from partsupp, part where p_partkey = ps_partkey and p_brand <> 'Brand#23' AND p_type NOT LIKE 'MEDIUM POLISHED%' and p_size IN (1, 4, 7) and ps_suppkey not in ( select s_suppkey from supplier where s_comment like '%Customer%Complaints%' ) group by p_brand, p_type, p_size order by supplier_cnt desc, p_brand, p_type, p_size ;
+select p_brand, p_type, p_size, count(distinct ps_suppkey) as supplier_cnt
+from partsupp, part
+where p_partkey = ps_partkey
+    and p_brand <> 'Brand#23'
+    AND p_type NOT LIKE 'MEDIUM POLISHED%'
+    and p_size IN (1, 4, 7)
+    and ps_suppkey not in 
+        (select s_suppkey from supplier where s_comment like '%Customer%Complaints%')
+group by p_brand, p_type, p_size
+order by supplier_cnt desc, p_brand, p_type, p_size;
 
 -- =================================================================
 -- Query ID: LITHE_17
@@ -971,7 +990,21 @@ select sum(l_extendedprice* (1 - l_discount)) as revenue from lineitem, part whe
 -- Query ID: LITHE_20
 -- Description: Standard query Q20 (suppliers for ivory parts in France with availability filter).
 -- =================================================================
-select s_name, s_address from supplier, nation where s_suppkey in ( select ps_suppkey from partsupp where ps_partkey in ( select p_partkey from part where p_name like '%ivory%' ) and ps_availqty > ( select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + INTERVAL '1' YEAR ) ) and s_nationkey = n_nationkey and n_name = 'FRANCE' order by s_name ;
+select s_name, s_address
+from supplier, nation
+where s_suppkey in 
+    (select ps_suppkey from partsupp
+    where ps_partkey in (select p_partkey from part where p_name like '%ivory%')
+        and ps_availqty > (select 0.5 * sum(l_quantity)
+                            from lineitem 
+                            where l_partkey = ps_partkey 
+                                and l_suppkey = ps_suppkey 
+                                and l_shipdate >= date '1995-01-01' 
+                                and l_shipdate < date '1995-01-01' + INTERVAL '1' YEAR )
+    )
+    and s_nationkey = n_nationkey 
+    and n_name = 'FRANCE' 
+order by s_name ;
 
 -- =================================================================
 -- Query ID: LITHE_21

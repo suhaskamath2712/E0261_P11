@@ -54,7 +54,13 @@ public class GetQueryPlans {
         }
     }
 
-    // Keys to drop from the JSON plan tree (implementation/executor-specific)
+    // Keys to drop from the JSON plan tree (execution-/implementation-specific).
+    //
+    // IMPORTANT: Do NOT remove predicate- or ordering-bearing fields such as
+    // "Filter", "Index Cond", "Hash Cond", "Merge Cond", "Sort Key", or
+    // "Scan Direction". Those can encode query semantics (especially with
+    // LIMIT/OFFSET) and removing them can create false positives where
+    // different queries appear to have the same cleaned plan.
     private static final Set<String> KEYS_TO_REMOVE = Set.of(
         // Execution timings and counters
         "Planning Time", "Execution Time", "Actual Rows", "Actual Loops",
@@ -66,18 +72,18 @@ public class GetQueryPlans {
         "I/O Read Time", "I/O Write Time",
         // Top-level wrapper lifted separately
         "Plan",
-        // Implementation-specific executor details (from sample plan)
-        "Sort Method", "Sort Space Used", "Sort Space Type", "Sort Key",
+        // Implementation-specific executor details
+        "Sort Method", "Sort Space Used", "Sort Space Type",
         "Workers Launched", "Workers Planned", "Workers", "Worker Number",
         "Parallel Aware", "Async Capable",
-        // Costing and width/row estimates
-        "Startup Cost", "Total Cost", "Plan Width", "Plan Rows",
-        // Scan/index implementation details
-        "Scan Direction", "Index Name", "Index Cond", "Rows Removed by Index Recheck", "Heap Fetches",
+        // Costing and width estimates (planner noise)
+        "Startup Cost", "Total Cost", "Plan Width",
+        // Scan/index implementation details (implementation, not semantics)
+        "Index Name", "Rows Removed by Index Recheck", "Heap Fetches",
         // Hash join/hash node internals
         "Hash Buckets", "Original Hash Buckets", "Hash Batches", "Original Hash Batches", "Peak Memory Usage",
-        // Join implementation extras
-        "Inner Unique", "Join Filter", "Rows Removed by Join Filter",
+        // Join implementation extras / executor bookkeeping
+        "Inner Unique", "Rows Removed by Join Filter",
         // Planner bookkeeping / tree wrapper
         "Parent Relationship"
     );

@@ -509,13 +509,32 @@ select 100.00 * sum(case when p_type like 'PROMO%' then l_extendedprice * (1 - l
 -- Query ID: LITHE_15
 -- Description: Standard query Q15 (top supplier revenue using CTE).
 -- =================================================================
-SELECT s.s_suppkey, s.s_name, s.s_address, s.s_phone, r.total_revenue FROM ( SELECT l_suppkey AS supplier_no, SUM(l_extendedprice * (1 - l_discount)) AS total_revenue, MAX(SUM(l_extendedprice * (1 - l_discount))) OVER () AS max_revenue FROM lineitem WHERE l_shipdate >= DATE '1995-01-01' AND l_shipdate < DATE '1995-01-01' + INTERVAL '3' MONTH GROUP BY l_suppkey ) r JOIN supplier s ON s.s_suppkey = r.supplier_no WHERE r.total_revenue = r.max_revenue ORDER BY s.s_suppkey;
+SELECT s.s_suppkey, s.s_name, s.s_address, s.s_phone, r.total_revenue
+FROM (SELECT l_suppkey AS supplier_no,
+            SUM(l_extendedprice * (1 - l_discount)) AS total_revenue,
+            MAX(SUM(l_extendedprice * (1 - l_discount))) OVER () AS max_revenue
+        FROM lineitem
+        WHERE l_shipdate >= DATE '1995-01-01' 
+            AND l_shipdate < DATE '1995-01-01' + INTERVAL '3' MONTH 
+        GROUP BY l_suppkey ) r
+JOIN supplier s ON s.s_suppkey = r.supplier_no
+WHERE r.total_revenue = r.max_revenue
+ORDER BY s.s_suppkey;
 
 -- =================================================================
 -- Query ID: LITHE_16
 -- Description: Standard query Q16 (parts/supplier relationship stats).
 -- =================================================================
-SELECT p_brand, p_type, p_size, COUNT(DISTINCT ps_suppkey) AS supplier_cnt FROM partsupp JOIN part ON p_partkey = ps_partkey LEFT JOIN supplier ON ps_suppkey = s_suppkey AND s_comment LIKE '%Customer%Complaints%' WHERE p_brand <> 'Brand#23' AND p_type NOT LIKE 'MEDIUM POLISHED%' AND p_size IN (1, 4, 7) AND s_suppkey IS NULL GROUP BY p_brand, p_type, p_size ORDER BY supplier_cnt DESC, p_brand, p_type, p_size;
+SELECT p_brand, p_type, p_size, COUNT(DISTINCT ps_suppkey) AS supplier_cnt
+FROM partsupp JOIN part ON p_partkey = ps_partkey
+LEFT JOIN supplier ON ps_suppkey = s_suppkey
+    AND s_comment LIKE '%Customer%Complaints%'
+WHERE p_brand <> 'Brand#23'
+    AND p_type NOT LIKE 'MEDIUM POLISHED%' 
+    AND p_size IN (1, 4, 7) 
+    AND s_suppkey IS NULL 
+GROUP BY p_brand, p_type, p_size 
+ORDER BY supplier_cnt DESC, p_brand, p_type, p_size;
 
 -- =================================================================
 -- Query ID: LITHE_17
@@ -539,7 +558,22 @@ select sum(l_extendedprice* (1 - l_discount)) as revenue from lineitem, part whe
 -- Query ID: LITHE_20
 -- Description: Standard query Q20 (suppliers for ivory parts in France with availability filter).
 -- =================================================================
-with filtered_supplier as ( select * from supplier where s_nationkey in ( select n_nationkey from nation where n_name = 'FRANCE' ) ) select s_name, s_address from filtered_supplier as supplier, nation where s_suppkey in ( select ps_suppkey from partsupp where ps_partkey in ( select p_partkey from part where p_name like '%ivory%' ) and ps_availqty > ( select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1995-01-01' and l_shipdate < date '1995-01-01' + INTERVAL '1' YEAR ) ) and s_nationkey = n_nationkey and n_name = 'FRANCE' order by s_name; 
+with filtered_supplier as (select * from supplier where s_nationkey in 
+    (select n_nationkey from nation where n_name = 'FRANCE'))
+select s_name, s_address 
+from filtered_supplier as supplier, nation 
+where s_suppkey in 
+    (select ps_suppkey from partsupp where ps_partkey in 
+        (select p_partkey from part where p_name like '%ivory%') 
+        and ps_availqty >  
+            (select 0.5 * sum(l_quantity) from lineitem
+            where l_partkey = ps_partkey 
+                and l_suppkey = ps_suppkey 
+                and l_shipdate >= date '1995-01-01' 
+                and l_shipdate < date '1995-01-01' + INTERVAL '1' YEAR)) 
+    and s_nationkey = n_nationkey 
+    and n_name = 'FRANCE' 
+order by s_name; 
 
 -- =================================================================
 -- Query ID: LITHE_21
