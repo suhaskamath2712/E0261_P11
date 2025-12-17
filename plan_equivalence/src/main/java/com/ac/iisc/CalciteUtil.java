@@ -8,7 +8,8 @@ import java.util.List;
 import java.util.Locale;
 
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
-import org.apache.calcite.config.Lex;
+import org.apache.calcite.avatica.util.Casing;
+import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -86,9 +87,19 @@ public final class CalciteUtil {
             JdbcSchema pgJdbcSchema = JdbcSchema.create(rootSchema, PG_SCHEMA, dataSource, PG_SCHEMA, null);
             rootSchema.add(PG_SCHEMA, pgJdbcSchema);
 
-            // Parser config: use MySQL lex, which is close to PostgreSQL for
-            // identifier folding and quoting in this workload.
-            SqlParser.Config parserConfig = SqlParser.config().withLex(Lex.MYSQL);
+            // Parser config: PostgreSQL-style behavior.
+            // - Double quotes delimit identifiers (e.g., "returns").
+            // - Unquoted identifiers fold to lower-case.
+            // - Matching is case-insensitive (consistent with typical SQL usage).
+            //
+            // NOTE: The Calcite connection property (info[lex]=JAVA) influences
+            // metadata/connection defaults, but the parser used by FrameworkConfig
+            // must be configured explicitly as well.
+            SqlParser.Config parserConfig = SqlParser.config()
+                .withQuoting(Quoting.DOUBLE_QUOTE)
+                .withUnquotedCasing(Casing.TO_LOWER)
+                .withQuotedCasing(Casing.UNCHANGED)
+                .withCaseSensitive(false);
 
             // Operator table: include standard SQL operators plus PostgreSQL- and
             // MySQL-specific functions such as LEAST/GREATEST so that validation

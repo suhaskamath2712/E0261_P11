@@ -51,6 +51,10 @@ Key public methods:
 - `RelNode applyTransformations(RelNode rel, List<String> transformations)`
    - Applies an allow-listed set of Calcite planner rules (HepPlanner).
 
+ - `String relNodeToSql(RelNode rel)`
+   - Best-effort Rel→SQL renderer using `RelToSqlConverter` + `PostgresqlSqlDialect`.
+   - Attempts to normalize/decorrelate the plan first; returns `null` for correlated plans or on conversion failure.
+
 - `String convertRelNodetoJSONQueryPlan(RelNode rel)`
    - Best-effort `RelNode` → SQL → PostgreSQL `EXPLAIN (FORMAT JSON, BUFFERS)`.
    - Returns `null` if SQL rendering or EXPLAIN fails.

@@ -1,0 +1,419 @@
+-----------------------------------------------------
+Query ID: TPCDS_Q1
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q2
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q3
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q4
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q5
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q6
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q7
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q8
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q9
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q10
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q11
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q12
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q13
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q14
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q15
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q16
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q17
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q18
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q19
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q20
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q21
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q22
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q23
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q24
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q25
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q26
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q27
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q28
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q29
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q30
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q31
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q32
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q33
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q34
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x,$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(RANGE($x,15,20))->Aggregate(groups=[0, 1], calls=[COUNT@-1])->Project[$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,'Williamson County'))->Scan(public.store)|Filter(AND(<($x,0)&CASE(<($x,0),<(1.2:DECIMAL(2, 1),DIVIDE($x,$x)),false)&SEARCH($x,Sarg['0-500', '1001-5000'])))->Scan(public.household_demographics)|Filter(AND(OR(=($x,2000),=($x,PLUS(1,2000)),=($x,PLUS(2,2000)))&RANGE($x,1,3)))->Scan(public.date_dim)|Scan(public.store_sales)}|Scan(public.customer)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x,$x,$x,$x,$x,$x]->Join(INNER,=($x,$x)){Filter(RANGE($x,15,20))->Aggregate(groups=[0, 1], calls=[COUNT@-1])->Project[$x,$x]->Join(INNER,=($x,$x)){Filter(=($x,'Williamson County':VARCHAR(30)))->Scan(public.store)|Filter(AND(<($x,0)&<(1.2:DECIMAL(2, 1),DIVIDE($x,CASE(=($x,0),null:INTEGER,$x)))&SEARCH($x,Sarg['0-500', '1001-5000'])))->Scan(public.household_demographics)|Filter(AND(RANGE($x,1,3)&RANGE($x,2000,2002)))->Scan(public.date_dim)|Scan(public.store_sales)}|Scan(public.customer)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$12, $11, $10, $13, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalAggregate(group=[{0, 1}], cnt=[COUNT()])
+          LogicalProject(exprs=[[$3, $0]])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), OR(=($6, 2000), =($6, +(2000, 1)), =($6, +(2000, 2))))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500          ', '1001-5000      ']:CHAR(15)), >($4, 0), CASE(>($4, 0), >(/($3, $4), 1.2:DECIMAL(2, 1)), false))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      JdbcTableScan(table=[[public, customer]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$12, $11, $10, $13, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalAggregate(group=[{0, 1}], cnt=[COUNT()])
+          LogicalProject(exprs=[[$3, $0]])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), SEARCH($6, Sarg[[2000..2002]]))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500':CHAR(9), '1001-5000']:CHAR(9)), >($4, 0), >(/($3, CASE(=($4, 0), null:INTEGER, $4)), 1.2:DECIMAL(2, 1)))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      JdbcTableScan(table=[[public, customer]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: false
+-----------------------------------------------------
+Query ID: TPCDS_Q35
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q36
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q37
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q38
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q39
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q40
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q41
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q42
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q43
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q44
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q45
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q46
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q47
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q48
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q49
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q50
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q51
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q52
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q53
+Equivalence without transformations: false
+LLM Equivalence 1: true
+LLM Transformations 1: []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[2:ASCENDING:LAST, 1:ASCENDING:LAST, 0:ASCENDING:LAST])->Filter(CASE(<($x,0),<(0.1:DECIMAL(2, 1),DIVIDE(OTHER_FUNCTION(MINUS($x,$x)),$x)),false))->Project[$x,$x,DIVIDE(CASE(<(0:BIGINT,COUNT($x)),SUM0($x),null:DECIMAL(19, 2)),COUNT($x))]->Aggregate(groups=[0, 1], calls=[SUM@2])->Project[$x,$x,$x]->Join(INNER,=($x,$x)){Filter(OR(=($x,1186),=($x,PLUS(1,1186)),=($x,PLUS(10,1186)),=($x,PLUS(11,1186)),=($x,PLUS(1186,2)),=($x,PLUS(1186,3)),=($x,PLUS(1186,4)),=($x,PLUS(1186,5)),=($x,PLUS(1186,6)),=($x,PLUS(1186,7)),=($x,PLUS(1186,8)),=($x,PLUS(1186,9))))->Scan(public.date_dim)|Filter(OR(AND(SEARCH($x,Sarg['Books', 'Children', 'Electronics'])&SEARCH($x,Sarg['exportiunivamalg #9', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9'])&SEARCH($x,Sarg['personal', 'portable', 'reference', 'self-help'])),AND(SEARCH($x,Sarg['Men', 'Music', 'Women'])&SEARCH($x,Sarg['accessories', 'classical', 'fragrances', 'pants'])&SEARCH($x,Sarg['amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1']))))->Scan(public.item)|Scan(public.store)|Scan(public.store_sales)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[2:ASCENDING:LAST, 1:ASCENDING:LAST, 0:ASCENDING:LAST])->Filter(CASE(<($x,0),<(0.1:DECIMAL(2, 1),DIVIDE(OTHER_FUNCTION(MINUS($x,$x)),$x)),false))->Project[$x,$x,DIVIDE(CASE(<(0:BIGINT,COUNT($x)),SUM0($x),null:DECIMAL(19, 2)),COUNT($x))]->Aggregate(groups=[0, 1], calls=[SUM@2])->Project[$x,$x,$x]->Join(INNER,=($x,$x)){Filter(OR(AND(SEARCH($x,Sarg['Books', 'Children', 'Electronics'])&SEARCH($x,Sarg['exportiunivamalg #9', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9'])&SEARCH($x,Sarg['personal', 'portable', 'reference', 'self-help'])),AND(SEARCH($x,Sarg['Men', 'Music', 'Women'])&SEARCH($x,Sarg['accessories', 'classical', 'fragrances', 'pants'])&SEARCH($x,Sarg['amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1']))))->Scan(public.item)|Filter(RANGE($x,1186,1197))->Scan(public.date_dim)|Scan(public.store)|Scan(public.store_sales)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$2], sort1=[$1], sort2=[$0], dir0=[ASC], dir1=[ASC], dir2=[ASC], fetch=[100])
+  LogicalFilter(condition=[CASE(>($2, 0), >(/(ABS(-($1, $2)), $2), 0.1:DECIMAL(2, 1)), false)])
+    LogicalProject(inputs=[0], exprs=[[$2, /(CASE(>(COUNT($2) OVER (PARTITION BY $0), 0), $SUM0($2) OVER (PARTITION BY $0), null:DECIMAL(19, 2)), COUNT($2) OVER (PARTITION BY $0))]])
+      LogicalAggregate(group=[{0, 1}], sum_sales=[SUM($2)])
+        LogicalProject(exprs=[[$13, $55, $35]])
+          LogicalJoin(condition=[=($29, $73)], joinType=[inner])
+            LogicalJoin(condition=[=($24, $0)], joinType=[inner])
+              LogicalFilter(condition=[OR(AND(SEARCH($12, Sarg['Books':CHAR(11), 'Children':CHAR(11), 'Electronics']:CHAR(11)), SEARCH($10, Sarg['personal':CHAR(9), 'portable':CHAR(9), 'reference', 'self-help']:CHAR(9)), SEARCH($8, Sarg['exportiunivamalg #9':CHAR(21), 'scholaramalgamalg #14', 'scholaramalgamalg #7':CHAR(21), 'scholaramalgamalg #9':CHAR(21)]:CHAR(21))), AND(SEARCH($12, Sarg['Men':CHAR(5), 'Music', 'Women']:CHAR(5)), SEARCH($10, Sarg['accessories', 'classical':CHAR(11), 'fragrances':CHAR(11), 'pants':CHAR(11)]:CHAR(11)), SEARCH($8, Sarg['amalgimporto #1':CHAR(18), 'edu packscholar #1', 'exportiimporto #1':CHAR(18), 'importoamalg #1':CHAR(18)]:CHAR(18))))])
+                JdbcTableScan(table=[[public, item]])
+              LogicalJoin(condition=[=($0, $23)], joinType=[inner])
+                JdbcTableScan(table=[[public, store_sales]])
+                LogicalFilter(condition=[OR(=($3, 1186), =($3, +(1186, 1)), =($3, +(1186, 2)), =($3, +(1186, 3)), =($3, +(1186, 4)), =($3, +(1186, 5)), =($3, +(1186, 6)), =($3, +(1186, 7)), =($3, +(1186, 8)), =($3, +(1186, 9)), =($3, +(1186, 10)), =($3, +(1186, 11)))])
+                  JdbcTableScan(table=[[public, date_dim]])
+            JdbcTableScan(table=[[public, store]])
+
+
+Rel2: 
+LogicalSort(sort0=[$2], sort1=[$1], sort2=[$0], dir0=[ASC], dir1=[ASC], dir2=[ASC], fetch=[100])
+  LogicalFilter(condition=[CASE(>($2, 0), >(/(ABS(-($1, $2)), $2), 0.1:DECIMAL(2, 1)), false)])
+    LogicalProject(inputs=[0], exprs=[[$2, /(CASE(>(COUNT($2) OVER (PARTITION BY $0), 0), $SUM0($2) OVER (PARTITION BY $0), null:DECIMAL(19, 2)), COUNT($2) OVER (PARTITION BY $0))]])
+      LogicalAggregate(group=[{0, 1}], sum_sales=[SUM($2)])
+        LogicalProject(exprs=[[$13, $55, $35]])
+          LogicalJoin(condition=[=($29, $73)], joinType=[inner])
+            LogicalJoin(condition=[=($24, $0)], joinType=[inner])
+              LogicalFilter(condition=[OR(AND(SEARCH($12, Sarg['Books':CHAR(11), 'Children':CHAR(11), 'Electronics']:CHAR(11)), SEARCH($10, Sarg['personal':CHAR(9), 'portable':CHAR(9), 'reference', 'self-help']:CHAR(9)), SEARCH($8, Sarg['exportiunivamalg #9':CHAR(21), 'scholaramalgamalg #14', 'scholaramalgamalg #7':CHAR(21), 'scholaramalgamalg #9':CHAR(21)]:CHAR(21))), AND(SEARCH($12, Sarg['Men':CHAR(5), 'Music', 'Women']:CHAR(5)), SEARCH($10, Sarg['accessories', 'classical':CHAR(11), 'fragrances':CHAR(11), 'pants':CHAR(11)]:CHAR(11)), SEARCH($8, Sarg['amalgimporto #1':CHAR(18), 'edu packscholar #1', 'exportiimporto #1':CHAR(18), 'importoamalg #1':CHAR(18)]:CHAR(18))))])
+                JdbcTableScan(table=[[public, item]])
+              LogicalJoin(condition=[=($0, $23)], joinType=[inner])
+                JdbcTableScan(table=[[public, store_sales]])
+                LogicalFilter(condition=[SEARCH($3, Sarg[[1186..1197]])])
+                  JdbcTableScan(table=[[public, date_dim]])
+            JdbcTableScan(table=[[public, store]])
+
+
+Equivalence with transformations: false
+LLM Equivalence 2: false
+-----------------------------------------------------
+Query ID: TPCDS_Q54
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q55
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q56
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q57
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q58
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q59
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q60
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q61
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q62
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q63
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q64
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q65
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q66
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q67
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q68
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q69
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q70
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q71
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q72
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q73
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q74
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q75
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q76
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q77
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q78
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q79
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q80
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q81
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q82
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q83
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q84
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q85
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q86
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q87
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q88
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q89
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q90
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q91
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q92
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q93
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q94
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q95
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q96
+Equivalence without transformations: false
+LLM Equivalence 1: false
+-----------------------------------------------------
+Query ID: TPCDS_Q97
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q98
+Equivalence without transformations: true
+-----------------------------------------------------
+Query ID: TPCDS_Q99
+Equivalence without transformations: true

@@ -92,6 +92,12 @@ Important details:
 - Cleaning removes run-specific/execution-only keys but preserves semantic keys to reduce false positives.
 - Some plans cannot be converted to SQL (notably correlated plans); the fallback is best-effort.
 
+Additional helpers:
+
+- `Calcite.relNodeToSql(RelNode)` — new helper that attempts to render a `RelNode` back to a SQL string using Calcite's `RelToSqlConverter` with `PostgresqlSqlDialect`. The method first tries to normalize and decorrelate the plan; if the plan still contains a `LogicalCorrelate` or conversion fails, it returns `null`.
+
+- Rel→SQL equality check — as a conservative, positive-only check, the engine may attempt to render both RelNodes to SQL and compare their normalized SQL text. If both rendered SQLs are identical after normalization (whitespace/semicolon normalization), the checker treats the queries as equivalent. This is an additional positive signal and never used to prove non-equivalence.
+
 ## Configuration
 
 Settings are read from `plan_equivalence/src/main/resources/config.properties` via `FileIO`.

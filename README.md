@@ -29,6 +29,8 @@ High-level flow:
    - **Canonical digest + AND safety-net**: lexicographically sorts textual `AND(...)` term lists (`normalizeAndOrderingInDigest`)
    - **Optional EXPLAIN fallback**: generate SQL via `RelToSqlConverter`, run `EXPLAIN (FORMAT JSON, BUFFERS)`, clean non-semantic keys, and compare the cleaned JSON.
 
+  - **Rel→SQL helper and equality check**: the engine includes `Calcite.relNodeToSql(RelNode)` — a best-effort Rel→SQL renderer using `RelToSqlConverter` with `PostgresqlSqlDialect`. As an additional positive-only signal, the engine may render both RelNodes to SQL, normalize whitespace/semicolons, and treat the queries as equivalent if the rendered SQLs are identical. This is conservative and never used to prove non-equivalence.
+
 ### Canonicalization highlights
 
 `canonicalDigest(RelNode)` is where most robustness lives:

@@ -74,6 +74,9 @@ Common keys:
 
 The EXPLAIN-based fallback is **best-effort**:
 
-- Conversion from `RelNode` → SQL can fail for some plans (notably correlated plans).
-- EXPLAIN equality is not a formal proof of semantic equivalence; it’s used only as a last resort.
-- Plan cleaning removes non-semantic, run-specific keys (timings, buffers, costs) but keeps semantic fields.
+
+Additional utilities
+
+- `Calcite.relNodeToSql(RelNode)` — helper to render a relational plan back to SQL (PostgreSQL dialect). It is a best-effort tool (returns `null` for correlated plans or on conversion errors).
+
+- Rel→SQL equality check — as an extra positive-only equivalence signal, the engine will attempt to render both RelNodes to SQL and compare normalized SQL text; if identical, the queries are treated as equivalent. This check is conservative and is not used to establish non-equivalence.

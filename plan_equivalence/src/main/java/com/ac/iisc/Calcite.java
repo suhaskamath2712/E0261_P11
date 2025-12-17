@@ -43,6 +43,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.RelBuilder;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -228,6 +229,14 @@ public class Calcite {
             // not register them as built-ins.
             sqlForParse = CalciteUtil.rewriteLeastGreatest(sqlForParse);
 
+            // Compatibility shim: TPC-DS/PostgreSQL commonly use SUBSTR(...).
+            // Calcite supports SUBSTRING(...) and, in Calcite 1.36, certain
+            // SUBSTR operator definitions can trigger a validation/type-coercion
+            // ClassCastException (FamilyOperandTypeChecker -> SqlOperandMetadata).
+            // Rewriting SUBSTR to SUBSTRING keeps semantics (Postgres synonym)
+            // but routes validation through the stable built-in operator.
+            sqlForParse = sqlForParse.replaceAll("(?i)\\bsubstr\\s*\\(", "substring(");
+
             // Compatibility shim: expand SELECT aliases referenced in the
             // outermost GROUP BY (e.g., "GROUP BY o_year" where o_year is an
             // alias for EXTRACT(YEAR FROM o_orderdate)).
@@ -346,7 +355,10 @@ public class Calcite {
 
             // Delegate to the RelNode-based equivalence checker so the core
             // comparison logic is shared between SQL-string and RelNode APIs.
-            return compareRelNodesForEquivalence(rel1, rel2, transformations);
+            // We also pass the original SQL strings so the final Postgres EXPLAIN
+            // fallback can run even when Calcite produces correlated plans
+            // (LogicalCorrelate), which RelToSqlConverter cannot reliably render.
+            return compareRelNodesForEquivalence(rel1, rel2, transformations, sql1, sql2);
         } catch (Exception e)
         {
             // Planning/parsing/validation error: treat as non-equivalent.
@@ -375,6 +387,20 @@ public class Calcite {
      * overloads.
      */
     private static boolean compareRelNodesForEquivalence(RelNode rel1, RelNode rel2, List<String> transformations) {
+        return compareRelNodesForEquivalence(rel1, rel2, transformations, null, null);
+    }
+
+    /**
+     * Core equivalence logic over RelNodes; optionally retains the original SQL strings
+     * so Postgres EXPLAIN fallback can run even when plans contain correlates.
+     */
+    private static boolean compareRelNodesForEquivalence(
+        RelNode rel1,
+        RelNode rel2,
+        List<String> transformations,
+        String sql1,
+        String sql2
+    ) {
         if (rel1 == null || rel2 == null) {
             return false;
         }
@@ -422,12 +448,43 @@ public class Calcite {
             String c2AndNorm = normalizeAndOrderingInDigest(c2);
             if (c1AndNorm.equals(c2AndNorm)) return true;
 
+            // Additional positive check (best-effort): convert both plans back to SQL
+            // and see if they converge to the same SQL text.
+            //
+            // Soundness: if both plans can be rendered to the same SQL statement (under
+            // the same dialect/rendering rules), then they are equivalent under Calcite's
+            // semantics. However, the converse is NOT true: differing rendered SQL does
+            // not imply non-equivalence (converter choices/aliases/order may differ).
+            String sx1 = relNodeToSql(rel1);
+            String sx2 = relNodeToSql(rel2);
+            if (sx1 != null && sx2 != null) {
+                String nsx1 = normalizeSqlForComparison(sx1);
+                String nsx2 = normalizeSqlForComparison(sx2);
+                if (nsx1 != null && nsx1.equals(nsx2)) return true;
+            }
+
             // Final fallback: compare cleaned PostgreSQL execution plans as a last resort.
             // If both queries yield the same physical plan on the target database,
             // treat them as equivalent even if Calcite's logical digests differ.
-            String p1 = convertRelNodetoJSONQueryPlan(rel1);
-            String p2 = convertRelNodetoJSONQueryPlan(rel2);
-            if (p1 != null && p1.equals(p2)) return true;
+            //
+            // Important: Calcite often represents correlated scalar subqueries as
+            // LogicalCorrelate. RelToSqlConverter is not reliable for such plans.
+            // If either plan still contains LogicalCorrelate, fall back to
+            // EXPLAINing the original SQL strings directly.
+            String p1 = null;
+            String p2 = null;
+            boolean correlatePresent = containsLogicalCorrelate(rel1) || containsLogicalCorrelate(rel2);
+            if (!correlatePresent) {
+                p1 = convertRelNodetoJSONQueryPlan(rel1);
+                p2 = convertRelNodetoJSONQueryPlan(rel2);
+                if (p1 != null && p1.equals(p2)) return true;
+            }
+
+            if ((p1 == null || p2 == null) && sql1 != null && sql2 != null) {
+                String sp1 = convertSqlToJSONQueryPlan(sql1);
+                String sp2 = convertSqlToJSONQueryPlan(sql2);
+                if (sp1 != null && sp1.equals(sp2)) return true;
+            }
 
             if (transformations != null) {
                 // Debug: print canonical digests as well to understand any
@@ -447,6 +504,25 @@ public class Calcite {
     }
 
     /**
+     * Run PostgreSQL EXPLAIN (FORMAT JSON...) on raw SQL text (best-effort).
+     *
+     * This bypasses RelToSqlConverter and therefore works even when Calcite's
+     * relational plan contains LogicalCorrelate (common for correlated subqueries).
+     */
+    private static String convertSqlToJSONQueryPlan(String sql) {
+        if (sql == null) return null;
+        String s = sql.trim();
+        while (s.endsWith(";")) s = s.substring(0, s.length() - 1).trim();
+        if (s.isBlank()) return null;
+        try {
+            return GetQueryPlans.getCleanedQueryPlanJSONasString(s);
+        } catch (SQLException e) {
+            System.err.println("[Calcite.convertSqlToJSONQueryPlan] Error while obtaining plan: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Normalize a digest string by replacing input references like $0, $12 with a
      * placeholder ($x) and collapsing repeated spaces. This reduces sensitivity to
      * field index positions that shift when join inputs are swapped.
@@ -460,6 +536,22 @@ public class Calcite {
         String s = digest.replaceAll("\\$\\d+", "\\$x");
         // Collapse multiple spaces for stability so cosmetic spacing doesn't differ
         s = s.replaceAll("[ ]+", " ");
+        return s.trim();
+    }
+
+    /**
+     * Normalize SQL text for comparison.
+     *
+     * This is intentionally conservative: it only removes trailing semicolons
+     * and collapses whitespace so that formatting differences from RelToSql
+     * do not cause false mismatches.
+     */
+    private static String normalizeSqlForComparison(String sql) {
+        if (sql == null) return null;
+        String s = sql.trim();
+        while (s.endsWith(";")) s = s.substring(0, s.length() - 1).trim();
+        if (s.isBlank()) return "";
+        s = s.replaceAll("\\s+", " ");
         return s.trim();
     }
 
@@ -2192,9 +2284,13 @@ public class Calcite {
         hp.setRoot(cur);
         cur = hp.findBestExp();
 
-        // Then, decorrelate to transform LogicalCorrelate into joins when possible
+        // Then, decorrelate to transform LogicalCorrelate into joins when possible.
+        // Use the RelBuilder overload (non-deprecated) so Calcite has the
+        // necessary factories/context.
         try {
-            cur = RelDecorrelator.decorrelateQuery(cur);
+            FrameworkConfig cfg = CalciteUtil.getFrameworkConfig();
+            RelBuilder rb = RelBuilder.create(cfg);
+            cur = RelDecorrelator.decorrelateQuery(cur, rb);
         } catch (Throwable t) {
             // Best-effort: if decorrelation not applicable, keep the current plan
         }
@@ -2213,6 +2309,54 @@ public class Calcite {
         cur = hp2.findBestExp();
 
         return cur;
+    }
+    
+    /**
+     * Convert a {@link RelNode} back to a SQL string (PostgreSQL dialect).
+     *
+     * This is a best-effort helper intended for debugging, logging, and
+     * downstream systems that need an executable SQL representation of a
+     * relational plan.
+     *
+     * Notes:
+     * - We first attempt to normalize scalar subqueries and decorrelate the
+     *   plan (see {@link #normalizeSubqueriesAndDecorrelate(RelNode)}), because
+     *   Calcite's {@link RelToSqlConverter} is not reliable for correlated plans.
+     * - If a {@code LogicalCorrelate} remains after decorrelation, we return
+     *   {@code null} rather than throwing.
+     *
+     * @param rel relational plan
+     * @return SQL string in PostgreSQL dialect, or {@code null} if conversion is
+     *         not possible (e.g., correlated plan) or on conversion errors
+     */
+    public static String relNodeToSql(RelNode rel) {
+        if (rel == null) return null;
+
+        RelNode relForSql = rel;
+        try {
+            relForSql = normalizeSubqueriesAndDecorrelate(rel);
+        } catch (Throwable t) {
+            // Best-effort: fall back to the original RelNode.
+            relForSql = rel;
+        }
+
+        // RelToSqlConverter can fail catastrophically on correlated plans.
+        if (containsLogicalCorrelate(relForSql)) {
+            System.err.println("[Calcite.relNodeToSql] Cannot convert correlated plan (LogicalCorrelate present).");
+            return null;
+        }
+
+        try {
+            RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
+            RelToSqlConverter.Result res = converter.visitRoot(relForSql);
+            return res.asStatement().toSqlString(PostgresqlSqlDialect.DEFAULT).getSql();
+        } catch (AssertionError e) {
+            System.err.println("[Calcite.relNodeToSql] AssertionError while converting RelNode to SQL: " + e.getMessage());
+            return null;
+        } catch (RuntimeException e) {
+            System.err.println("[Calcite.relNodeToSql] Error while converting RelNode to SQL: " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -2237,12 +2381,24 @@ public class Calcite {
     {
         if (rel == null) return "null";
 
+        // Best-effort: many benchmark queries contain correlated scalar subqueries
+        // (e.g., TPCDS_Q6), which appear as LogicalCorrelate in the initial plan.
+        // RelToSqlConverter often fails on correlated plans, but Calcite can
+        // decorrelate many of them into joins/aggregates. Try that first.
+        RelNode relForSql = rel;
+        try {
+            relForSql = normalizeSubqueriesAndDecorrelate(rel);
+        } catch (Throwable t) {
+            // If anything goes wrong, fall back to the original RelNode.
+            relForSql = rel;
+        }
+
         // RelToSqlConverter in Calcite does not reliably support correlated plans
         // (LogicalCorrelate) and can throw AssertionError such as
         // "field ordinal X out of range". Since this method is only a best-effort
         // fallback (Postgres EXPLAIN), we skip correlated plans instead of
         // crashing the whole equivalence run.
-        if (containsLogicalCorrelate(rel)) {
+        if (containsLogicalCorrelate(relForSql)) {
             System.err.println("[Calcite.convertRelNodetoJSONQueryPlan] Skipping EXPLAIN fallback: plan contains LogicalCorrelate.");
             return null;
         }
@@ -2250,7 +2406,7 @@ public class Calcite {
         String sql = null;
         try {
             RelToSqlConverter converter = new RelToSqlConverter(PostgresqlSqlDialect.DEFAULT);
-            RelToSqlConverter.Result res = converter.visitRoot(rel);
+            RelToSqlConverter.Result res = converter.visitRoot(relForSql);
             sql = res.asStatement().toSqlString(PostgresqlSqlDialect.DEFAULT).getSql();
 
             return GetQueryPlans.getCleanedQueryPlanJSONasString(sql);
