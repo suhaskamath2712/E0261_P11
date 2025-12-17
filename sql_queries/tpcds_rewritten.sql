@@ -3,27 +3,23 @@
 -- Description: Find customers with returns 20% higher than the average
 -- for a specific store in a specific year.
 -- =================================================================
-WITH customer_total_return AS 
-    (SELECT sr_customer_sk AS ctr_customer_sk,
-        sr_store_sk AS ctr_store_sk, 
-        SUM(sr_fee) AS ctr_total_return 
-    FROM store_returns JOIN date_dim ON sr_returned_date_sk = d_date_sk 
-    WHERE d_year = 2000 
-    GROUP BY sr_customer_sk, sr_store_sk),
-    
-    average_total_return AS
-    (SELECT ctr_store_sk, AVG(ctr_total_return) * 1.2 AS avg_total_return
-    FROM customer_total_return
-    GROUP BY ctr_store_sk) 
-SELECT c_customer_id
-FROM customer_total_return ctr1
-JOIN store ON ctr1.ctr_store_sk = s_store_sk 
-JOIN customer ON ctr1.ctr_customer_sk = c_customer_sk 
-JOIN average_total_return atr ON ctr1.ctr_store_sk = atr.ctr_store_sk 
-WHERE ctr1.ctr_total_return > atr.avg_total_return 
-    AND s_state = 'TN' 
-    ORDER BY c_customer_id 
-    LIMIT 100;
+with customer_total_return as
+  (select sr_customer_sk as ctr_customer_sk,
+		sr_store_sk as ctr_store_sk,
+		sum(SR_FEE) as ctr_total_return
+	from store_returns,date_dim
+	where sr_returned_date_sk = d_date_sk
+		and d_year =2000
+	group by sr_customer_sk,sr_store_sk)
+select c_customer_id from customer_total_return ctr1,store,customer
+where ctr1.ctr_total_return >
+	(select avg(ctr_total_return)*1.2 from customer_total_return ctr2
+	where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
+	and s_store_sk = ctr1.ctr_store_sk
+	and s_state = 'TN'
+	and ctr1.ctr_customer_sk = c_customer_sk
+order by c_customer_id
+limit 100;
 
 -- =================================================================
 -- Query ID: TPCDS_Q2
@@ -300,7 +296,22 @@ select i_item_id,i_item_desc,s_store_id,s_store_name,max(ss_quantity) as store_s
 -- Query ID: TPCDS_Q30
 -- Description:
 -- =================================================================
- WITH customer_total_return AS ( SELECT wr_returning_customer_sk AS ctr_customer_sk, ca_state AS ctr_state, SUM(wr_return_amt) AS ctr_total_return FROM web_returns JOIN date_dim ON wr_returned_date_sk = d_date_sk JOIN customer_address ON wr_returning_addr_sk = ca_address_sk WHERE d_year = 2000 GROUP BY wr_returning_customer_sk, ca_state ), state_avg_return AS ( SELECT ctr_state, AVG(ctr_total_return) * 1.2 AS avg_return_threshold FROM customer_total_return GROUP BY ctr_state ) SELECT c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date, ctr1.ctr_total_return FROM customer_total_return ctr1 JOIN state_avg_return sar ON ctr1.ctr_state = sar.ctr_state JOIN customer ON ctr1.ctr_customer_sk = c_customer_sk JOIN customer_address ON ca_address_sk = c_current_addr_sk WHERE ctr1.ctr_total_return > sar.avg_return_threshold AND ca_state = 'IN' ORDER BY c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date, ctr_total_return LIMIT 100 
+WITH customer_total_return AS (
+ SELECT wr_returning_customer_sk AS ctr_customer_sk,ca_state AS ctr_state,Sum(wr_return_amt) AS ctr_total_return
+ FROM web_returns,date_dim,customer_address
+ WHERE wr_returned_date_sk = d_date_sk
+  AND d_year = 2000
+  AND wr_returning_addr_sk = ca_address_sk
+ GROUP BY wr_returning_customer_sk,ca_state
+)
+SELECT c_customer_id,c_salutation,c_first_name,c_last_name,c_preferred_cust_flag,c_birth_day,c_birth_month,c_birth_year,c_birth_country,c_login,c_email_address,c_last_review_date,ctr_total_return
+FROM customer_total_return ctr1,customer_address,customer
+WHERE ctr1.ctr_total_return > (SELECT Avg(ctr_total_return) * 1.2 FROM customer_total_return ctr2 WHERE ctr1.ctr_state = ctr2.ctr_state)
+ AND ca_address_sk = c_current_addr_sk
+ AND ca_state = 'IN'
+ AND ctr1.ctr_customer_sk = c_customer_sk
+ORDER BY c_customer_id,c_salutation,c_first_name,c_last_name,c_preferred_cust_flag,c_birth_day,c_birth_month,c_birth_year,c_birth_country,c_login,c_email_address,c_last_review_date,ctr_total_return
+LIMIT 100;
 
 -- =================================================================
 -- Query ID: TPCDS_Q31

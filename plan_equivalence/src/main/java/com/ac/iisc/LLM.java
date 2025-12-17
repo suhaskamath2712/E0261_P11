@@ -158,7 +158,18 @@ public class LLM
         if (loaded == null || loaded.isEmpty()) {
             SUPPORTED_TRANSFORMATIONS = List.of();
         } else {
-            SUPPORTED_TRANSFORMATIONS = List.copyOf(loaded);
+            // transformation_list.txt historically contained "Name - Description" lines.
+            // Only keep the canonical transformation names (text before the first " - ").
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (String line : loaded) {
+                if (line == null) continue;
+                String s = line.trim();
+                if (s.isEmpty()) continue;
+                int idx = s.indexOf(" - ");
+                String name = (idx >= 0) ? s.substring(0, idx).trim() : s;
+                if (!name.isEmpty()) names.add(name);
+            }
+            SUPPORTED_TRANSFORMATIONS = List.copyOf(names);
         }
     }
     
