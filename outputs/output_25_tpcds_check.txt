@@ -1,0 +1,267 @@
+-----------------------------------------------------
+Query ID: TPCDS_Q6
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q9
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q24
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: [JoinAssociateRule, FilterJoinRule.FilterIntoJoinRule, JoinPushTransitivePredicatesRule, AggregateProjectPullUpConstantsRule, FilterAggregateTransposeRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x*]->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x*]->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Project[$x*]->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (ref-only Project removed) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (ref-only Project removed) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 Project predicates inlined) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 Project predicates inlined) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 LEFT+COUNT>0 -> INNER) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 LEFT+COUNT>0 -> INNER) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 OR-order normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 OR-order normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5 web RANGE placement normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5 web RANGE placement normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5 INNER-factor order normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5 INNER-factor order normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION-order normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION-order normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (AND-order normalized) Rel1: Sort->Project[$x*]->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (AND-order normalized) Rel2: Sort->Project[$x*]->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Project[$x*]->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Project+AND normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Project+AND normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5+AND normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5+AND normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION+AND normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION+AND normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 OR+AND normalized) Rel1: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest (Q41 OR+AND normalized) Rel2: Sort->Join(INNER,>($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
+  LogicalProject(inputs=[0..3])
+    LogicalJoin(condition=[>($3, $4)], joinType=[inner])
+      LogicalProject(exprs=[[$2, $1, $0, $3]])
+        LogicalAggregate(group=[{5, 13, 14}], paid=[SUM($3)])
+          LogicalJoin(condition=[AND(=($1, $12), =($0, $7), =($2, $4))], joinType=[inner])
+            LogicalProject(inputs=[0..2], exprs=[[$4]])
+              LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                  JdbcTableScan(table=[[public, store_sales]])
+                LogicalProject(exprs=[[$2, $9]])
+                  JdbcTableScan(table=[[public, store_returns]])
+            LogicalProject(inputs=[0..2], exprs=[[$4, $5, $6, $7, $8, $9, $10, $11, $12]])
+              LogicalJoin(condition=[=($3, $13)], joinType=[inner])
+                LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                  LogicalFilter(condition=[=($10, 2)])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalJoin(condition=[true], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$5, $15, $18, $20]])
+                    LogicalFilter(condition=[=($17, 'khaki               ')])
+                      JdbcTableScan(table=[[public, item]])
+                  LogicalProject(inputs=[0], exprs=[[$2, $3, $6, $7]])
+                    LogicalJoin(condition=[AND(=($1, $5), <>($4, $8))], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                        JdbcTableScan(table=[[public, customer]])
+                      LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                        JdbcTableScan(table=[[public, customer_address]])
+      LogicalAggregate(group=[{}], agg#0=[SINGLE_VALUE($0)])
+        LogicalProject(exprs=[[*(0.05:DECIMAL(3, 2), $0)]])
+          LogicalAggregate(group=[{}], agg#0=[AVG($10)])
+            LogicalAggregate(group=[{1, 2, 4, 5, 6, 7, 8, 10, 11, 14}], netpaid=[SUM($0)])
+              LogicalJoin(condition=[AND(=($9, $13), <>($12, $16), =($3, $15))], joinType=[inner])
+                LogicalProject(exprs=[[$1, $2, $3, $4, $5, $6, $7, $8, $9, $11, $12, $13, $14]])
+                  LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+                    LogicalProject(exprs=[[$1, $3, $5, $6, $7, $9, $10, $11, $12, $13]])
+                      LogicalJoin(condition=[AND(=($0, $8), =($2, $4))], joinType=[inner])
+                        LogicalProject(inputs=[0..2], exprs=[[$4]])
+                          LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                            LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                              JdbcTableScan(table=[[public, store_sales]])
+                            LogicalProject(exprs=[[$2, $9]])
+                              JdbcTableScan(table=[[public, store_returns]])
+                        LogicalJoin(condition=[true], joinType=[inner])
+                          LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                            LogicalFilter(condition=[=($10, 2)])
+                              JdbcTableScan(table=[[public, store]])
+                          LogicalProject(inputs=[0], exprs=[[$5, $15, $17, $18, $20]])
+                            LogicalFilter(condition=[=($17, 'khaki               ')])
+                              JdbcTableScan(table=[[public, item]])
+                    LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                      JdbcTableScan(table=[[public, customer]])
+                LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                  JdbcTableScan(table=[[public, customer_address]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
+  LogicalProject(inputs=[0..3])
+    LogicalJoin(condition=[>($3, $4)], joinType=[inner])
+      LogicalAggregate(group=[{0, 1, 2}], paid=[SUM($10)])
+        LogicalFilter(condition=[=($5, 'khaki               ')])
+          LogicalProject(exprs=[[$8, $7, $0, $9, $1, $4, $2, $6, $5, $3, $10]])
+            LogicalAggregate(group=[{5, 6, 8, 9, 10, 11, 12, 14, 15, 16}], netpaid=[SUM($3)])
+              LogicalJoin(condition=[AND(=($1, $13), =($0, $7), =($2, $4))], joinType=[inner])
+                LogicalProject(inputs=[0..2], exprs=[[$4]])
+                  LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                    LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                      JdbcTableScan(table=[[public, store_sales]])
+                    LogicalProject(exprs=[[$2, $9]])
+                      JdbcTableScan(table=[[public, store_returns]])
+                LogicalProject(inputs=[0..2], exprs=[[$4, $5, $6, $7, $8, $9, $10, $11, $12, $13]])
+                  LogicalJoin(condition=[=($3, $14)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                      LogicalFilter(condition=[=($10, 2)])
+                        JdbcTableScan(table=[[public, store]])
+                    LogicalJoin(condition=[true], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$5, $15, $17, $18, $20]])
+                        JdbcTableScan(table=[[public, item]])
+                      LogicalProject(inputs=[0], exprs=[[$2, $3, $6, $7]])
+                        LogicalJoin(condition=[AND(=($1, $5), <>($4, $8))], joinType=[inner])
+                          LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                            JdbcTableScan(table=[[public, customer]])
+                          LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                            JdbcTableScan(table=[[public, customer_address]])
+      LogicalAggregate(group=[{}], agg#0=[SINGLE_VALUE($0)])
+        LogicalProject(exprs=[[*(0.05:DECIMAL(3, 2), $0)]])
+          LogicalAggregate(group=[{}], agg#0=[AVG($10)])
+            LogicalAggregate(group=[{1, 2, 4, 5, 6, 7, 8, 10, 11, 14}], netpaid=[SUM($0)])
+              LogicalJoin(condition=[AND(=($9, $13), <>($12, $16), =($3, $15))], joinType=[inner])
+                LogicalProject(exprs=[[$1, $2, $3, $4, $5, $6, $7, $8, $9, $11, $12, $13, $14]])
+                  LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+                    LogicalProject(exprs=[[$1, $2, $3, $4, $5, $7, $8, $9, $10, $11]])
+                      LogicalJoin(condition=[=($0, $6)], joinType=[inner])
+                        LogicalProject(inputs=[0..1], exprs=[[$3, $5, $6, $7]])
+                          LogicalJoin(condition=[=($2, $4)], joinType=[inner])
+                            LogicalProject(inputs=[0..2], exprs=[[$4]])
+                              LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                                LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                                  JdbcTableScan(table=[[public, store_sales]])
+                                LogicalProject(exprs=[[$2, $9]])
+                                  JdbcTableScan(table=[[public, store_returns]])
+                            LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                              LogicalFilter(condition=[=($10, 2)])
+                                JdbcTableScan(table=[[public, store]])
+                        LogicalProject(inputs=[0], exprs=[[$5, $15, $17, $18, $20]])
+                          JdbcTableScan(table=[[public, item]])
+                    LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                      JdbcTableScan(table=[[public, customer]])
+                LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                  JdbcTableScan(table=[[public, customer_address]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 2: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): [FilterAggregateTransposeRule, FilterJoinRule.FilterIntoJoinRule, SortRemoveConstantKeysRule, AggregateProjectPullUpConstantsRule, JoinToMultiJoinRule, MultiJoinOptimizeBushyRule]
+LLM Equivalence 2 B->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q46
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q47
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q63
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q69
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q89
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q93
+Equivalence without transformations: false
+LLM Equivalence A->B 1: true
+LLM Transformations A->B 1: [AggregateMergeRule, ReduceExpressionsRule.ProjectReduceExpressionsRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Project[$x*]->Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Project[$x*]->Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (ref-only Project removed) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (ref-only Project removed) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 Project predicates inlined) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 Project predicates inlined) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 LEFT+COUNT>0 -> INNER) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 LEFT+COUNT>0 -> INNER) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 OR-order normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 OR-order normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5 web RANGE placement normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5 web RANGE placement normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5 INNER-factor order normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5 INNER-factor order normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION-order normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION-order normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (AND-order normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Project[$x*]->Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (AND-order normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Project[$x*]->Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Project+AND normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Project+AND normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5+AND normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5+AND normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION+AND normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q5+UNION+AND normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 OR+AND normalized) Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest (Q41 OR+AND normalized) Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Scan(public.store_returns)}|Scan(public.reason)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0}], sumsales=[SUM($2)])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $7, CASE(IS NOT NULL($9), *(-($3, $9), $4), $5)]])
+        LogicalJoin(condition=[AND(=($6, $0), =($8, $2))], joinType=[left])
+          LogicalProject(exprs=[[$2, $3, $9, $10, $13, *($10, $13)]])
+            JdbcTableScan(table=[[public, store_sales]])
+          LogicalProject(exprs=[[$2, $8, $9, $10]])
+            JdbcTableScan(table=[[public, store_returns]])
+      LogicalProject(inputs=[0])
+        LogicalFilter(condition=[=($2, 'Package was damaged                                                                                 ')])
+          JdbcTableScan(table=[[public, reason]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0}], sumsales=[SUM($2)])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $7, *(CASE(AND($5, IS NOT NULL($9)), -($3, $9), $3), $4)]])
+        LogicalJoin(condition=[AND(=($6, $0), =($8, $2))], joinType=[left])
+          LogicalProject(exprs=[[$2, $3, $9, $10, $13, IS NOT NULL($10)]])
+            JdbcTableScan(table=[[public, store_sales]])
+          LogicalProject(exprs=[[$2, $8, $9, $10]])
+            JdbcTableScan(table=[[public, store_returns]])
+      LogicalProject(inputs=[0])
+        LogicalFilter(condition=[=($2, 'Package was damaged                                                                                 ')])
+          JdbcTableScan(table=[[public, reason]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->B 2: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): [AggregateExtractProjectRule, ReduceExpressionsRule.ProjectReduceExpressionsRule, AggregateProjectMergeRule, AggregateMergeRule]
+LLM Equivalence 2 B->X: false

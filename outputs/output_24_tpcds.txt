@@ -1,0 +1,1147 @@
+-----------------------------------------------------
+Query ID: TPCDS_Q5
+Equivalence without transformations: false
+LLM Equivalence A->B 1: true
+LLM Transformations A->B 1: [JoinRightUnionTransposeRule, JoinLeftUnionTransposeRule, AggregateMergeRule, SortRemoveRedundantRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Aggregate(groups=[channel, id], calls=[SUM(profit), SUM(returns), SUM(sales)])->Union(ALL)[Project['catalog channel',OTHER('catalog_page',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[cp_catalog_page_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Project[$x*]->Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.catalog_returns)|Scan(public.catalog_page)|Scan(public.date_dim)}, Project[$x*]->Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.catalog_sales)|Scan(public.catalog_page)|Scan(public.date_dim)}], Project['store channel',OTHER('store',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[s_store_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Project[$x*]->Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.store_returns)|Scan(public.date_dim)|Scan(public.store)}, Project[$x*]->Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.store_sales)|Scan(public.date_dim)|Scan(public.store)}], Project['web channel',OTHER('web_site',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[web_site_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Project[$x*]->Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Join(LEFT,=($x,$x)){Join(INNER,=($x,$x)){Project[$x*]->Scan(public.web_returns)|Scan(public.date_dim)}|Project[$x*]->Scan(public.web_sales)}|Scan(public.web_site)}, Project[$x*]->Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.web_sales)|Scan(public.date_dim)|Scan(public.web_site)}]]
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Aggregate(groups=[channel, id], calls=[SUM(profit), SUM(returns), SUM(sales)])->Union(ALL)[Project['catalog channel',OTHER('catalog_page',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[cp_catalog_page_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.catalog_returns)|Scan(public.catalog_page)}, Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.catalog_sales)|Scan(public.catalog_page)}], Project['store channel',OTHER('store',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[s_store_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.store_returns)|Scan(public.store)}, Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.store_sales)|Scan(public.store)}], Project['web channel',OTHER('web_site',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[web_site_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.web_sales)|Scan(public.web_site)}, Join(INNER,=($x,$x)){Project[$x*,0,0]->Join(LEFT,=($x,$x)){Project[$x*]->Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Scan(public.web_returns)}|Project[$x*]->Scan(public.web_sales)}|Scan(public.web_site)}]]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], sales=[SUM($2)], returns=[SUM($3)], profit=[SUM($4)])
+    LogicalUnion(all=[true])
+      LogicalUnion(all=[true])
+        LogicalProject(exprs=[['store channel', ||('store', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{0}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+            LogicalUnion(all=[true])
+              LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+                LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                  LogicalProject(inputs=[0..1])
+                    JdbcTableScan(table=[[public, store]])
+                  LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                    LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                      LogicalProject(exprs=[[$7, $0, $15, $22, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                        JdbcTableScan(table=[[public, store_sales]])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                          JdbcTableScan(table=[[public, date_dim]])
+              LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+                LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                  LogicalProject(inputs=[0..1])
+                    JdbcTableScan(table=[[public, store]])
+                  LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                    LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                      LogicalProject(exprs=[[$7, $0, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $11, $19]])
+                        JdbcTableScan(table=[[public, store_returns]])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                          JdbcTableScan(table=[[public, date_dim]])
+        LogicalProject(exprs=[['catalog channel', ||('catalog_page', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{0}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+            LogicalUnion(all=[true])
+              LogicalProject(exprs=[[$6, $1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                    LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                      LogicalProject(exprs=[[$12, $0, $23, $33, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                        JdbcTableScan(table=[[public, catalog_sales]])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                          JdbcTableScan(table=[[public, date_dim]])
+                  LogicalProject(inputs=[0..1])
+                    JdbcTableScan(table=[[public, catalog_page]])
+              LogicalProject(exprs=[[$6, $1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                    LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                      LogicalProject(exprs=[[$12, $0, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $18, $26]])
+                        JdbcTableScan(table=[[public, catalog_returns]])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                          JdbcTableScan(table=[[public, date_dim]])
+                  LogicalProject(inputs=[0..1])
+                    JdbcTableScan(table=[[public, catalog_page]])
+      LogicalProject(exprs=[['web channel', ||('web_site', $0), $1, $3, -($2, $4)]])
+        LogicalAggregate(group=[{0}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+          LogicalUnion(all=[true])
+            LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+              LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                LogicalProject(inputs=[0..1])
+                  JdbcTableScan(table=[[public, web_site]])
+                LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                  LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                    LogicalProject(exprs=[[$13, $0, $23, $33, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                      JdbcTableScan(table=[[public, web_sales]])
+                    LogicalProject(inputs=[0])
+                      LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                        JdbcTableScan(table=[[public, date_dim]])
+            LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+              LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                LogicalProject(inputs=[0..1])
+                  JdbcTableScan(table=[[public, web_site]])
+                LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                  LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                    LogicalProject(exprs=[[$6, $0, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $3, $4]])
+                      LogicalJoin(condition=[AND(=($1, $5), =($2, $7))], joinType=[left])
+                        LogicalProject(inputs=[0], exprs=[[$2, $13, $15, $23]])
+                          JdbcTableScan(table=[[public, web_returns]])
+                        LogicalProject(exprs=[[$3, $13, $17]])
+                          JdbcTableScan(table=[[public, web_sales]])
+                    LogicalProject(inputs=[0])
+                      LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                        JdbcTableScan(table=[[public, date_dim]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], sales=[SUM($2)], returns=[SUM($3)], profit=[SUM($4)])
+    LogicalUnion(all=[true])
+      LogicalUnion(all=[true])
+        LogicalProject(exprs=[['store channel', ||('store', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{1}], sales=[SUM($30)], profit=[SUM($31)], returns=[SUM($32)], profit_loss=[SUM($33)])
+            LogicalUnion(all=[true])
+              LogicalJoin(condition=[=($29, $0)], joinType=[inner])
+                JdbcTableScan(table=[[public, store]])
+                LogicalProject(exprs=[[$1, $2, $3, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$7, $15, $22]])
+                      JdbcTableScan(table=[[public, store_sales]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[=($29, $0)], joinType=[inner])
+                JdbcTableScan(table=[[public, store]])
+                LogicalProject(exprs=[[$1, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $2, $3]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$7, $11, $19]])
+                      JdbcTableScan(table=[[public, store_returns]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+        LogicalProject(exprs=[['catalog channel', ||('catalog_page', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{6}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+            LogicalUnion(all=[true])
+              LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                LogicalProject(exprs=[[$1, $2, $3, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$12, $23, $33]])
+                      JdbcTableScan(table=[[public, catalog_sales]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+                JdbcTableScan(table=[[public, catalog_page]])
+              LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                LogicalProject(exprs=[[$1, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $2, $3]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$12, $18, $26]])
+                      JdbcTableScan(table=[[public, catalog_returns]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+                JdbcTableScan(table=[[public, catalog_page]])
+      LogicalProject(exprs=[['web channel', ||('web_site', $0), $1, $3, -($2, $4)]])
+        LogicalAggregate(group=[{1}], sales=[SUM($27)], profit=[SUM($28)], returns=[SUM($29)], profit_loss=[SUM($30)])
+          LogicalUnion(all=[true])
+            LogicalJoin(condition=[=($26, $0)], joinType=[inner])
+              JdbcTableScan(table=[[public, web_site]])
+              LogicalProject(exprs=[[$1, $2, $3, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$13, $23, $33]])
+                    JdbcTableScan(table=[[public, web_sales]])
+                  LogicalAggregate(group=[{0}])
+                    LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                      JdbcTableScan(table=[[public, date_dim]])
+            LogicalJoin(condition=[=($26, $0)], joinType=[inner])
+              JdbcTableScan(table=[[public, web_site]])
+              LogicalProject(exprs=[[$5, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $2, $3]])
+                LogicalJoin(condition=[AND(=($0, $4), =($1, $6))], joinType=[left])
+                  LogicalProject(exprs=[[$1, $2, $3, $4]])
+                    LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$2, $13, $15, $23]])
+                        JdbcTableScan(table=[[public, web_returns]])
+                      LogicalAggregate(group=[{0}])
+                        LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                          JdbcTableScan(table=[[public, date_dim]])
+                  LogicalProject(exprs=[[$3, $13, $17]])
+                    JdbcTableScan(table=[[public, web_sales]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->B 2: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: [AggregateRemoveRule, JoinRightUnionTransposeRule, JoinAssociateRule, FilterJoinRule.FilterIntoJoinRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Aggregate(groups=[channel, id], calls=[SUM(profit), SUM(returns), SUM(sales)])->Union(ALL)[Project['catalog channel',OTHER('catalog_page',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[cp_catalog_page_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.catalog_returns)|Scan(public.catalog_page)}, Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.catalog_sales)|Scan(public.catalog_page)}], Project['store channel',OTHER('store',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[s_store_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Project[$x*]->Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.store_returns)|Scan(public.store)}, Project[$x*]->Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.store_sales)|Scan(public.store)}], Project['web channel',OTHER('web_site',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[web_site_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Project[$x*]->Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Project[$x*,0,0]->Scan(public.web_sales)|Scan(public.web_site)}, Project[$x*]->Join(INNER,=($x,$x)){Project[$x*,0,0]->Join(LEFT,=($x,$x)){Project[$x*]->Join(INNER,=($x,$x)){Filter(RANGE($x,2000-08-19,2000-09-02))->Scan(public.date_dim)|Scan(public.web_returns)}|Project[$x*]->Scan(public.web_sales)}|Scan(public.web_site)}]]
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Aggregate(groups=[channel, id], calls=[SUM(profit), SUM(returns), SUM(sales)])->Union(ALL)[Project['catalog channel',OTHER('catalog_page',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[cp_catalog_page_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.catalog_returns)|Scan(public.catalog_page)|Scan(public.date_dim)}, Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.catalog_sales)|Scan(public.catalog_page)|Scan(public.date_dim)}], Project['store channel',OTHER('store',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[s_store_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.store_returns)|Scan(public.date_dim)|Scan(public.store)}, Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.store_sales)|Scan(public.date_dim)|Scan(public.store)}], Project['web channel',OTHER('web_site',$x),$x,$x,MINUS($x,$x)]->Aggregate(groups=[web_site_id], calls=[SUM(net_loss), SUM(profit), SUM(return_amt), SUM(sales_price)])->Union(ALL)[Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Join(LEFT,=($x,$x)){Join(INNER,=($x,$x)){Project[$x*]->Scan(public.web_returns)|Scan(public.date_dim)}|Project[$x*]->Scan(public.web_sales)}|Scan(public.web_site)}, Join(INNER,<=($x,2000-08-19)&<=($x,2000-09-02)&=($x,$x)){Project[$x*,0,0]->Scan(public.web_sales)|Scan(public.date_dim)|Scan(public.web_site)}]]
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], sales=[SUM($2)], returns=[SUM($3)], profit=[SUM($4)])
+    LogicalUnion(all=[true])
+      LogicalUnion(all=[true])
+        LogicalProject(exprs=[['store channel', ||('store', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{0}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+            LogicalUnion(all=[true])
+              LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+                LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                  LogicalProject(inputs=[0..1])
+                    JdbcTableScan(table=[[public, store]])
+                  LogicalProject(exprs=[[$1, $2, $3, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                    LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$7, $15, $22]])
+                        JdbcTableScan(table=[[public, store_sales]])
+                      LogicalAggregate(group=[{0}])
+                        LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                          JdbcTableScan(table=[[public, date_dim]])
+              LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+                LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                  LogicalProject(inputs=[0..1])
+                    JdbcTableScan(table=[[public, store]])
+                  LogicalProject(exprs=[[$1, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $2, $3]])
+                    LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$7, $11, $19]])
+                        JdbcTableScan(table=[[public, store_returns]])
+                      LogicalAggregate(group=[{0}])
+                        LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                          JdbcTableScan(table=[[public, date_dim]])
+        LogicalProject(exprs=[['catalog channel', ||('catalog_page', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{6}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+            LogicalUnion(all=[true])
+              LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                LogicalProject(exprs=[[$1, $2, $3, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$12, $23, $33]])
+                      JdbcTableScan(table=[[public, catalog_sales]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+                JdbcTableScan(table=[[public, catalog_page]])
+              LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                LogicalProject(exprs=[[$1, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $2, $3]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$12, $18, $26]])
+                      JdbcTableScan(table=[[public, catalog_returns]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+                JdbcTableScan(table=[[public, catalog_page]])
+      LogicalProject(exprs=[['web channel', ||('web_site', $0), $1, $3, -($2, $4)]])
+        LogicalAggregate(group=[{0}], sales=[SUM($1)], profit=[SUM($2)], returns=[SUM($3)], profit_loss=[SUM($4)])
+          LogicalUnion(all=[true])
+            LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+              LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                LogicalProject(inputs=[0..1])
+                  JdbcTableScan(table=[[public, web_site]])
+                LogicalProject(exprs=[[$1, $2, $3, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$13, $23, $33]])
+                      JdbcTableScan(table=[[public, web_sales]])
+                    LogicalAggregate(group=[{0}])
+                      LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+            LogicalProject(exprs=[[$1, $3, $4, $5, $6]])
+              LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+                LogicalProject(inputs=[0..1])
+                  JdbcTableScan(table=[[public, web_site]])
+                LogicalProject(exprs=[[$5, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $2, $3]])
+                  LogicalJoin(condition=[AND(=($0, $4), =($1, $6))], joinType=[left])
+                    LogicalProject(exprs=[[$1, $2, $3, $4]])
+                      LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                        LogicalProject(inputs=[0], exprs=[[$2, $13, $15, $23]])
+                          JdbcTableScan(table=[[public, web_returns]])
+                        LogicalAggregate(group=[{0}])
+                          LogicalFilter(condition=[SEARCH($2, Sarg[[2000-08-19..2000-09-02]])])
+                            JdbcTableScan(table=[[public, date_dim]])
+                    LogicalProject(exprs=[[$3, $13, $17]])
+                      JdbcTableScan(table=[[public, web_sales]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], sales=[SUM($2)], returns=[SUM($3)], profit=[SUM($4)])
+    LogicalUnion(all=[true])
+      LogicalUnion(all=[true])
+        LogicalProject(exprs=[['store channel', ||('store', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{1}], sales=[SUM($3)], profit=[SUM($4)], returns=[SUM($5)], profit_loss=[SUM($6)])
+            LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+              LogicalProject(inputs=[0..1])
+                JdbcTableScan(table=[[public, store]])
+              LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+                LogicalUnion(all=[true])
+                  LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                    LogicalProject(exprs=[[$7, $0, $15, $22, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                      JdbcTableScan(table=[[public, store_sales]])
+                    LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                      JdbcTableScan(table=[[public, date_dim]])
+                  LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                    LogicalProject(exprs=[[$7, $0, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $11, $19]])
+                      JdbcTableScan(table=[[public, store_returns]])
+                    LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                      JdbcTableScan(table=[[public, date_dim]])
+        LogicalProject(exprs=[['catalog channel', ||('catalog_page', $0), $1, $3, -($2, $4)]])
+          LogicalAggregate(group=[{35}], sales=[SUM($2)], profit=[SUM($3)], returns=[SUM($4)], profit_loss=[SUM($5)])
+            LogicalUnion(all=[true])
+              LogicalJoin(condition=[=($0, $34)], joinType=[inner])
+                LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                  LogicalProject(exprs=[[$12, $0, $23, $33, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                    JdbcTableScan(table=[[public, catalog_sales]])
+                  LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                    JdbcTableScan(table=[[public, date_dim]])
+                JdbcTableScan(table=[[public, catalog_page]])
+              LogicalJoin(condition=[=($0, $34)], joinType=[inner])
+                LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                  LogicalProject(exprs=[[$12, $0, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $18, $26]])
+                    JdbcTableScan(table=[[public, catalog_returns]])
+                  LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                    JdbcTableScan(table=[[public, date_dim]])
+                JdbcTableScan(table=[[public, catalog_page]])
+      LogicalProject(exprs=[['web channel', ||('web_site', $0), $1, $3, -($2, $4)]])
+        LogicalAggregate(group=[{1}], sales=[SUM($3)], profit=[SUM($4)], returns=[SUM($5)], profit_loss=[SUM($6)])
+          LogicalJoin(condition=[=($2, $0)], joinType=[inner])
+            LogicalProject(inputs=[0..1])
+              JdbcTableScan(table=[[public, web_site]])
+            LogicalProject(inputs=[0], exprs=[[$2, $3, $4, $5]])
+              LogicalUnion(all=[true])
+                LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                  LogicalProject(exprs=[[$13, $0, $23, $33, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2)]])
+                    JdbcTableScan(table=[[public, web_sales]])
+                  LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                    JdbcTableScan(table=[[public, date_dim]])
+                LogicalJoin(condition=[=($1, $6)], joinType=[inner])
+                  LogicalProject(exprs=[[$6, $0, 0:DECIMAL(7, 2), 0:DECIMAL(7, 2), $3, $4]])
+                    LogicalJoin(condition=[AND(=($1, $5), =($2, $7))], joinType=[left])
+                      LogicalProject(inputs=[0], exprs=[[$2, $13, $15, $23]])
+                        JdbcTableScan(table=[[public, web_returns]])
+                      LogicalProject(exprs=[[$3, $13, $17]])
+                        JdbcTableScan(table=[[public, web_sales]])
+                  LogicalFilter(condition=[AND(>=($2, 2000-08-19), <=($2, +(2000-08-19, 1209600000:INTERVAL DAY)))])
+                    JdbcTableScan(table=[[public, date_dim]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 2: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): [JoinRightUnionTransposeRule]
+LLM Equivalence 2 B->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q9
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q24
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: [JoinAssociateRule, FilterJoinRule.JoinConditionPushRule, AggregateProjectPullUpConstantsRule, AggregateFilterTransposeRule, FilterProjectTransposeRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x*]->Join(INNER,<($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,'khaki')&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x*]->Join(INNER,<($x,$x)){Aggregate(groups=[], calls=[SINGLE_VALUE(expr)])->Project[TIMES($x,0.05:DECIMAL(3, 2))]->Aggregate(groups=[], calls=[AVG(netpaid)])->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}|Aggregate(groups=[c_first_name, c_last_name, s_store_name], calls=[SUM(netpaid)])->Filter(=($x,'khaki'))->Project[$x*]->Aggregate(groups=[c_first_name, c_last_name, i_color, i_current_price, i_manager_id, i_size, i_units, s_store_name, state, state], calls=[SUM(ss_net_paid)])->Join(INNER,<>($x,$x)&=($x,$x)&=($x,2)){Project[$x,$x,$x,OTHER_FUNCTION($x)]->Scan(public.customer_address)|Scan(public.customer)|Scan(public.item)|Scan(public.store)|Scan(public.store_returns)|Scan(public.store_sales)}}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
+  LogicalProject(inputs=[0..3])
+    LogicalJoin(condition=[>($3, $4)], joinType=[inner])
+      LogicalProject(exprs=[[$2, $1, $0, $3]])
+        LogicalAggregate(group=[{5, 13, 14}], paid=[SUM($3)])
+          LogicalJoin(condition=[AND(=($1, $12), =($0, $7), =($2, $4))], joinType=[inner])
+            LogicalProject(inputs=[0..2], exprs=[[$4]])
+              LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                  JdbcTableScan(table=[[public, store_sales]])
+                LogicalProject(exprs=[[$2, $9]])
+                  JdbcTableScan(table=[[public, store_returns]])
+            LogicalProject(inputs=[0..2], exprs=[[$4, $5, $6, $7, $8, $9, $10, $11, $12]])
+              LogicalJoin(condition=[=($3, $13)], joinType=[inner])
+                LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                  LogicalFilter(condition=[=($10, 2)])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalJoin(condition=[true], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$5, $15, $18, $20]])
+                    LogicalFilter(condition=[=($17, 'khaki               ')])
+                      JdbcTableScan(table=[[public, item]])
+                  LogicalProject(inputs=[0], exprs=[[$2, $3, $6, $7]])
+                    LogicalJoin(condition=[AND(=($1, $5), <>($4, $8))], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                        JdbcTableScan(table=[[public, customer]])
+                      LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                        JdbcTableScan(table=[[public, customer_address]])
+      LogicalAggregate(group=[{}], agg#0=[SINGLE_VALUE($0)])
+        LogicalProject(exprs=[[*(0.05:DECIMAL(3, 2), $0)]])
+          LogicalAggregate(group=[{}], agg#0=[AVG($10)])
+            LogicalAggregate(group=[{1, 2, 4, 5, 6, 7, 8, 10, 11, 14}], netpaid=[SUM($0)])
+              LogicalJoin(condition=[AND(=($9, $13), <>($12, $16), =($3, $15))], joinType=[inner])
+                LogicalProject(exprs=[[$1, $2, $3, $4, $5, $6, $7, $8, $9, $11, $12, $13, $14]])
+                  LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+                    LogicalProject(exprs=[[$1, $3, $5, $6, $7, $9, $10, $11, $12, $13]])
+                      LogicalJoin(condition=[AND(=($0, $8), =($2, $4))], joinType=[inner])
+                        LogicalProject(inputs=[0..2], exprs=[[$4]])
+                          LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                            LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                              JdbcTableScan(table=[[public, store_sales]])
+                            LogicalProject(exprs=[[$2, $9]])
+                              JdbcTableScan(table=[[public, store_returns]])
+                        LogicalJoin(condition=[true], joinType=[inner])
+                          LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                            LogicalFilter(condition=[=($10, 2)])
+                              JdbcTableScan(table=[[public, store]])
+                          LogicalProject(inputs=[0], exprs=[[$5, $15, $17, $18, $20]])
+                            LogicalFilter(condition=[=($17, 'khaki               ')])
+                              JdbcTableScan(table=[[public, item]])
+                    LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                      JdbcTableScan(table=[[public, customer]])
+                LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                  JdbcTableScan(table=[[public, customer_address]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
+  LogicalProject(inputs=[0..3])
+    LogicalJoin(condition=[>($3, $4)], joinType=[inner])
+      LogicalAggregate(group=[{0, 1, 2}], paid=[SUM($10)])
+        LogicalFilter(condition=[=($5, 'khaki               ')])
+          LogicalProject(exprs=[[$8, $7, $0, $9, $1, $4, $2, $6, $5, $3, $10]])
+            LogicalAggregate(group=[{5, 6, 8, 9, 10, 11, 12, 14, 15, 16}], netpaid=[SUM($3)])
+              LogicalJoin(condition=[AND(=($1, $13), =($0, $7), =($2, $4))], joinType=[inner])
+                LogicalProject(inputs=[0..2], exprs=[[$4]])
+                  LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                    LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                      JdbcTableScan(table=[[public, store_sales]])
+                    LogicalProject(exprs=[[$2, $9]])
+                      JdbcTableScan(table=[[public, store_returns]])
+                LogicalProject(inputs=[0..2], exprs=[[$4, $5, $6, $7, $8, $9, $10, $11, $12, $13]])
+                  LogicalJoin(condition=[=($3, $14)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                      LogicalFilter(condition=[=($10, 2)])
+                        JdbcTableScan(table=[[public, store]])
+                    LogicalJoin(condition=[true], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$5, $15, $17, $18, $20]])
+                        JdbcTableScan(table=[[public, item]])
+                      LogicalProject(inputs=[0], exprs=[[$2, $3, $6, $7]])
+                        LogicalJoin(condition=[AND(=($1, $5), <>($4, $8))], joinType=[inner])
+                          LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                            JdbcTableScan(table=[[public, customer]])
+                          LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                            JdbcTableScan(table=[[public, customer_address]])
+      LogicalAggregate(group=[{}], agg#0=[SINGLE_VALUE($0)])
+        LogicalProject(exprs=[[*(0.05:DECIMAL(3, 2), $0)]])
+          LogicalAggregate(group=[{}], agg#0=[AVG($10)])
+            LogicalAggregate(group=[{1, 2, 4, 5, 6, 7, 8, 10, 11, 14}], netpaid=[SUM($0)])
+              LogicalJoin(condition=[AND(=($9, $13), <>($12, $16), =($3, $15))], joinType=[inner])
+                LogicalProject(exprs=[[$1, $2, $3, $4, $5, $6, $7, $8, $9, $11, $12, $13, $14]])
+                  LogicalJoin(condition=[=($0, $10)], joinType=[inner])
+                    LogicalProject(exprs=[[$1, $2, $3, $4, $5, $7, $8, $9, $10, $11]])
+                      LogicalJoin(condition=[=($0, $6)], joinType=[inner])
+                        LogicalProject(inputs=[0..1], exprs=[[$3, $5, $6, $7]])
+                          LogicalJoin(condition=[=($2, $4)], joinType=[inner])
+                            LogicalProject(inputs=[0..2], exprs=[[$4]])
+                              LogicalJoin(condition=[AND(=($3, $6), =($0, $5))], joinType=[inner])
+                                LogicalProject(exprs=[[$2, $3, $7, $9, $20]])
+                                  JdbcTableScan(table=[[public, store_sales]])
+                                LogicalProject(exprs=[[$2, $9]])
+                                  JdbcTableScan(table=[[public, store_returns]])
+                            LogicalProject(inputs=[0], exprs=[[$5, $24, $25]])
+                              LogicalFilter(condition=[=($10, 2)])
+                                JdbcTableScan(table=[[public, store]])
+                        LogicalProject(inputs=[0], exprs=[[$5, $15, $17, $18, $20]])
+                          JdbcTableScan(table=[[public, item]])
+                    LogicalProject(inputs=[0], exprs=[[$4, $8, $9, $14]])
+                      JdbcTableScan(table=[[public, customer]])
+                LogicalProject(inputs=[0], exprs=[[$8, $9, UPPER($10)]])
+                  JdbcTableScan(table=[[public, customer_address]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 2: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q34
+Equivalence without transformations: false
+LLM Equivalence A->B 1: true
+LLM Transformations A->B 1: [ReduceExpressionsRule.FilterReduceExpressionsRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&=($x,$x)&=($x,'Williamson County')&CASE(<($x,0),<(1.2:DECIMAL(2, 1),DIVIDE($x,$x)),false)&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&<(1.2:DECIMAL(2, 1),DIVIDE($x,CASE(=($x,0),null:INTEGER,$x)))&=($x,$x)&=($x,'Williamson County')&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), OR(=($6, 2000), =($6, +(2000, 1)), =($6, +(2000, 2))))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500          ', '1001-5000      ']:CHAR(15)), >($4, 0), CASE(>($4, 0), >(/($3, $4), 1.2:DECIMAL(2, 1)), false))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), SEARCH($6, Sarg[[2000..2002]]))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500':CHAR(9), '1001-5000']:CHAR(9)), >($4, 0), >(/($3, CASE(=($4, 0), null:INTEGER, $4)), 1.2:DECIMAL(2, 1)))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->B 2: true
+LLM Transformations A->B 2: [ReduceExpressionsRule.FilterReduceExpressionsRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&=($x,$x)&=($x,'Williamson County')&CASE(<($x,0),<(1.2:DECIMAL(2, 1),DIVIDE($x,$x)),false)&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&<(1.2:DECIMAL(2, 1),DIVIDE($x,CASE(=($x,0),null:INTEGER,$x)))&=($x,$x)&=($x,'Williamson County')&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), OR(=($6, 2000), =($6, +(2000, 1)), =($6, +(2000, 2))))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500          ', '1001-5000      ']:CHAR(15)), >($4, 0), CASE(>($4, 0), >(/($3, $4), 1.2:DECIMAL(2, 1)), false))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), SEARCH($6, Sarg[[2000..2002]]))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500':CHAR(9), '1001-5000']:CHAR(9)), >($4, 0), >(/($3, CASE(=($4, 0), null:INTEGER, $4)), 1.2:DECIMAL(2, 1)))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: []
+LLM Equivalence B->A 2: true
+LLM Transformations B->A 2: [ReduceExpressionsRule.FilterReduceExpressionsRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&<(1.2:DECIMAL(2, 1),DIVIDE($x,CASE(=($x,0),null:INTEGER,$x)))&=($x,$x)&=($x,'Williamson County')&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&=($x,$x)&=($x,'Williamson County')&CASE(<($x,0),<(1.2:DECIMAL(2, 1),DIVIDE($x,$x)),false)&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), SEARCH($6, Sarg[[2000..2002]]))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500':CHAR(9), '1001-5000']:CHAR(9)), >($4, 0), >(/($3, CASE(=($4, 0), null:INTEGER, $4)), 1.2:DECIMAL(2, 1)))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), OR(=($6, 2000), =($6, +(2000, 1)), =($6, +(2000, 2))))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500          ', '1001-5000      ']:CHAR(15)), >($4, 0), CASE(>($4, 0), >(/($3, $4), 1.2:DECIMAL(2, 1)), false))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): [ReduceExpressionsRule.FilterReduceExpressionsRule]
+LLM Equivalence 2 B->X: true
+LLM Transformations (B to X): []
+[Calcite.compareQueries] canonicalDigest Rel1: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&<(1.2:DECIMAL(2, 1),DIVIDE($x,CASE(=($x,0),null:INTEGER,$x)))&=($x,$x)&=($x,'Williamson County')&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort->Project[$x*]->Join(INNER,=($x,$x)&RANGE($x,15,20)){Aggregate(groups=[ss_customer_sk, ss_ticket_number], calls=[COUNT(*)])->Join(INNER,<($x,0)&=($x,$x)&=($x,'Williamson County')&CASE(<($x,0),<(1.2:DECIMAL(2, 1),DIVIDE($x,$x)),false)&RANGE($x,1,3)&RANGE($x,2000,2002)&SEARCH($x,'0-500')){Scan(public.date_dim)|Scan(public.household_demographics)|Scan(public.store)|Scan(public.store_sales)}|Scan(public.customer)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), SEARCH($6, Sarg[[2000..2002]]))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500':CHAR(9), '1001-5000']:CHAR(9)), >($4, 0), >(/($3, CASE(=($4, 0), null:INTEGER, $4)), 1.2:DECIMAL(2, 1)))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[DESC], dir4=[ASC])
+  LogicalProject(exprs=[[$6, $5, $4, $7, $0, $2]])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalFilter(condition=[SEARCH($2, Sarg[[15..20]])])
+        LogicalProject(exprs=[[$1, $0, $2]])
+          LogicalAggregate(group=[{0, 3}], cnt=[COUNT()])
+            LogicalJoin(condition=[AND(=($1, $5), =($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $2, $3, $4]])
+                LogicalJoin(condition=[=($0, $5)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$3, $5, $7, $9]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(SEARCH($9, Sarg[[1..3], [25..28]]), OR(=($6, 2000), =($6, +(2000, 1)), =($6, +(2000, 2))))])
+                      JdbcTableScan(table=[[public, date_dim]])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[=($23, 'Williamson County')])
+                    JdbcTableScan(table=[[public, store]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(SEARCH($2, Sarg['0-500':CHAR(9), '1001-5000']:CHAR(9)), >($4, 0), CASE(>($4, 0), >(/($3, $4), 1.2:DECIMAL(2, 1)), false))])
+                    JdbcTableScan(table=[[public, household_demographics]])
+      LogicalProject(inputs=[0], exprs=[[$7, $8, $9, $10]])
+        JdbcTableScan(table=[[public, customer]])
+
+
+Equivalence: false
+-----------------------------------------------------
+Query ID: TPCDS_Q41
+Equivalence without transformations: false
+LLM Equivalence A->B 1: true
+LLM Transformations A->B 1: [SemiJoinRule, FilterJoinRule.FilterIntoJoinRule, FilterJoinRule.JoinConditionPushRule, ReduceExpressionsRule.FilterReduceExpressionsRule, SortJoinTransposeRule, SortRemoveRedundantRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Filter(OR(<($x,0),AND(<(0,0:BIGINT)&IS_NULL($x))))->Join(LEFT,=($x,$x)){Filter(RANGE($x,704,744))->Scan(public.item)|Aggregate(groups=[i_manufact0], calls=[COUNT(*)])->Join(INNER,OR(AND($x&=($x,$x)),AND($x&=($x,$x)))){Aggregate(groups=[i_manufact], calls=[])->Filter(RANGE($x,704,744))->Scan(public.item)|Project[$x,OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime']))),OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))]->Scan(public.item)}}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Join(INNER,=($x,$x)&RANGE($x,704,744)){Aggregate(groups=[i_manufact], calls=[])->Filter(AND(IS_NOT_NULL($x)&OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))))->Scan(public.item)|Scan(public.item)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{21}])
+    LogicalFilter(condition=[OR(AND(IS NULL($23), >(0:BIGINT, 0)), >($23, 0))])
+      LogicalJoin(condition=[=($14, $22)], joinType=[left])
+        LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+          JdbcTableScan(table=[[public, item]])
+        LogicalAggregate(group=[{3}], item_cnt=[COUNT()])
+          LogicalJoin(condition=[OR(AND(=($0, $3), $1), AND(=($0, $3), $2))], joinType=[inner])
+            LogicalProject(exprs=[[$14, OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest              ', 'lime                ']:CHAR(20)), SEARCH($18, Sarg['Pallet    ', 'Pound     ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy                ', 'slate               ']:CHAR(20)), SEARCH($18, Sarg['Bunch     ', 'Gross     ']:CHAR(10)), SEARCH($15, Sarg['extra large         ', 'petite              ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder              ', 'sky                 ']:CHAR(20)), SEARCH($18, Sarg['Dozen     ', 'Lb        ']:CHAR(10)), SEARCH($15, Sarg['N/A                 ', 'large               ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon              ', 'smoke               ']:CHAR(20)), SEARCH($18, Sarg['Case      ', 'Ounce     ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20)))), OR(AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine          ', 'dark                ']:CHAR(20)), SEARCH($18, Sarg['Tbl       ', 'Ton       ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted             ', 'plum                ']:CHAR(20)), SEARCH($18, Sarg['Box       ', 'Dram      ']:CHAR(10)), SEARCH($15, Sarg['extra large         ', 'petite              ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya              ', 'peach               ']:CHAR(20)), SEARCH($18, Sarg['Bundle    ', 'Carton    ']:CHAR(10)), SEARCH($15, Sarg['N/A                 ', 'large               ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick           ', 'sienna              ']:CHAR(20)), SEARCH($18, Sarg['Cup       ', 'Each      ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))))]])
+              JdbcTableScan(table=[[public, item]])
+            LogicalAggregate(group=[{14}])
+              LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+                JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{1}])
+    LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+      LogicalProject(exprs=[[$14, $21]])
+        LogicalFilter(condition=[SEARCH($13, Sarg[[704..744]])])
+          JdbcTableScan(table=[[public, item]])
+      LogicalAggregate(group=[{14}])
+        LogicalFilter(condition=[AND(OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest', 'lime':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Pallet', 'Pound':CHAR(6)]:CHAR(6)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy':CHAR(5), 'slate']:CHAR(5)), SEARCH($18, Sarg['Bunch', 'Gross']:CHAR(5)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder', 'sky':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Dozen', 'Lb':CHAR(5)]:CHAR(5)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon', 'smoke':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Case':CHAR(5), 'Ounce']:CHAR(5)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine', 'dark':CHAR(10)]:CHAR(10)), SEARCH($18, Sarg['Tbl', 'Ton']:CHAR(3)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted', 'plum':CHAR(7)]:CHAR(7)), SEARCH($18, Sarg['Box':CHAR(4), 'Dram']:CHAR(4)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya', 'peach':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Bundle', 'Carton']:CHAR(6)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick', 'sienna':CHAR(9)]:CHAR(9)), SEARCH($18, Sarg['Cup':CHAR(4), 'Each']:CHAR(4)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7)))), IS NOT NULL($14))])
+          JdbcTableScan(table=[[public, item]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->B 2: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: [JoinToCorrelateRule, FilterCorrelateRule, SortJoinTransposeRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Join(INNER,=($x,$x)&RANGE($x,704,744)){Aggregate(groups=[i_manufact], calls=[])->Filter(AND(IS_NOT_NULL($x)&OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))))->Scan(public.item)|Scan(public.item)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Filter(OR(<($x,0),AND(<(0,0:BIGINT)&IS_NULL($x))))->Join(LEFT,=($x,$x)){Filter(RANGE($x,704,744))->Scan(public.item)|Aggregate(groups=[i_manufact0], calls=[COUNT(*)])->Join(INNER,OR(AND($x&=($x,$x)),AND($x&=($x,$x)))){Aggregate(groups=[i_manufact], calls=[])->Filter(RANGE($x,704,744))->Scan(public.item)|Project[$x,OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime']))),OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))]->Scan(public.item)}}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{1}])
+    LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+      LogicalProject(exprs=[[$14, $21]])
+        LogicalFilter(condition=[SEARCH($13, Sarg[[704..744]])])
+          JdbcTableScan(table=[[public, item]])
+      LogicalAggregate(group=[{14}])
+        LogicalFilter(condition=[AND(OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest', 'lime':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Pallet', 'Pound':CHAR(6)]:CHAR(6)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy':CHAR(5), 'slate']:CHAR(5)), SEARCH($18, Sarg['Bunch', 'Gross']:CHAR(5)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder', 'sky':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Dozen', 'Lb':CHAR(5)]:CHAR(5)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon', 'smoke':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Case':CHAR(5), 'Ounce']:CHAR(5)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine', 'dark':CHAR(10)]:CHAR(10)), SEARCH($18, Sarg['Tbl', 'Ton']:CHAR(3)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted', 'plum':CHAR(7)]:CHAR(7)), SEARCH($18, Sarg['Box':CHAR(4), 'Dram']:CHAR(4)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya', 'peach':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Bundle', 'Carton']:CHAR(6)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick', 'sienna':CHAR(9)]:CHAR(9)), SEARCH($18, Sarg['Cup':CHAR(4), 'Each']:CHAR(4)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7)))), IS NOT NULL($14))])
+          JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{21}])
+    LogicalFilter(condition=[OR(AND(IS NULL($23), >(0:BIGINT, 0)), >($23, 0))])
+      LogicalJoin(condition=[=($14, $22)], joinType=[left])
+        LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+          JdbcTableScan(table=[[public, item]])
+        LogicalAggregate(group=[{3}], item_cnt=[COUNT()])
+          LogicalJoin(condition=[OR(AND(=($0, $3), $1), AND(=($0, $3), $2))], joinType=[inner])
+            LogicalProject(exprs=[[$14, OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest              ', 'lime                ']:CHAR(20)), SEARCH($18, Sarg['Pallet    ', 'Pound     ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy                ', 'slate               ']:CHAR(20)), SEARCH($18, Sarg['Bunch     ', 'Gross     ']:CHAR(10)), SEARCH($15, Sarg['extra large         ', 'petite              ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder              ', 'sky                 ']:CHAR(20)), SEARCH($18, Sarg['Dozen     ', 'Lb        ']:CHAR(10)), SEARCH($15, Sarg['N/A                 ', 'large               ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon              ', 'smoke               ']:CHAR(20)), SEARCH($18, Sarg['Case      ', 'Ounce     ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20)))), OR(AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine          ', 'dark                ']:CHAR(20)), SEARCH($18, Sarg['Tbl       ', 'Ton       ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted             ', 'plum                ']:CHAR(20)), SEARCH($18, Sarg['Box       ', 'Dram      ']:CHAR(10)), SEARCH($15, Sarg['extra large         ', 'petite              ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya              ', 'peach               ']:CHAR(20)), SEARCH($18, Sarg['Bundle    ', 'Carton    ']:CHAR(10)), SEARCH($15, Sarg['N/A                 ', 'large               ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick           ', 'sienna              ']:CHAR(20)), SEARCH($18, Sarg['Cup       ', 'Each      ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))))]])
+              JdbcTableScan(table=[[public, item]])
+            LogicalAggregate(group=[{14}])
+              LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+                JdbcTableScan(table=[[public, item]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 2: true
+LLM Transformations B->A 2: [SortJoinTransposeRule, JoinToCorrelateRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Join(INNER,=($x,$x)&RANGE($x,704,744)){Aggregate(groups=[i_manufact], calls=[])->Filter(AND(IS_NOT_NULL($x)&OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))))->Scan(public.item)|Scan(public.item)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Filter(OR(<($x,0),AND(<(0,0:BIGINT)&IS_NULL($x))))->Join(LEFT,=($x,$x)){Filter(RANGE($x,704,744))->Scan(public.item)|Aggregate(groups=[i_manufact0], calls=[COUNT(*)])->Join(INNER,OR(AND($x&=($x,$x)),AND($x&=($x,$x)))){Aggregate(groups=[i_manufact], calls=[])->Filter(RANGE($x,704,744))->Scan(public.item)|Project[$x,OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime']))),OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))]->Scan(public.item)}}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{1}])
+    LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+      LogicalProject(exprs=[[$14, $21]])
+        LogicalFilter(condition=[SEARCH($13, Sarg[[704..744]])])
+          JdbcTableScan(table=[[public, item]])
+      LogicalAggregate(group=[{14}])
+        LogicalFilter(condition=[AND(OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest', 'lime':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Pallet', 'Pound':CHAR(6)]:CHAR(6)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy':CHAR(5), 'slate']:CHAR(5)), SEARCH($18, Sarg['Bunch', 'Gross']:CHAR(5)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder', 'sky':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Dozen', 'Lb':CHAR(5)]:CHAR(5)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon', 'smoke':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Case':CHAR(5), 'Ounce']:CHAR(5)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine', 'dark':CHAR(10)]:CHAR(10)), SEARCH($18, Sarg['Tbl', 'Ton']:CHAR(3)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted', 'plum':CHAR(7)]:CHAR(7)), SEARCH($18, Sarg['Box':CHAR(4), 'Dram']:CHAR(4)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya', 'peach':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Bundle', 'Carton']:CHAR(6)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick', 'sienna':CHAR(9)]:CHAR(9)), SEARCH($18, Sarg['Cup':CHAR(4), 'Each']:CHAR(4)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7)))), IS NOT NULL($14))])
+          JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{21}])
+    LogicalFilter(condition=[OR(AND(IS NULL($23), >(0:BIGINT, 0)), >($23, 0))])
+      LogicalJoin(condition=[=($14, $22)], joinType=[left])
+        LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+          JdbcTableScan(table=[[public, item]])
+        LogicalAggregate(group=[{3}], item_cnt=[COUNT()])
+          LogicalJoin(condition=[OR(AND(=($0, $3), $1), AND(=($0, $3), $2))], joinType=[inner])
+            LogicalProject(exprs=[[$14, OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest              ', 'lime                ']:CHAR(20)), SEARCH($18, Sarg['Pallet    ', 'Pound     ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy                ', 'slate               ']:CHAR(20)), SEARCH($18, Sarg['Bunch     ', 'Gross     ']:CHAR(10)), SEARCH($15, Sarg['extra large         ', 'petite              ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder              ', 'sky                 ']:CHAR(20)), SEARCH($18, Sarg['Dozen     ', 'Lb        ']:CHAR(10)), SEARCH($15, Sarg['N/A                 ', 'large               ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon              ', 'smoke               ']:CHAR(20)), SEARCH($18, Sarg['Case      ', 'Ounce     ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20)))), OR(AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine          ', 'dark                ']:CHAR(20)), SEARCH($18, Sarg['Tbl       ', 'Ton       ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted             ', 'plum                ']:CHAR(20)), SEARCH($18, Sarg['Box       ', 'Dram      ']:CHAR(10)), SEARCH($15, Sarg['extra large         ', 'petite              ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya              ', 'peach               ']:CHAR(20)), SEARCH($18, Sarg['Bundle    ', 'Carton    ']:CHAR(10)), SEARCH($15, Sarg['N/A                 ', 'large               ']:CHAR(20))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick           ', 'sienna              ']:CHAR(20)), SEARCH($18, Sarg['Cup       ', 'Each      ']:CHAR(10)), SEARCH($15, Sarg['economy             ', 'small               ']:CHAR(20))))]])
+              JdbcTableScan(table=[[public, item]])
+            LogicalAggregate(group=[{14}])
+              LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+                JdbcTableScan(table=[[public, item]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): [SemiJoinRule, ReduceExpressionsRule.FilterReduceExpressionsRule]
+LLM Equivalence 2 B->X: true
+LLM Transformations (B to X): [SortJoinTransposeRule, SemiJoinRemoveRule, JoinAddRedundantSemiJoinRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Join(INNER,=($x,$x)&RANGE($x,704,744)){Aggregate(groups=[i_manufact], calls=[])->Filter(AND(IS_NOT_NULL($x)&OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))))->Scan(public.item)|Scan(public.item)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST])->Aggregate(groups=[i_product_name], calls=[])->Join(INNER,<($x,0)&<=($x,704)&<=($x,PLUS(40,704))&=($x,$x)){Aggregate(groups=[i_manufact0], calls=[COUNT(*)])->Join(INNER,OR(AND($x&=($x,$x)),AND($x&=($x,$x)))){Aggregate(groups=[i_manufact], calls=[])->Filter(RANGE($x,704,744))->Scan(public.item)|Project[$x,OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Case', 'Ounce'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['maroon', 'smoke'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Dozen', 'Lb'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['powder', 'sky'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Bunch', 'Gross'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['navy', 'slate'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Pallet', 'Pound'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['forest', 'lime']))),OR(AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Bundle', 'Carton'])&SEARCH($x,Sarg['N/A', 'large'])&SEARCH($x,Sarg['papaya', 'peach'])),AND(RANGE($x,Men,Men)&SEARCH($x,Sarg['Cup', 'Each'])&SEARCH($x,Sarg['economy', 'small'])&SEARCH($x,Sarg['firebrick', 'sienna'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Box', 'Dram'])&SEARCH($x,Sarg['extra large', 'petite'])&SEARCH($x,Sarg['frosted', 'plum'])),AND(RANGE($x,Women,Women)&SEARCH($x,Sarg['Tbl', 'Ton'])&SEARCH($x,Sarg['aquamarine', 'dark'])&SEARCH($x,Sarg['economy', 'small'])))]->Scan(public.item)}|Scan(public.item)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{1}])
+    LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+      LogicalProject(exprs=[[$14, $21]])
+        LogicalFilter(condition=[SEARCH($13, Sarg[[704..744]])])
+          JdbcTableScan(table=[[public, item]])
+      LogicalAggregate(group=[{14}])
+        LogicalFilter(condition=[AND(OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest', 'lime':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Pallet', 'Pound':CHAR(6)]:CHAR(6)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy':CHAR(5), 'slate']:CHAR(5)), SEARCH($18, Sarg['Bunch', 'Gross']:CHAR(5)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder', 'sky':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Dozen', 'Lb':CHAR(5)]:CHAR(5)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon', 'smoke':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Case':CHAR(5), 'Ounce']:CHAR(5)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine', 'dark':CHAR(10)]:CHAR(10)), SEARCH($18, Sarg['Tbl', 'Ton']:CHAR(3)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted', 'plum':CHAR(7)]:CHAR(7)), SEARCH($18, Sarg['Box':CHAR(4), 'Dram']:CHAR(4)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya', 'peach':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Bundle', 'Carton']:CHAR(6)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick', 'sienna':CHAR(9)]:CHAR(9)), SEARCH($18, Sarg['Cup':CHAR(4), 'Each']:CHAR(4)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7)))), IS NOT NULL($14))])
+          JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], dir0=[ASC], fetch=[100])
+  LogicalAggregate(group=[{1}])
+    LogicalJoin(condition=[=($0, $2)], joinType=[inner])
+      LogicalProject(exprs=[[$14, $21]])
+        LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+          JdbcTableScan(table=[[public, item]])
+      LogicalProject(inputs=[0])
+        LogicalFilter(condition=[>($1, 0)])
+          LogicalAggregate(group=[{3}], item_cnt=[COUNT()])
+            LogicalJoin(condition=[OR(AND(=($0, $3), $1), AND(=($0, $3), $2))], joinType=[inner])
+              LogicalProject(exprs=[[$14, OR(AND(=($12, 'Women'), SEARCH($17, Sarg['forest', 'lime':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Pallet', 'Pound':CHAR(6)]:CHAR(6)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['navy':CHAR(5), 'slate']:CHAR(5)), SEARCH($18, Sarg['Bunch', 'Gross']:CHAR(5)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['powder', 'sky':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Dozen', 'Lb':CHAR(5)]:CHAR(5)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['maroon', 'smoke':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Case':CHAR(5), 'Ounce']:CHAR(5)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7)))), OR(AND(=($12, 'Women'), SEARCH($17, Sarg['aquamarine', 'dark':CHAR(10)]:CHAR(10)), SEARCH($18, Sarg['Tbl', 'Ton']:CHAR(3)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))), AND(=($12, 'Women'), SEARCH($17, Sarg['frosted', 'plum':CHAR(7)]:CHAR(7)), SEARCH($18, Sarg['Box':CHAR(4), 'Dram']:CHAR(4)), SEARCH($15, Sarg['extra large', 'petite':CHAR(11)]:CHAR(11))), AND(=($12, 'Men'), SEARCH($17, Sarg['papaya', 'peach':CHAR(6)]:CHAR(6)), SEARCH($18, Sarg['Bundle', 'Carton']:CHAR(6)), SEARCH($15, Sarg['N/A':CHAR(5), 'large']:CHAR(5))), AND(=($12, 'Men'), SEARCH($17, Sarg['firebrick', 'sienna':CHAR(9)]:CHAR(9)), SEARCH($18, Sarg['Cup':CHAR(4), 'Each']:CHAR(4)), SEARCH($15, Sarg['economy', 'small':CHAR(7)]:CHAR(7))))]])
+                JdbcTableScan(table=[[public, item]])
+              LogicalAggregate(group=[{14}])
+                LogicalFilter(condition=[AND(>=($13, 704), <=($13, +(704, 40)))])
+                  JdbcTableScan(table=[[public, item]])
+
+
+Equivalence: false
+-----------------------------------------------------
+Query ID: TPCDS_Q46
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q47
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q63
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q65
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: [JoinAssociateRule, AggregateJoinTransposeRule, FilterJoinRule.JoinConditionPushRule, SortJoinTransposeRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Project[$x*]->Join(INNER,<=($x,TIMES($x,0.1:DECIMAL(2, 1)))&=($x,$x)){Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,=($x,$x)&RANGE($x,1176,1187)){Scan(public.date_dim)|Scan(public.store_sales)}|Aggregate(groups=[ss_store_sk], calls=[AVG(revenue)])->Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,=($x,$x)&RANGE($x,1176,1187)){Scan(public.date_dim)|Scan(public.store_sales)}|Scan(public.item)|Scan(public.store)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Project[$x*]->Join(INNER,<=($x,TIMES($x,0.1:DECIMAL(2, 1)))&=($x,$x)&=($x,TIMES($x,0.1:DECIMAL(2, 1)))){Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,<=($x,1176)&<=($x,PLUS(11,1176))&=($x,$x)){Scan(public.date_dim)|Scan(public.store_sales)}|Aggregate(groups=[ss_store_sk], calls=[AVG(revenue)])->Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,<=($x,1176)&<=($x,PLUS(11,1176))&=($x,$x)){Scan(public.date_dim)|Scan(public.store_sales)}|Scan(public.item)|Scan(public.store)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalProject(exprs=[[$2, $4, $1, $5, $6, $7]])
+    LogicalJoin(condition=[=($3, $0)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $2, $4]])
+        LogicalJoin(condition=[=($3, $0)], joinType=[inner])
+          LogicalProject(inputs=[0..2])
+            LogicalJoin(condition=[AND(=($3, $0), <=($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $0, $2]])
+                LogicalAggregate(group=[{1, 2}], revenue=[SUM($3)])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                      JdbcTableScan(table=[[public, store_sales]])
+                    LogicalProject(inputs=[0])
+                      LogicalFilter(condition=[SEARCH($3, Sarg[[1176..1187]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+              LogicalProject(inputs=[0], exprs=[[*(0.1:DECIMAL(2, 1), $1)]])
+                LogicalAggregate(group=[{1}], ave=[AVG($2)])
+                  LogicalAggregate(group=[{1, 2}], revenue=[SUM($3)])
+                    LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                        JdbcTableScan(table=[[public, store_sales]])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[SEARCH($3, Sarg[[1176..1187]])])
+                          JdbcTableScan(table=[[public, date_dim]])
+          LogicalProject(inputs=[0], exprs=[[$5]])
+            JdbcTableScan(table=[[public, store]])
+      LogicalProject(inputs=[0], exprs=[[$4, $5, $6, $8]])
+        JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalProject(exprs=[[$1, $3, $9, $4, $5, $6]])
+    LogicalJoin(condition=[AND(=($2, $8), =($7, $0))], joinType=[inner])
+      LogicalJoin(condition=[true], joinType=[inner])
+        LogicalProject(inputs=[0], exprs=[[$5]])
+          JdbcTableScan(table=[[public, store]])
+        LogicalProject(inputs=[0], exprs=[[$4, $5, $6, $8]])
+          JdbcTableScan(table=[[public, item]])
+      LogicalProject(inputs=[0], exprs=[[$3, $4]])
+        LogicalJoin(condition=[AND(<=($4, $1), =($0, $2))], joinType=[inner])
+          LogicalProject(inputs=[0], exprs=[[*(0.1:DECIMAL(2, 1), $1)]])
+            LogicalAggregate(group=[{1}], ave=[AVG($2)])
+              LogicalAggregate(group=[{1, 2}], revenue=[SUM($3)])
+                LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                  LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                    JdbcTableScan(table=[[public, store_sales]])
+                  LogicalProject(inputs=[0])
+                    LogicalFilter(condition=[AND(>=($3, 1176), <=($3, +(1176, 11)))])
+                      JdbcTableScan(table=[[public, date_dim]])
+          LogicalProject(exprs=[[$1, $0, $2]])
+            LogicalAggregate(group=[{1, 2}], revenue=[SUM($3)])
+              LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                  JdbcTableScan(table=[[public, store_sales]])
+                LogicalProject(inputs=[0])
+                  LogicalFilter(condition=[AND(>=($3, 1176), <=($3, +(1176, 11)))])
+                    JdbcTableScan(table=[[public, date_dim]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 2: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): [JoinAssociateRule]
+LLM Equivalence 2 B->X: true
+LLM Transformations (B to X): [JoinToMultiJoinRule, FilterJoinRule.JoinConditionPushRule, MultiJoinOptimizeBushyRule, SortJoinTransposeRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Project[$x*]->Join(INNER,<=($x,TIMES($x,0.1:DECIMAL(2, 1)))&=($x,$x)){Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,=($x,$x)&RANGE($x,1176,1187)){Scan(public.date_dim)|Scan(public.store_sales)}|Aggregate(groups=[ss_store_sk], calls=[AVG(revenue)])->Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,=($x,$x)&RANGE($x,1176,1187)){Scan(public.date_dim)|Scan(public.store_sales)}|Scan(public.item)|Scan(public.store)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[0:ASCENDING:LAST, 1:ASCENDING:LAST])->Project[$x*]->Join(INNER,<=($x,TIMES($x,0.1:DECIMAL(2, 1)))&=($x,$x)&=($x,TIMES($x,0.1:DECIMAL(2, 1)))){Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,<=($x,1176)&<=($x,PLUS(11,1176))&=($x,$x)){Scan(public.date_dim)|Scan(public.store_sales)}|Aggregate(groups=[ss_store_sk], calls=[AVG(revenue)])->Aggregate(groups=[ss_item_sk, ss_store_sk], calls=[SUM(ss_sales_price)])->Join(INNER,<=($x,1176)&<=($x,PLUS(11,1176))&=($x,$x)){Scan(public.date_dim)|Scan(public.store_sales)}|Scan(public.item)|Scan(public.store)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalProject(exprs=[[$2, $4, $1, $5, $6, $7]])
+    LogicalJoin(condition=[=($3, $0)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $2, $4]])
+        LogicalJoin(condition=[=($3, $0)], joinType=[inner])
+          LogicalProject(inputs=[0..2])
+            LogicalJoin(condition=[AND(=($3, $0), <=($2, $4))], joinType=[inner])
+              LogicalProject(exprs=[[$1, $0, $2]])
+                LogicalAggregate(group=[{2, 3}], revenue=[SUM($4)])
+                  LogicalJoin(condition=[=($1, $0)], joinType=[inner])
+                    LogicalProject(inputs=[0])
+                      LogicalFilter(condition=[SEARCH($3, Sarg[[1176..1187]])])
+                        JdbcTableScan(table=[[public, date_dim]])
+                    LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                      JdbcTableScan(table=[[public, store_sales]])
+              LogicalProject(inputs=[0], exprs=[[*(0.1:DECIMAL(2, 1), $1)]])
+                LogicalAggregate(group=[{1}], ave=[AVG($2)])
+                  LogicalAggregate(group=[{2, 3}], revenue=[SUM($4)])
+                    LogicalJoin(condition=[=($1, $0)], joinType=[inner])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[SEARCH($3, Sarg[[1176..1187]])])
+                          JdbcTableScan(table=[[public, date_dim]])
+                      LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                        JdbcTableScan(table=[[public, store_sales]])
+          LogicalProject(inputs=[0], exprs=[[$5]])
+            JdbcTableScan(table=[[public, store]])
+      LogicalProject(inputs=[0], exprs=[[$4, $5, $6, $8]])
+        JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalProject(exprs=[[$1, $2, $7, $3, $4, $5]])
+    LogicalJoin(condition=[=($0, $6)], joinType=[inner])
+      LogicalProject(inputs=[0], exprs=[[$5]])
+        JdbcTableScan(table=[[public, store]])
+      LogicalProject(exprs=[[$1, $2, $3, $4, $5, $7]])
+        LogicalJoin(condition=[=($0, $6)], joinType=[inner])
+          LogicalProject(inputs=[0], exprs=[[$4, $5, $6, $8]])
+            JdbcTableScan(table=[[public, item]])
+          LogicalProject(inputs=[0], exprs=[[$3, $4]])
+            LogicalJoin(condition=[AND(>=($1, $4), =($0, $2))], joinType=[inner])
+              LogicalProject(inputs=[0], exprs=[[*(0.1:DECIMAL(2, 1), $1)]])
+                LogicalAggregate(group=[{1}], agg#0=[AVG($2)])
+                  LogicalAggregate(group=[{1, 2}], revenue=[SUM($3)])
+                    LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                      LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                        JdbcTableScan(table=[[public, store_sales]])
+                      LogicalProject(inputs=[0])
+                        LogicalFilter(condition=[AND(>=($3, 1176), <=($3, +(1176, 11)))])
+                          JdbcTableScan(table=[[public, date_dim]])
+              LogicalProject(exprs=[[$1, $0, $2]])
+                LogicalAggregate(group=[{1, 2}], revenue=[SUM($3)])
+                  LogicalJoin(condition=[=($0, $4)], joinType=[inner])
+                    LogicalProject(inputs=[0], exprs=[[$2, $7, $13]])
+                      JdbcTableScan(table=[[public, store_sales]])
+                    LogicalProject(inputs=[0])
+                      LogicalFilter(condition=[AND(>=($3, 1176), <=($3, +(1176, 11)))])
+                        JdbcTableScan(table=[[public, date_dim]])
+
+
+Equivalence: false
+-----------------------------------------------------
+Query ID: TPCDS_Q69
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q86
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: true
+LLM Transformations B->A 1: [SortProjectTransposeRule, ProjectRemoveRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[3:DESCENDING:FIRST, 5:ASCENDING:LAST, 4:ASCENDING:LAST])->Project[$x,$x,$x,PLUS($x,$x),RANK(),CASE(=(0:BIGINT,PLUS($x,$x)),$x,'null:CHAR(50)')]->Aggregate(groups=[i_category, i_class], calls=[GROUPING(i_category), GROUPING(i_class), SUM(ws_net_paid)])->Join(INNER,=($x,$x)&RANGE($x,1186,1197)){Scan(public.date_dim)|Scan(public.item)|Scan(public.web_sales)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[3:DESCENDING:FIRST, 5:ASCENDING:LAST, 4:ASCENDING:LAST])->Project[$x,$x,$x,PLUS($x,$x),RANK(),CASE(=(0:BIGINT,PLUS($x,$x)),$x,'null:CHAR(50)')]->Aggregate(groups=[i_category, i_class], calls=[GROUPING(i_category), GROUPING(i_class), SUM(ws_net_paid)])->Join(INNER,<=($x,1186)&<=($x,PLUS(11,1186))&=($x,$x)){Scan(public.date_dim)|Scan(public.item)|Scan(public.web_sales)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$3], sort1=[$5], sort2=[$4], dir0=[DESC], dir1=[ASC], dir2=[ASC], fetch=[100])
+  LogicalProject(exprs=[[$2, $1, $0, +($3, $4), RANK() OVER (PARTITION BY +($3, $4), CASE(=(+($3, $4), 0), $1, null:CHAR(50)) ORDER BY $2 DESC), CASE(=(+($3, $4), 0), $1, null:CHAR(50))]])
+    LogicalAggregate(group=[{5, 6}], groups=[[{5, 6}, {6}, {}]], total_sum=[SUM($2)], agg#1=[GROUPING($6)], agg#2=[GROUPING($5)])
+      LogicalJoin(condition=[AND(=($4, $1), =($3, $0))], joinType=[inner])
+        LogicalProject(inputs=[0], exprs=[[$3, $29]])
+          JdbcTableScan(table=[[public, web_sales]])
+        LogicalJoin(condition=[true], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[SEARCH($3, Sarg[[1186..1197]])])
+              JdbcTableScan(table=[[public, date_dim]])
+          LogicalProject(inputs=[0], exprs=[[$10, $12]])
+            JdbcTableScan(table=[[public, item]])
+
+
+Rel2: 
+LogicalSort(sort0=[$3], sort1=[$5], sort2=[$4], dir0=[DESC], dir1=[ASC], dir2=[ASC], fetch=[100])
+  LogicalProject(exprs=[[$2, $1, $0, +($3, $4), RANK() OVER (PARTITION BY +($3, $4), CASE(=($4, 0), $1, null:CHAR(50)) ORDER BY $2 DESC), CASE(=(+($3, $4), 0), $1, null:CHAR(50))]])
+    LogicalAggregate(group=[{5, 6}], groups=[[{5, 6}, {6}, {}]], total_sum=[SUM($2)], agg#1=[GROUPING($6)], agg#2=[GROUPING($5)])
+      LogicalJoin(condition=[AND(=($4, $1), =($3, $0))], joinType=[inner])
+        LogicalProject(inputs=[0], exprs=[[$3, $29]])
+          JdbcTableScan(table=[[public, web_sales]])
+        LogicalJoin(condition=[true], joinType=[inner])
+          LogicalProject(inputs=[0])
+            LogicalFilter(condition=[AND(>=($3, 1186), <=($3, +(1186, 11)))])
+              JdbcTableScan(table=[[public, date_dim]])
+          LogicalProject(inputs=[0], exprs=[[$10, $12]])
+            JdbcTableScan(table=[[public, item]])
+
+
+Equivalence with transformations: false
+LLM Equivalence B->A 2: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q89
+Equivalence without transformations: false
+LLM Equivalence A->B 1: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q93
+Equivalence without transformations: false
+LLM Equivalence A->B 1: true
+LLM Transformations A->B 1: [AggregateMergeRule, ReduceExpressionsRule.ProjectReduceExpressionsRule]
+[Calcite.compareQueries] canonicalDigest Rel1: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM(act_sales)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,CASE(IS_NOT_NULL($x),TIMES($x,MINUS($x,$x)),$x)]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,TIMES($x,$x)]->Scan(public.store_sales)|Project[$x*]->Scan(public.store_returns)}|Scan(public.reason)}
+[Calcite.compareQueries] canonicalDigest Rel2: Sort(fetch=100,order=[1:ASCENDING:LAST, 0:ASCENDING:LAST])->Aggregate(groups=[ss_customer_sk], calls=[SUM($f1)])->Join(INNER,=($x,$x)&=($x,'Package was damaged')){Project[$x,$x,TIMES($x,CASE(AND($x&IS_NOT_NULL($x)),MINUS($x,$x),$x))]->Join(LEFT,=($x,$x)){Project[$x,$x,$x,$x,$x,IS_NOT_NULL($x)]->Scan(public.store_sales)|Project[$x*]->Scan(public.store_returns)}|Scan(public.reason)}
+
+[Calcite.compareQueries] NOT EQUIVALENT
+
+
+Transformed Rel1: 
+LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0}], sumsales=[SUM($2)])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $7, CASE(IS NOT NULL($9), *(-($3, $9), $4), $5)]])
+        LogicalJoin(condition=[AND(=($6, $0), =($8, $2))], joinType=[left])
+          LogicalProject(exprs=[[$2, $3, $9, $10, $13, *($10, $13)]])
+            JdbcTableScan(table=[[public, store_sales]])
+          LogicalProject(exprs=[[$2, $8, $9, $10]])
+            JdbcTableScan(table=[[public, store_returns]])
+      LogicalProject(inputs=[0])
+        LogicalFilter(condition=[=($2, 'Package was damaged                                                                                 ')])
+          JdbcTableScan(table=[[public, reason]])
+
+
+Rel2: 
+LogicalSort(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100])
+  LogicalAggregate(group=[{0}], sumsales=[SUM($2)])
+    LogicalJoin(condition=[=($1, $3)], joinType=[inner])
+      LogicalProject(exprs=[[$1, $7, *(CASE(AND($5, IS NOT NULL($9)), -($3, $9), $3), $4)]])
+        LogicalJoin(condition=[AND(=($6, $0), =($8, $2))], joinType=[left])
+          LogicalProject(exprs=[[$2, $3, $9, $10, $13, IS NOT NULL($10)]])
+            JdbcTableScan(table=[[public, store_sales]])
+          LogicalProject(exprs=[[$2, $8, $9, $10]])
+            JdbcTableScan(table=[[public, store_returns]])
+      LogicalProject(inputs=[0])
+        LogicalFilter(condition=[=($2, 'Package was damaged                                                                                 ')])
+          JdbcTableScan(table=[[public, reason]])
+
+
+Equivalence with transformations: false
+LLM Equivalence A->B 2: false
+LLM Equivalence B->A 1: false
+LLM Equivalence A->X: true
+LLM Transformations (A to X): []
+LLM Equivalence 2 B->X: false
+-----------------------------------------------------
+Query ID: TPCDS_Q96
+Equivalence without transformations: false
+LLM Equivalence A->B 1: true
+LLM Transformations A->B 1: [SortRemoveRedundantRule]
+Equivalence with transformations: true

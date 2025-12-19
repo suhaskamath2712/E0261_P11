@@ -78,7 +78,7 @@ public class Test
     */
 
     private static final List<String> queryIDList = List.of(
-        "TPCDS_Q96"
+        "TPCDS_Q47"
     );
 
     //A1, F1 are not equivalent in reality

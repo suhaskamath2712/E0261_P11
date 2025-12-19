@@ -7,6 +7,7 @@ import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
+import org.json.JSONArray;
 
 /**
  * LLM helper for optional plan-level comparison assistance.
@@ -47,10 +48,14 @@ public class LLM
 
     private static final String PROMPT_1 = """
             System Message:
-            You are an expert in relational query optimization and Apache Calcite transformations.
-            Your job is to compare two PostgreSQL logical plans and decide whether they are
-            semantically equivalent, and if so, which Calcite transformations from
-            SUPPORTED_TRANSFORMATIONS can map ORIGINAL_PLAN_JSON to TARGET_PLAN_JSON.
+            You are an expert in relational query optimization and Apache Calcite rewrite rules.
+            Your job is to compare two cleaned PostgreSQL EXPLAIN (FORMAT JSON) plan trees
+            and decide whether they are semantically equivalent.
+            If they are equivalent, propose a short sequence of Apache Calcite transformation
+            rule names (from SUPPORTED_TRANSFORMATIONS) that would plausibly transform a Calcite
+            relational plan for the ORIGINAL query into one matching the TARGET query.
+            (Even though the input plans are PostgreSQL plans, your output rule names must be
+            Calcite rule names from the allow-list; do not invent names.)
             
             Hard constraints:
             - Always respond with exactly one JSON object matching the schema requested in
@@ -58,6 +63,8 @@ public class LLM
             - Only use transformation names that appear in SUPPORTED_TRANSFORMATIONS.
             - If you are not confident, use "equivalent":"dont_know" rather than guessing.
             - Assume temperature is effectively 0: your answers must be deterministic and reproducible.
+                        - Do NOT propose SQL rewrites or edits. Only propose transformation rule names.
+                        - Prefer the shortest valid transformation list (often 0-4 rules). Avoid long lists.
             
             TASK:
             Given ORIGINAL_PLAN_JSON and TARGET_PLAN_JSON (both in simplified JSON plan format),
@@ -77,17 +84,18 @@ public class LLM
             INPUTS PROVIDED (appended below this prompt):
             1) SCHEMA_SUMMARY: a compact JSON describing tables and primary/foreign keys.
                Use this only for reasoning about join keys, uniqueness, and nullability assumptions.
-            2) SUPPORTED_TRANSFORMATIONS: the exact set of allowed transformation names.
+                2) SUPPORTED_TRANSFORMATIONS: a JSON array containing the exact set of allowed
+                    transformation rule names.
             """;
 
     private static final String PROMPT_2 = """
-            RESPONSE SCHEMA (MUST return exactly this JSON object):
-            {
-              "reasoning": "Step-by-step analysis of whether ORIGINAL_PLAN_JSON can be transformed into TARGET_PLAN_JSON using SUPPORTED_TRANSFORMATIONS. Think carefully here before deciding on 'equivalent' and 'transformations'.",
-              "equivalent": <"true" | "false" | "dont_know">,
-              "transformations": [ <ordered list of exact transformation names from SUPPORTED_TRANSFORMATIONS> ],
-              "preconditions": [ <objects describing required preconditions for each transformation, in the same order as 'transformations'> ]
-            }
+                        RESPONSE SCHEMA (MUST return exactly ONE JSON object; copy this shape exactly):
+                        {
+                            "reasoning": "",
+                            "equivalent": "dont_know",
+                            "transformations": [],
+                            "preconditions": []
+                        }
             
             RULES:
             1) Use the "reasoning" field to think through the problem BEFORE choosing values for
@@ -105,42 +113,7 @@ public class LLM
                Keep preconditions short and specific.
             5) Do NOT invent any transformation names. If you are unsure, prefer "equivalent":"dont_know".
             6) Output NOTHING but the required JSON object. No markdown, no extra text, no comments.
-            
-            ONE-SHOT EXAMPLE:
-            SCHEMA_SUMMARY:
-            { "orders": {"pk":["o_orderkey"], "cols":["o_custkey","o_orderdate"]},
-              "customer":{"pk":["c_custkey"], "cols":["c_mktsegment"]} }
-            
-            SUPPORTED_TRANSFORMATIONS: ["AggregateProjectMergeRule","ProjectRemoveRule","JoinAssociateRule", ...]  // (full list)
-            
-            ORIGINAL_PLAN_JSON:
-            { "Node Type":"Join", "Join Type":"Inner",
-              "Plans":[
-                {"Node Type":"Project",
-                 "Plans":[{"Node Type":"Aggregate",
-                           "Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]}]},
-                {"Node Type":"TableScan","Relation Name":"customer"}
-              ],
-              "Join Cond":"(orders.o_custkey = customer.c_custkey)"
-            }
-            
-            TARGET_PLAN_JSON:
-            { "Node Type":"Join", "Join Type":"Inner",
-              "Plans":[
-                {"Node Type":"Aggregate",
-                 "Plans":[{"Node Type":"TableScan","Relation Name":"orders"}]},
-                {"Node Type":"TableScan","Relation Name":"customer"}
-              ],
-              "Join Cond":"(orders.o_custkey = customer.c_custkey)"
-            }
-            
-            EXPECTED_RESPONSE:
-            {
-              "reasoning": "The only difference is that in ORIGINAL_PLAN_JSON the left input has a Project on top of an Aggregate, whereas in TARGET_PLAN_JSON it is just the Aggregate. The Project appears to be redundant and can be merged into the Aggregate without changing semantics. AggregateProjectMergeRule is designed for exactly this pattern.",
-              "equivalent": "true",
-              "transformations": ["AggregateProjectMergeRule"],
-              "preconditions": [ { "requires": "Project directly on top of Aggregate with no column reordering or expression changes" } ]
-            }
+            7) The output MUST be valid JSON (double quotes, no trailing commas). Do not wrap in code fences.
             
             NOW PROCESS:
             """;
@@ -203,7 +176,9 @@ public class LLM
         // Build strict prompt including both plans and the allowed rule list
         StringBuilder sb = new StringBuilder();
         sb.append(PROMPT_1);
-        for (String t : SUPPORTED_TRANSFORMATIONS) sb.append(t).append('\n');
+        sb.append("\nSUPPORTED_TRANSFORMATIONS:\n");
+        sb.append(new JSONArray(SUPPORTED_TRANSFORMATIONS).toString());
+        sb.append('\n');
         sb.append(PROMPT_2);
 
         //Get database schemas
@@ -259,7 +234,9 @@ public class LLM
         // Build strict prompt including both plans and the allowed rule list
         StringBuilder sb = new StringBuilder();
         sb.append(PROMPT_1);
-        for (String t : SUPPORTED_TRANSFORMATIONS) sb.append(t).append('\n');
+        sb.append("\nSUPPORTED_TRANSFORMATIONS:\n");
+        sb.append(new JSONArray(SUPPORTED_TRANSFORMATIONS).toString());
+        sb.append('\n');
         sb.append(PROMPT_2);
 
         //Get database schemas
