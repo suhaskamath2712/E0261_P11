@@ -78,7 +78,22 @@ public class Test
     */
 
     private static final List<String> queryIDList = List.of(
-        "TPCDS_Q47"
+        "TPCDS_Q7", "TPCDS_Q8", "TPCDS_Q9", "TPCDS_Q10", "TPCDS_Q11", "TPCDS_Q12",
+        "TPCDS_Q13", "TPCDS_Q14", "TPCDS_Q15", "TPCDS_Q16", "TPCDS_Q17", "TPCDS_Q18",
+        "TPCDS_Q19", "TPCDS_Q20", "TPCDS_Q21", "TPCDS_Q22", "TPCDS_Q23", "TPCDS_Q24",
+        "TPCDS_Q25", "TPCDS_Q26", "TPCDS_Q27", "TPCDS_Q28", "TPCDS_Q29", "TPCDS_Q30",
+        "TPCDS_Q31", "TPCDS_Q32", "TPCDS_Q33", "TPCDS_Q34", "TPCDS_Q35", "TPCDS_Q36",
+        "TPCDS_Q37", "TPCDS_Q38", "TPCDS_Q39", "TPCDS_Q40", "TPCDS_Q41", "TPCDS_Q42",
+        "TPCDS_Q43", "TPCDS_Q44", "TPCDS_Q45", "TPCDS_Q46", "TPCDS_Q47", "TPCDS_Q48",
+        "TPCDS_Q49", "TPCDS_Q50", "TPCDS_Q51", "TPCDS_Q52", "TPCDS_Q53", "TPCDS_Q54",
+        "TPCDS_Q55", "TPCDS_Q56", "TPCDS_Q57", "TPCDS_Q58", "TPCDS_Q59", "TPCDS_Q60",
+        "TPCDS_Q61", "TPCDS_Q62", "TPCDS_Q63", "TPCDS_Q64", "TPCDS_Q65", "TPCDS_Q66",
+        "TPCDS_Q67", "TPCDS_Q68", "TPCDS_Q69", "TPCDS_Q70", "TPCDS_Q71", "TPCDS_Q72",
+        "TPCDS_Q73", "TPCDS_Q74", "TPCDS_Q75", "TPCDS_Q76", "TPCDS_Q77", "TPCDS_Q78",
+        "TPCDS_Q79", "TPCDS_Q80", "TPCDS_Q81", "TPCDS_Q82", "TPCDS_Q83", "TPCDS_Q84",
+        "TPCDS_Q85", "TPCDS_Q86", "TPCDS_Q87", "TPCDS_Q88", "TPCDS_Q89", "TPCDS_Q90",
+        "TPCDS_Q91", "TPCDS_Q92", "TPCDS_Q93", "TPCDS_Q94", "TPCDS_Q95", "TPCDS_Q96",
+        "TPCDS_Q97", "TPCDS_Q98", "TPCDS_Q99"
     );
 
     //A1, F1 are not equivalent in reality
@@ -186,7 +201,20 @@ public class Test
             if (!llmResponse.areQueriesEquivalent()) continue;
 
             System.out.println("LLM Transformations (B to X): " + llmResponse.getTransformationSteps());
-            System.out.println("Equivalence: " + Calcite.compareQueries(sqlB, intermediateSql, llmResponse.getTransformationSteps()));
+            equivalence = Calcite.compareQueries(sqlB, intermediateSql, llmResponse.getTransformationSteps());
+            System.out.println("Equivalence: " + equivalence);
+
+            if (!equivalence)
+            {
+                llmResponse = LLM.getLLMResponse(sqlB, intermediateSql, llmResponse);
+                System.out.println("LLM Equivalence 2 B->X: " + llmResponse.areQueriesEquivalent());
+
+                if (!llmResponse.areQueriesEquivalent()) continue;
+
+                System.out.println("LLM Transformations (B to X): " + llmResponse.getTransformationSteps());
+                equivalence = Calcite.compareQueries(sqlB, intermediateSql, llmResponse.getTransformationSteps());
+                System.out.println("Equivalence: " + equivalence);
+            }
         } 
     }
 }

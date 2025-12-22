@@ -117,6 +117,48 @@ public class LLM
             
             NOW PROCESS:
             """;
+
+    private static final String PROMPT_3 = """
+            System Message:
+            You are an expert in relational query optimization and Apache Calcite rewrite rules.
+            Your job is to compare two cleaned PostgreSQL EXPLAIN (FORMAT JSON) plan trees
+            and decide whether they are semantically equivalent.
+            If they are equivalent, propose a short sequence of Apache Calcite transformation
+            rule names (from SUPPORTED_TRANSFORMATIONS) that would plausibly transform a Calcite
+            relational plan for the ORIGINAL query into one matching the TARGET query.
+            (Even though the input plans are PostgreSQL plans, your output rule names must be
+            Calcite rule names from the allow-list; do not invent names.)
+            
+            Hard constraints:
+            - Always respond with exactly one JSON object matching the schema requested in
+              RESPONSE SCHEMA. Do not output anything else (no prose outside JSON).
+            - Only use transformation names that appear in SUPPORTED_TRANSFORMATIONS.
+            - If you are not confident, use "equivalent":"dont_know" rather than guessing.
+            - Assume temperature is effectively 0: your answers must be deterministic and reproducible.
+                        - Do NOT propose SQL rewrites or edits. Only propose transformation rule names.
+                        - Prefer the shortest valid transformation list (often 0-4 rules). Avoid long lists.
+            
+            TASK:
+            Given ORIGINAL_PLAN_JSON and TARGET_PLAN_JSON (both in simplified JSON plan format),
+            and SCHEMA_SUMMARY (primary/foreign keys and basic table info),
+            decide whether they are equivalent. If equivalent, produce an ordered list of Apache
+            Calcite transformations (from SUPPORTED_TRANSFORMATIONS) that map
+            ORIGINAL_PLAN_JSON -> TARGET_PLAN_JSON.
+            
+            High-level reasoning steps (to be reflected in the 'reasoning' field of the JSON output):
+            1) Compare overall structure: root operators, join tree shape, grouping/aggregation, projections.
+            2) Compare key semantic properties: join keys, grouping keys, filter predicates, set-ops, limits.
+            3) Identify local structural differences that could be explained by a small number of known
+               transformations (e.g., project/aggregate/join/filter reorderings).
+            4) If a plausible sequence exists, list those transformations and their minimal preconditions.
+               Otherwise, return "equivalent":"dont_know".
+            
+            INPUTS PROVIDED (appended below this prompt):
+            1) SCHEMA_SUMMARY: a compact JSON describing tables and primary/foreign keys.
+               Use this only for reasoning about join keys, uniqueness, and nullability assumptions.
+                2) SUPPORTED_TRANSFORMATIONS: a JSON array containing the exact set of allowed
+                    transformation rule names.
+            """;
     
     /**
      * Transformation rule names the LLM is allowed to emit.
