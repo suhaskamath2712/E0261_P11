@@ -67,36 +67,23 @@ public class Test
         "TPCDS_Q91", "TPCDS_Q92", "TPCDS_Q93", "TPCDS_Q94", "TPCDS_Q95", "TPCDS_Q96",
         "TPCDS_Q97", "TPCDS_Q98", "TPCDS_Q99"
     );
-
-    private static final List<String> queryIDList = List.of(
-        "TPCDS_Q1", "TPCDS_Q5", "TPCDS_Q6", "TPCDS_Q9", "TPCDS_Q24",
-        "TPCDS_Q30", "TPCDS_Q34", "TPCDS_Q41", "TPCDS_Q44", "TPCDS_Q46",
-        "TPCDS_Q47", "TPCDS_Q53", "TPCDS_Q63", "TPCDS_Q65", "TPCDS_Q69",
-        "TPCDS_Q81", "TPCDS_Q86", "TPCDS_Q89", "TPCDS_Q93", "TPCDS_Q96"
-    );
-
     */
 
     private static final List<String> queryIDList = List.of(
-        "TPCDS_Q7", "TPCDS_Q8", "TPCDS_Q9", "TPCDS_Q10", "TPCDS_Q11", "TPCDS_Q12",
-        "TPCDS_Q13", "TPCDS_Q14", "TPCDS_Q15", "TPCDS_Q16", "TPCDS_Q17", "TPCDS_Q18",
-        "TPCDS_Q19", "TPCDS_Q20", "TPCDS_Q21", "TPCDS_Q22", "TPCDS_Q23", "TPCDS_Q24",
-        "TPCDS_Q25", "TPCDS_Q26", "TPCDS_Q27", "TPCDS_Q28", "TPCDS_Q29", "TPCDS_Q30",
-        "TPCDS_Q31", "TPCDS_Q32", "TPCDS_Q33", "TPCDS_Q34", "TPCDS_Q35", "TPCDS_Q36",
-        "TPCDS_Q37", "TPCDS_Q38", "TPCDS_Q39", "TPCDS_Q40", "TPCDS_Q41", "TPCDS_Q42",
-        "TPCDS_Q43", "TPCDS_Q44", "TPCDS_Q45", "TPCDS_Q46", "TPCDS_Q47", "TPCDS_Q48",
-        "TPCDS_Q49", "TPCDS_Q50", "TPCDS_Q51", "TPCDS_Q52", "TPCDS_Q53", "TPCDS_Q54",
-        "TPCDS_Q55", "TPCDS_Q56", "TPCDS_Q57", "TPCDS_Q58", "TPCDS_Q59", "TPCDS_Q60",
-        "TPCDS_Q61", "TPCDS_Q62", "TPCDS_Q63", "TPCDS_Q64", "TPCDS_Q65", "TPCDS_Q66",
-        "TPCDS_Q67", "TPCDS_Q68", "TPCDS_Q69", "TPCDS_Q70", "TPCDS_Q71", "TPCDS_Q72",
-        "TPCDS_Q73", "TPCDS_Q74", "TPCDS_Q75", "TPCDS_Q76", "TPCDS_Q77", "TPCDS_Q78",
-        "TPCDS_Q79", "TPCDS_Q80", "TPCDS_Q81", "TPCDS_Q82", "TPCDS_Q83", "TPCDS_Q84",
-        "TPCDS_Q85", "TPCDS_Q86", "TPCDS_Q87", "TPCDS_Q88", "TPCDS_Q89", "TPCDS_Q90",
-        "TPCDS_Q91", "TPCDS_Q92", "TPCDS_Q93", "TPCDS_Q94", "TPCDS_Q95", "TPCDS_Q96",
-        "TPCDS_Q97", "TPCDS_Q98", "TPCDS_Q99"
+        "TPCHN1", "TPCHN2", "TPCHN3", "TPCHN4", "TPCHN5", "TPCHN6", "TPCHN7", "TPCHN8", "TPCHN9", "TPCHN10",
+        "TPCHN11", "TPCHN12", "TPCHN13", "TPCHN14", "TPCHN15", "TPCHN16", "TPCHN17", "TPCHN18", "TPCHN19", "TPCHN20",
+        "TPCHN21", "TPCHN22", "TPCHN23", "TPCHN24", "TPCHN25", "TPCHN26", "TPCHN27", "TPCHN28", "TPCHN29", "TPCHN30",
+        "TPCHN31", "TPCHN32", "TPCHN33", "TPCHN34", "TPCHN35", "TPCHN36", "TPCHN37", "TPCHN38", "TPCHN39", "TPCHN40",
+        "TPCHN41", "TPCHN42", "TPCHN43", "TPCHN44", "TPCHN45", "TPCHN46", "TPCHN47", "TPCHN48", "TPCHN49", "TPCHN50",
+        "TPCHN51", "TPCHN52", "TPCHN53", "TPCHN54", "TPCHN55", "TPCHN56", "TPCHN57", "TPCHN58", "TPCHN59", "TPCHN60",
+        "TPCHN61", "TPCHN62", "TPCHN63", "TPCHN64", "TPCHN65", "TPCHN66", "TPCHN67", "TPCHN68", "TPCHN69", "TPCHN70",
+        "TPCHN71", "TPCHN72", "TPCHN73", "TPCHN74", "TPCHN75", "TPCHN76", "TPCHN77", "TPCHN78", "TPCHN79", "TPCHN80",
+        "TPCHN81", "TPCHN82", "TPCHN83", "TPCHN84", "TPCHN85", "TPCHN86", "TPCHN87", "TPCHN88", "TPCHN89", "TPCHN90",
+        "TPCHN91", "TPCHN92", "TPCHN93", "TPCHN94", "TPCHN95", "TPCHN96", "TPCHN97", "TPCHN98", "TPCHN99", "TPCHN100",
+        "TPCHN101", "TPCHN102", "TPCHN103", "TPCHN104", "TPCHN105", "TPCHN106", "TPCHN107", "TPCHN108", "TPCHN109", "TPCHN110",
+        "TPCHN111", "TPCHN112", "TPCHN113", "TPCHN114", "TPCHN115", "TPCHN116", "TPCHN117", "TPCHN118", "TPCHN119", "TPCHN120",
+        "TPCHN121", "TPCHN122", "TPCHN123", "TPCHN124", "TPCHN125", "TPCHN126"
     );
-
-    //A1, F1 are not equivalent in reality
 
     /**
      * Small demo entrypoint: builds two example SQL statements and prints the
@@ -120,7 +107,7 @@ public class Test
             if (equivalence)    continue;
 
             //ROUND 1 Check
-            LLMResponse llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            LLMResponse llmResponse = LLMEqual.getLLMResponse(sqlA, sqlB);
             System.out.println("LLM Equivalence A->B 1: " + llmResponse.areQueriesEquivalent());
 
             if (llmResponse.areQueriesEquivalent())
@@ -137,7 +124,7 @@ public class Test
             //ROUND 2 check - Only if round 1 gives equivalent but transformations are wrong
             if (llmResponse.areQueriesEquivalent())
             {
-                llmResponse = LLM.getLLMResponse(sqlA, sqlB, llmResponse);
+                llmResponse = LLMEqual.getLLMResponse(sqlA, sqlB, llmResponse);
                 System.out.println("LLM Equivalence A->B 2: " + llmResponse.areQueriesEquivalent());
 
                 if (llmResponse.areQueriesEquivalent())
@@ -153,7 +140,7 @@ public class Test
             }
 
             //Repeat round 1 & 2 for B->A
-            llmResponse = LLM.getLLMResponse(sqlB, sqlA);
+            llmResponse = LLMEqual.getLLMResponse(sqlB, sqlA);
             System.out.println("LLM Equivalence B->A 1: " + llmResponse.areQueriesEquivalent());
 
             if (llmResponse.areQueriesEquivalent())
@@ -170,7 +157,7 @@ public class Test
             //ROUND 2 check - Only if round 1 gives equivalent but transformations are wrong
             if (llmResponse.areQueriesEquivalent())
             {
-                llmResponse = LLM.getLLMResponse(sqlB, sqlA, llmResponse);
+                llmResponse = LLMEqual.getLLMResponse(sqlB, sqlA, llmResponse);
                 System.out.println("LLM Equivalence B->A 2: " + llmResponse.areQueriesEquivalent());
 
                 if (llmResponse.areQueriesEquivalent())
@@ -186,7 +173,7 @@ public class Test
             }
             
             //If still false, we try to get A -> X then B -> X transformations and check if they lead to same RelNode
-            llmResponse = LLM.getLLMResponse(sqlA, sqlB);
+            llmResponse = LLMEqual.getLLMResponse(sqlA, sqlB);
             System.out.println("LLM Equivalence A->X: " + llmResponse.areQueriesEquivalent());
 
             if (!llmResponse.areQueriesEquivalent()) continue;
@@ -195,7 +182,7 @@ public class Test
             System.out.println("LLM Transformations (A to X): " + llmResponse.getTransformationSteps());
             RelNode intermediateRel = Calcite.getOptimizedRelNode(Frameworks.getPlanner(Calcite.getFrameworkConfig()), sqlA);
             String intermediateSql = Calcite.relNodeToSql(intermediateRel);
-            llmResponse = LLM.getLLMResponse(sqlB, intermediateSql);
+            llmResponse = LLMEqual.getLLMResponse(sqlB, intermediateSql);
             System.out.println("LLM Equivalence 2 B->X: " + llmResponse.areQueriesEquivalent());
 
             if (!llmResponse.areQueriesEquivalent()) continue;
@@ -206,7 +193,7 @@ public class Test
 
             if (!equivalence)
             {
-                llmResponse = LLM.getLLMResponse(sqlB, intermediateSql, llmResponse);
+                llmResponse = LLMEqual.getLLMResponse(sqlB, intermediateSql, llmResponse);
                 System.out.println("LLM Equivalence 2 B->X: " + llmResponse.areQueriesEquivalent());
 
                 if (!llmResponse.areQueriesEquivalent()) continue;

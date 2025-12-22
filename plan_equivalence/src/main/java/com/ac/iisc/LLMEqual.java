@@ -3,57 +3,23 @@ package com.ac.iisc;
 import java.sql.SQLException;
 import java.util.List;
 
+import org.json.JSONArray;
+
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
-import org.json.JSONArray;
 
-/**
- * LLM helper for optional plan-level comparison assistance.
- *
- * Behavior changes / contract:
- * - Constructs a strict prompt that includes two cleaned plan JSON blobs and
- *   an allow-list of supported Calcite transformation names, sourced from transformation_list.txt.
- * - Performs a fast environment check for `OPENAI_API_KEY`; if missing, the
- *   helper returns a safe "not equivalent" contract string instead of
- *   attempting an interactive request.
- * - Contacts the OpenAI Responses API and extracts assistant text from the
- *   returned object; this extraction is defensive and will fall back to a
- *   non-equivalent response if parsing fails.
- * - The expected assistant output contract is a single JSON object with the
- *   following fields:
- *     - `reasoning`: free-form string containing step-by-step analysis.
- *     - `equivalent`: string; `"true"` | `"false"` | `"dont_know"`.
- *     - `transformations`: array of transformation names (may be empty).
- *     - `preconditions`: array of objects describing minimal preconditions for
- *       each listed transformation (same order as `transformations`).
- *   The implementation currently consumes only `equivalent` and
- *   `transformations`; additional fields are included for interpretability.
- *   The helper continues to accept the legacy line-oriented output format for
- *   backward compatibility.
- *
- * Note: LLM integration is optional and the rest of the toolchain works
- * without it. Keep credentials out of source control and ensure your JVM
- * process inherits `OPENAI_API_KEY` (restart terminal/IDE after `setx`).
- */
-public class LLM
+public class LLMEqual
 {
-    /**
-     * Default model used if no configuration is provided.
-     *
-     * Config key: {@code llm_model} in {@code config.properties}.
-     */
-    private static final String DEFAULT_LLM_MODEL = "gpt-5";
-
     private static final String PROMPT_1 = """
             System Message:
             You are an expert in relational query optimization and Apache Calcite rewrite rules.
-            Your job is to compare two cleaned PostgreSQL EXPLAIN (FORMAT JSON) plan trees
-            and decide whether they are semantically equivalent.
-            If they are equivalent, propose a short sequence of Apache Calcite transformation
-            rule names (from SUPPORTED_TRANSFORMATIONS) that would plausibly transform a Calcite
-            relational plan for the ORIGINAL query into one matching the TARGET query.
+            Your job is to compare two equivalent cleaned PostgreSQL EXPLAIN (FORMAT JSON) plan trees
+            and propose a short sequence of Apache Calcite transformation rule names (from 
+            SUPPORTED_TRANSFORMATIONS) that would transform a Calcite relational plan
+            for the ORIGINAL query into one matching the TARGET query.
+
             (Even though the input plans are PostgreSQL plans, your output rule names must be
             Calcite rule names from the allow-list; do not invent names.)
             
@@ -63,8 +29,8 @@ public class LLM
             - Only use transformation names that appear in SUPPORTED_TRANSFORMATIONS.
             - If you are not confident, use "equivalent":"dont_know" rather than guessing.
             - Assume temperature is effectively 0: your answers must be deterministic and reproducible.
-                        - Do NOT propose SQL rewrites or edits. Only propose transformation rule names.
-                        - Prefer the shortest valid transformation list (often 0-4 rules). Avoid long lists.
+            - Do NOT propose SQL rewrites or edits. Only propose transformation rule names.
+            - Prefer the shortest valid transformation list (often 0-4 rules). Avoid long lists.
             
             TASK:
             Given ORIGINAL_PLAN_JSON and TARGET_PLAN_JSON (both in simplified JSON plan format),
@@ -84,86 +50,38 @@ public class LLM
             INPUTS PROVIDED (appended below this prompt):
             1) SCHEMA_SUMMARY: a compact JSON describing tables and primary/foreign keys.
                Use this only for reasoning about join keys, uniqueness, and nullability assumptions.
-                2) SUPPORTED_TRANSFORMATIONS: a JSON array containing the exact set of allowed
-                    transformation rule names.
+            2) SUPPORTED_TRANSFORMATIONS: a JSON array containing the exact set of allowed
+                transformation rule names.
             """;
 
     private static final String PROMPT_2 = """
             RESPONSE SCHEMA (MUST return exactly ONE JSON object; copy this shape exactly):
             {
                 "reasoning": "",
-                "equivalent": "dont_know",
+                "equivalent": "true",
                 "transformations": [],
                 "preconditions": []
             }
             
             RULES:
             1) Use the "reasoning" field to think through the problem BEFORE choosing values for
-               "equivalent", "transformations", and "preconditions". This is where you do your
+               "transformations", and "preconditions". This is where you do your
                detailed comparison of ORIGINAL_PLAN_JSON and TARGET_PLAN_JSON.
-            2) If plans are structurally and semantically identical, return
-               "equivalent":"true", "transformations":[], and "preconditions":[].
-            3) Only use names from SUPPORTED_TRANSFORMATIONS. If none apply or you are not confident,
-               return "equivalent":"dont_know" with empty lists.
-            4) For each transformation listed, provide a corresponding precondition object describing
+            2) Only use names from SUPPORTED_TRANSFORMATIONS.
+            3) For each transformation listed, provide a corresponding precondition object describing
                the minimal, strictly necessary condition (for example:
                - node X is a Project directly on top of an Aggregate with no column reordering, or
                - a filter predicate P exists on a specific child, or
                - join keys (A = B) exist between two inputs).
                Keep preconditions short and specific.
-            5) Do NOT invent any transformation names. If you are unsure, prefer "equivalent":"dont_know".
-            6) Output NOTHING but the required JSON object. No markdown, no extra text, no comments.
-            7) The output MUST be valid JSON (double quotes, no trailing commas). Do not wrap in code fences.
+            4) Do NOT invent any transformation names. If you are unsure, prefer "equivalent":"dont_know".
+            5) Output NOTHING but the required JSON object. No markdown, no extra text, no comments.
+            6) The output MUST be valid JSON (double quotes, no trailing commas). Do not wrap in code fences.
             
             NOW PROCESS:
             """;
-    
-    /**
-     * Transformation rule names the LLM is allowed to emit.
-     * These correspond to Calcite CoreRules and are validated in LLMResponse.
-     * The list is now always sourced from transformation_list.txt and may change as that file changes.
-     * Keep the canonical names; unknown or misspelled names will be rejected.
-     */
-    public static final List<String> SUPPORTED_TRANSFORMATIONS;
-
-    static {
-        java.util.List<String> loaded = FileIO.readLinesResource("transformation_list.txt");
-        if (loaded == null || loaded.isEmpty()) {
-            SUPPORTED_TRANSFORMATIONS = List.of();
-        } else {
-            // transformation_list.txt historically contained "Name - Description" lines.
-            // Only keep the canonical transformation names (text before the first " - ").
-            java.util.List<String> names = new java.util.ArrayList<>();
-            for (String line : loaded) {
-                if (line == null) continue;
-                String s = line.trim();
-                if (s.isEmpty()) continue;
-                int idx = s.indexOf(" - ");
-                String name = (idx >= 0) ? s.substring(0, idx).trim() : s;
-                if (!name.isEmpty()) names.add(name);
-            }
-            SUPPORTED_TRANSFORMATIONS = List.copyOf(names);
-        }
-    }
-    
-    /**
-     * Public accessor so parser/validator code can check transformation names.
-     * The returned list is always in sync with transformation_list.txt.
-     */
-    public static List<String> getSupportedTransformations() {
-        // immutable List.of
-        return SUPPORTED_TRANSFORMATIONS;
-    }
-    /**
-     * Contact the LLM with two cleaned plan JSON strings and receive the assistant's
-     * text output. The method performs an environment check and a defensive
-     * extraction of assistant text from the response object.
-     *
-     * @param sqlAJSON cleaned JSON plan for query A (may be null)
-     * @param sqlBJSON cleaned JSON plan for query B (may be null)
-     * @return assistant text trimmed, or a safe "false\nNo transformations found" contract string on failure
-     */
-    public static String contactLLM(String sqlAJSON, String sqlBJSON)
+            
+    public static String contactLLM (String sqlAJSON, String sqlBJSON)
     {
         // Fail fast if API key is not present in the environment
         String apiKey = System.getenv("OPENAI_API_KEY");
@@ -177,7 +95,7 @@ public class LLM
         StringBuilder sb = new StringBuilder();
         sb.append(PROMPT_1);
         sb.append("\nSUPPORTED_TRANSFORMATIONS:\n");
-        sb.append(new JSONArray(SUPPORTED_TRANSFORMATIONS).toString());
+        sb.append(new JSONArray(LLM.SUPPORTED_TRANSFORMATIONS).toString());
         sb.append('\n');
         sb.append(PROMPT_2);
 
@@ -194,7 +112,7 @@ public class LLM
 
         // Contact the OpenAI Responses API using env configuration
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
-        String model = getConfiguredModel();
+        String model = LLM.getConfiguredModel();
 
         ResponseCreateParams params = ResponseCreateParams.builder()
             .input(prompt)
@@ -208,7 +126,7 @@ public class LLM
         // Best-effort extraction of assistant text content from the response.
         // If SDK accessors are unavailable, fall back to parsing the toString() output.
         String raw = resp.toString();
-        String contentText = extractAssistantText(raw);
+        String contentText = LLM.extractAssistantText(raw);
 
         if (contentText == null || contentText.isBlank()) {
             System.err.println("[LLM] Unable to extract assistant text from response; returning not equivalent.");
@@ -221,7 +139,7 @@ public class LLM
         return contentText.trim();
     }
 
-    public static String contactLLM(String sqlAJSON, String sqlBJSON, LLMResponse previousResponse)
+    public static String contactLLM (String sqlAJSON, String sqlBJSON, LLMResponse previousResponse)
     {
         // Fail fast if API key is not present in the environment
         String apiKey = System.getenv("OPENAI_API_KEY");
@@ -235,7 +153,7 @@ public class LLM
         StringBuilder sb = new StringBuilder();
         sb.append(PROMPT_1);
         sb.append("\nSUPPORTED_TRANSFORMATIONS:\n");
-        sb.append(new JSONArray(SUPPORTED_TRANSFORMATIONS).toString());
+        sb.append(new JSONArray(LLM.SUPPORTED_TRANSFORMATIONS).toString());
         sb.append('\n');
         sb.append(PROMPT_2);
 
@@ -247,7 +165,6 @@ public class LLM
         sb.append("\n\nTARGET_PLAN_JSON:\n").append(sqlBJSON == null ? "(null)" : sqlBJSON);
 
         sb.append("""
-                
                 The JSON object shown below was your previous response. It was judged incorrect
                 by an external equivalence checker. Carefully reconsider SCHEMA_SUMMARY,
                 ORIGINAL_PLAN_JSON, TARGET_PLAN_JSON, and SUPPORTED_TRANSFORMATIONS, then
@@ -261,7 +178,7 @@ public class LLM
 
         // Contact the OpenAI Responses API using env configuration
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
-        String model = getConfiguredModel();
+        String model = LLM.getConfiguredModel();
 
         ResponseCreateParams params = ResponseCreateParams.builder()
             .input(prompt)
@@ -275,7 +192,7 @@ public class LLM
         // Best-effort extraction of assistant text content from the response.
         // If SDK accessors are unavailable, fall back to parsing the toString() output.
         String raw = resp.toString();
-        String contentText = extractAssistantText(raw);
+        String contentText = LLM.extractAssistantText(raw);
 
         if (contentText == null || contentText.isBlank()) {
             System.err.println("[LLM] Unable to extract assistant text from response; returning not equivalent.");
@@ -286,19 +203,6 @@ public class LLM
         //System.out.println("LLM Assistant Text: " + contentText);
 
         return contentText.trim();
-    }
-
-    /**
-     * Reads the configured LLM model from {@code config.properties}.
-     *
-     * Uses {@link FileIO#getProperty(String, String)} so model selection can be changed without
-     * recompiling. Falls back to {@link #DEFAULT_LLM_MODEL} if missing/blank.
-     */
-    public static String getConfiguredModel() {
-        String v = FileIO.getProperty("llm_model", DEFAULT_LLM_MODEL);
-        if (v == null) return DEFAULT_LLM_MODEL;
-        v = v.trim();
-        return v.isEmpty() ? DEFAULT_LLM_MODEL : v;
     }
 
     public static LLMResponse getLLMResponse(String sqlA, String sqlB)
@@ -351,34 +255,5 @@ public class LLM
             System.err.println("[LLM] Unexpected LLM output format; treating as not equivalent. " + iae.getMessage());
             return new LLMResponse(false, List.of());
         }
-    }
-
-    // --- Helpers ---
-    /**
-     * Extract the assistant's text from the Response.toString() output.
-     * This is a fallback for environments where typed SDK getters are not available.
-     */
-    public static String extractAssistantText(String respString) {
-        if (respString == null) return null;
-        // Try to find the first occurrence of outputText=ResponseOutputText{... text=... , type=
-        int ot = respString.indexOf("outputText=ResponseOutputText{");
-        if (ot >= 0) {
-            int textIdx = respString.indexOf("text=", ot);
-            if (textIdx >= 0) {
-                int typeIdx = respString.indexOf(", type=", textIdx);
-                if (typeIdx > textIdx) {
-                    String slice = respString.substring(textIdx + 5, typeIdx).trim();
-                    // Remove any surrounding quotes if present (toString may omit)
-                    return slice;
-                }
-            }
-        }
-        // Fallback: try generic " text=" capture
-        int tIdx = respString.indexOf(" text=");
-        if (tIdx >= 0) {
-            int comma = respString.indexOf(",", tIdx + 6);
-            if (comma > tIdx) return respString.substring(tIdx + 6, comma).trim();
-        }
-        return null;
     }
 }

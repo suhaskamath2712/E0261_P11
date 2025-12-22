@@ -84,3 +84,24 @@ Common keys:
 - `documentation/code_reference.md` — class-by-class reference.
 - `documentation/documentation.md` — project-level notes and configuration.
 
+## Utilities
+
+This repository includes a couple of convenience Python utilities under `python_scripts/`.
+
+- `python_scripts/format_sql_queries.py` — split any SQL file into discrete statements and emit
+  an `original_queries.sql`-style file where each statement is preceded by a standardized
+  `-- Query ID: <id>` comment block. The script tries not to change SQL text; use `--pretty`
+  to optionally reindent/format using `sqlparse` (optional dependency).
+
+  Example:
+
+  ```bash
+  python3 python_scripts/format_sql_queries.py \
+    --input sql_queries/mutated_queries.sql \
+    --output sql_queries/mutated_queries_formatted.sql \
+    --id-prefix M --start-index 1
+  ```
+
+  Run `--help` for more options (preserve existing IDs, strip existing headers, description template).
+
+

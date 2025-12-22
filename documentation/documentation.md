@@ -79,4 +79,14 @@ Additional utilities
 
 - `Calcite.relNodeToSql(RelNode)` — helper to render a relational plan back to SQL (PostgreSQL dialect). It is a best-effort tool (returns `null` for correlated plans or on conversion errors).
 
+## Utility scripts
+
+The `python_scripts/` folder contains small helper scripts useful during development:
+
+- `format_sql_queries.py` — Breaks a monolithic `.sql` file into individual query blocks and emits
+  an `original_queries.sql`-style output where each block is preceded by a `-- Query ID: ...` header.
+  The script defaults to preserving the original SQL text and offers an optional `--pretty` flag
+  which uses `sqlparse` to reindent SQL for human readability.
+
+
 - Rel→SQL equality check — as an extra positive-only equivalence signal, the engine will attempt to render both RelNodes to SQL and compare normalized SQL text; if identical, the queries are treated as equivalent. This check is conservative and is not used to establish non-equivalence.
